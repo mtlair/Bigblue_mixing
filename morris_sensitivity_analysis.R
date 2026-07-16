@@ -20,12 +20,15 @@
 #     the entrained foam during the pressurized residence time t_hold before
 #     the nozzle (LSW r^3 ~ t kinetics, Henry's-law accelerated by pressure,
 #     damped by surfactant film coverage)
-#   * Two-stage atomization: (1) effervescent stage - the pre-gassed stream
-#     forms an annular liquid film around the expanding gas core at the
-#     primary orifice; ligament Rayleigh breakup plus flash-expansion
-#     shattering (Lund-type model); (2) traditional bi-fluid airblast stage
-#     (Rizk & Lefebvre) acting on the stage-1 spray; the stages combine as a
-#     soft-minimum
+#   * Effervescent-airblast hybrid exit plane: nothing atomizes in the feed
+#     line (confined flow); the entrained gas acts AT the bi-fluid exit,
+#     where its throat voidage thins the annular liquid film (reducing the
+#     characteristic length fed to the airblast correlation) and bubbles
+#     small enough to ride inside the films flash-shatter the fragments on
+#     the final letdown (multiplicative, gated by bubble size vs film
+#     thickness). The nozzle carries its own pressure ladder: liquid line
+#     P_feed -> mixing chamber P_chamber = 0.8 P_system -> near-choked
+#     throat -> ambient
 #   * Dryer energy/moisture balance: dryer gas flow rate mdot_gas_dry and
 #     inlet absolute humidity Y_in give co-current outlet temperature and
 #     relative humidity, which drive the drying Peclet number and the
@@ -75,7 +78,8 @@ set.seed(42)
 # residence before the nozzle; dryer gas flow and inlet humidity).
 factors <- data.frame(
   name = c("ALR",           # air-liquid mass ratio  m_G/m_L           [-]
-           "P_system",      # atomizing air pressure                   [Pa]
+           "P_system",      # atomizing air supply pressure            [Pa]
+           "P_feed",        # liquid feed line (hold) pressure         [Pa]
            "mdot_L",        # liquid feed mass flow                    [kg/s]
            "sigma",         # liquid surface tension                   [N/m]
            "mu_L",          # serum (continuous phase) viscosity       [Pa s]
@@ -95,14 +99,16 @@ factors <- data.frame(
            "Delta_pH",      # delta pH vs isoelectric point            [-]
            "I_strength",    # ionic strength                           [M]
            "Tg_polymer"),   # dry-polymer glass transition             [K]
-  min  = c( 1.0, 2.0e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05, 330,
-            0.10, 0.001, 280,   5, 0.000, 0.000, 0.000, 1.0e-4, 0.2, 1.0e-3, 280),
-  max  = c(10.0, 7.0e5, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40, 470,
-            1.00, 0.020, 330, 600, 0.020, 0.050, 0.050, 2.0e-2, 4.0, 5.0e-1, 380),
+  min  = c( 1.0, 2.0e5, 1.5e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05,
+            330, 0.10, 0.001, 280,   5, 0.000, 0.000, 0.000, 1.0e-4, 0.2,
+            1.0e-3, 280),
+  max  = c(10.0, 7.0e5, 1.0e6, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40,
+            470, 1.00, 0.020, 330, 600, 0.020, 0.050, 0.050, 2.0e-2, 4.0,
+            5.0e-1, 380),
   # sample wide-ranging positive factors log-uniformly
-  log  = c(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE,
-           TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE,
-           FALSE),
+  log  = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE,
+           FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE,
+           TRUE, FALSE),
   stringsAsFactors = FALSE
 )
 k <- nrow(factors)
@@ -142,13 +148,14 @@ HLB      <- 12        # surfactant HLB (foam stability driver)  [-]
 phi_m    <- 0.63      # Krieger-Dougherty max packing           [-]
 Tg_solv  <- 150       # solvent (monomer/plasticizer) Tg, Fox   [K]
 d_ratio  <- 0.10      # primary particle / aggregate size ratio [-]
-d_o_eff  <- 5.0e-4    # effervescent-stage orifice diameter     [m]
+C_cham   <- 0.80      # mixing chamber / air supply pressure    [-]
 k_rip0   <- 4.0e-15   # Ostwald ripening rate at 1 atm          [m3/s]
 cp_gas   <- 1005      # dryer gas heat capacity                 [J/kg K]
 h_fg     <- 2.30e6    # latent heat of water evaporation        [J/kg]
 
 spray_dry_model <- function(x) {
   ALR    <- x[["ALR"]];        P_G    <- x[["P_system"]]
+  P_F    <- x[["P_feed"]]
   mdot_L <- x[["mdot_L"]];     sigma  <- x[["sigma"]]
   mu_L   <- x[["mu_L"]];       rho_L  <- x[["rho_L"]]
   alpha0 <- x[["alpha_g_0"]];  D_b    <- x[["D_b"]]
@@ -186,27 +193,33 @@ spray_dry_model <- function(x) {
 
   ## --- Module 0d: Pressurized hold - coalescence / Ostwald ripening --------
   # LSW kinetics D^3 ~ t; Henry's-law gas solubility makes ripening faster
-  # under pressure, surfactant film coverage retards both mechanisms
-  k_rip <- k_rip0 * (P_G / P_atm) * (1 - 0.8 * theta_surf)
+  # under the liquid-line pressure, surfactant coverage retards both
+  k_rip <- k_rip0 * (P_F / P_atm) * (1 - 0.8 * theta_surf)
   D_b_h <- (D_b^3 + k_rip * t_hold)^(1/3)         # coarsened bubble size
 
   ## --- Module 0e: DLVO electrostatics (v47 Sect. 6) ------------------------
   E_rep     <- dpH * (1 / (1 + 10 * I_str)) * (1 - theta_surf)
   stability <- 1 + E_rep + 5 * theta_surf         # electrostatic + steric
 
-  ## --- Module 1: Feed properties -------------------------------------------
-  rho_G0    <- P_G / (R_air * T_feed)             # gas density at feed P
+  ## --- Module 1: Feed properties (at liquid-line pressure P_feed) ----------
+  rho_G0    <- P_F / (R_air * T_feed)             # entrained gas density
   rho_eff0  <- (1 - alpha_g) * rho_L + alpha_g * rho_G0   # rho_eff,z (HEM)
   mu_eff    <- mu_slurry * (1 + 2.5 * alpha_g)    # mu_eff,z (dilute-bubble)
   sigma_eff <- sigma * (1 - 0.5 * alpha_g)        # foam-reduced surface tension
 
-  ## --- Module 2: Two-phase conditioning (Boyle expansion to exit) ----------
-  r_exp   <- P_G / P_atm                          # expansion ratio
-  alpha_e <- alpha_g * r_exp / (1 - alpha_g + alpha_g * r_exp)
-  alpha_e <- min(alpha_e, 0.97)
-  D_b_e   <- D_b_h * r_exp^(1/3)                  # bubble growth D_b ~ P^-1/3
-  rho_Ge  <- P_atm / (R_air * T_feed)
-  rho_eff <- (1 - alpha_e) * rho_L + alpha_e * rho_Ge
+  ## --- Module 2: Nozzle pressure ladder & two-phase conditioning -----------
+  # liquid line P_feed -> mixing chamber -> near-choked throat -> ambient;
+  # alpha_g_0 is measured at line pressure, so all expansions reference P_feed
+  P_cham   <- C_cham * P_G                        # internal chamber pressure
+  P_throat <- max(P_atm, 0.53 * P_cham)           # near-choked throat pressure
+  r_th     <- max(P_F / P_throat, 1)              # feed -> throat expansion
+  r_exp    <- max(P_F / P_atm, 1)                 # feed -> ambient expansion
+  r_flash  <- max(P_throat / P_atm, 1)            # final letdown (shattering)
+  alpha_th <- min(alpha_g * r_th / (1 - alpha_g + alpha_g * r_th), 0.97)
+  alpha_e  <- min(alpha_g * r_exp / (1 - alpha_g + alpha_g * r_exp), 0.97)
+  D_b_e    <- D_b_h * r_exp^(1/3)                 # bubble growth D_b ~ P^-1/3
+  rho_Ge   <- P_atm / (R_air * T_feed)
+  rho_eff  <- (1 - alpha_e) * rho_L + alpha_e * rho_Ge
 
   ## --- Module 3: Nozzle hydraulics ------------------------------------------
   U_L <- mdot_L / (rho_L * A_L)                   # liquid exit velocity
@@ -216,24 +229,24 @@ spray_dry_model <- function(x) {
   U_rel <- max(U_G - U_L, 5)
   rho_A <- P_atm / (R_air * T_feed)               # ambient air density
 
-  ## --- Module 4a: Stage 1 - effervescent atomization (Lund-type) -----------
-  # at the primary orifice the entrained gas expands to a core; the liquid
-  # occupies an annular film whose thickness sets the ligament diameter
-  P_throat <- max(P_atm, 0.53 * P_G)              # near-choked throat pressure
-  r_th     <- P_G / P_throat
-  alpha_th <- min(alpha_g * r_th / (1 - alpha_g + alpha_g * r_th), 0.97)
-  t_film   <- (d_o_eff / 2) * (1 - sqrt(alpha_th))  # annular film thickness
-  # ligament ~ film thickness; Rayleigh breakup (x1.89), then flash-expansion
-  # bubble bursting shatters ligaments on depressurization to ambient
-  d_eff1   <- 1.89 * t_film / (1 + alpha_th * (r_exp - 1))^(1/3)
-
-  ## --- Module 4b: Stage 2 - bi-fluid airblast (Rizk & Lefebvre) ------------
-  SMD_ab <- 0.48 * D_h * (sigma_eff / (rho_A * U_rel^2 * D_h))^0.4 *
+  ## --- Module 4: Effervescent-airblast hybrid exit plane -------------------
+  # Confined flow cannot atomize: the entrained gas does its work AT the
+  # bi-fluid exit orifice, simultaneously with the airblast shear.
+  # (a) throat voidage of the entrained gas thins the annular liquid film,
+  #     shrinking the characteristic length the airblast correlation sees
+  t_film <- (D_h / 2) * (1 - sqrt(alpha_th))      # annular film thickness
+  L_c    <- max(2 * t_film, 0.02 * D_h)           # characteristic length
+  SMD_ab <- 0.48 * L_c * (sigma_eff / (rho_A * U_rel^2 * L_c))^0.4 *
               (1 + 1 / ALR)^0.4 +
-            0.15 * D_h * sqrt(mu_eff^2 / (sigma_eff * rho_L * D_h)) *
+            0.15 * L_c * sqrt(mu_eff^2 / (sigma_eff * rho_L * L_c)) *
               (1 + 1 / ALR)
-  # the airblast stage re-atomizes the stage-1 spray: soft-minimum blend
-  SMD <- (d_eff1^-3 + SMD_ab^-3)^(-1/3)
+  # (b) bubbles small enough to ride inside the films burst on the final
+  #     letdown and subdivide the fragments (multiplicative refinement);
+  #     coarse (post-hold) bubbles vent to the gas core instead
+  D_b_th  <- D_b_h * r_th^(1/3)                   # bubble size at the throat
+  g_in    <- 1 / (1 + D_b_th / t_film)            # fraction riding inside film
+  F_flash <- (1 + alpha_th * (r_flash - 1))^(-1/3)
+  SMD     <- SMD_ab * (1 - g_in * (1 - F_flash))
 
   ## --- Module 5: Secondary breakup (Weber-number correction) ---------------
   We_g <- rho_A * U_rel^2 * SMD / sigma_eff       # gas Weber number of drop

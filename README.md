@@ -16,14 +16,17 @@ stoichiometry (`theta_surf` from `C_surfactant`, `MW_surfactant`,
 Krieger–Dougherty crowding from feed solids (`phi_s`).
 
 Spray-line extensions beyond the reactor spec: pressurized-hold bubble
-coarsening (Ostwald ripening + coalescence over `t_hold`, pressure-
-accelerated, surfactant-retarded), two-stage atomization (a Lund-type
-effervescent stage — annular film, Rayleigh ligament breakup, flash-expansion
-shattering — feeding a traditional Rizk–Lefebvre bi-fluid airblast stage),
-and a co-current dryer energy/moisture balance (`mdot_gas_dry`, `Y_in` →
-outlet temperature and humidity driving the drying Péclet number and the
-sticky-point state). The v47 impeller closure (`v_tip`) was removed as
-belonging to an upstream unit operation. It screens 21 input factors with
+coarsening (Ostwald ripening + coalescence over `t_hold` at the liquid-line
+pressure `P_feed`, surfactant-retarded), an effervescent–airblast hybrid
+exit plane (nothing atomizes in the confined feed line; the entrained gas
+acts at the bi-fluid exit, where its throat voidage thins the annular liquid
+film feeding the Rizk–Lefebvre correlation, and bubbles smaller than the
+film flash-shatter the fragments on the final letdown), an explicit nozzle
+pressure ladder (`P_feed` → chamber `0.8·P_system` → near-choked throat →
+ambient), and a co-current dryer energy/moisture balance (`mdot_gas_dry`,
+`Y_in` → outlet temperature and humidity driving the drying Péclet number
+and the sticky-point state). The v47 impeller closure (`v_tip`) was removed
+as belonging to an upstream unit operation. It screens 22 input factors with
 the Morris elementary-effects method for seven outputs:
 
 | Output | Nomenclature symbol |
