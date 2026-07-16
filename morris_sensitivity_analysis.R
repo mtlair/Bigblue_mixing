@@ -10,15 +10,34 @@
 #   * Product glass transition: Fox equation on residual solvent -> Tg_eff,
 #     driving stickiness / pore collapse / caking above Tg
 #   * Surfactant molar stoichiometry: theta_surf from C_surfactant, MW and
-#     A_molecule vs dynamically sheared bubble surface area
+#     A_molecule vs colloid + bubble surface area
 #   * DLVO electrostatics: E_repulsion = dpH * Debye screening * (1-theta_surf),
 #     gating aggregation (skin onset) and fractal openness (D_f -> porosity)
 #   * Krieger-Dougherty crowding viscosity from feed solids (phi_s)
-#   * Impeller dissipation (v_tip) tearing bubbles and driving entrainment
 #
-# Module chain: Feed Properties -> Two-Phase Conditioning -> Nozzle
-# Hydraulics -> Primary Atomization -> Secondary Breakup -> Drying /
-# Particle Formation.
+# Spray-specific extensions beyond the v47 reactor spec:
+#   * Pressurized-hold bubble coarsening: Ostwald ripening + coalescence of
+#     the entrained foam during the pressurized residence time t_hold before
+#     the nozzle (LSW r^3 ~ t kinetics, Henry's-law accelerated by pressure,
+#     damped by surfactant film coverage)
+#   * Two-stage atomization: (1) effervescent stage - the pre-gassed stream
+#     forms an annular liquid film around the expanding gas core at the
+#     primary orifice; ligament Rayleigh breakup plus flash-expansion
+#     shattering (Lund-type model); (2) traditional bi-fluid airblast stage
+#     (Rizk & Lefebvre) acting on the stage-1 spray; the stages combine as a
+#     soft-minimum
+#   * Dryer energy/moisture balance: dryer gas flow rate mdot_gas_dry and
+#     inlet absolute humidity Y_in give co-current outlet temperature and
+#     relative humidity, which drive the drying Peclet number and the
+#     sticky-point state (replaces the former independent RH_gas knob)
+#
+# NOTE: the v47 impeller dissipation closure (v_tip) was removed - it belongs
+# to an upstream unit operation; its history is carried by the feed bubble
+# size D_b and the hold-time coarsening model.
+#
+# Module chain: Feed Properties -> Pressurized Hold -> Two-Phase
+# Conditioning -> Effervescent Stage -> Bi-Fluid Airblast Stage ->
+# Secondary Breakup -> Dryer Balance -> Particle Formation.
 #
 # Outputs screened (nomenclature-sheet symbols where they exist):
 #   1. D_particle     - final (dry) particle size                    [um]
@@ -51,8 +70,9 @@ set.seed(42)
 #   T_system   : dryer gas temperature                              [K]
 #   Delta_pH   : system delta pH vs isoelectric point               [pH units]
 #   I_strength : ionic strength (Debye screening driver)            [M]
-#   v_tip      : feed-tank impeller tip speed                       [m/s]
 # Others use the spray report's notation (sigma, mu_L, ALR, D_b, ...).
+# t_hold, mdot_gas_dry and Y_in are spray-line additions (pressurized
+# residence before the nozzle; dryer gas flow and inlet humidity).
 factors <- data.frame(
   name = c("ALR",           # air-liquid mass ratio  m_G/m_L           [-]
            "P_system",      # atomizing air pressure                   [Pa]
@@ -63,24 +83,26 @@ factors <- data.frame(
            "alpha_g_0",     # feed foam quality / gas entrainment      [-]
            "D_b",           # feed bubble diameter (before shear)      [m]
            "C_solid_mass",  # solid mass fraction in feed              [-]
-           "T_system",      # dryer gas temperature                    [K]
-           "RH_gas",        # dryer gas relative humidity              [-]
+           "T_system",      # dryer gas INLET temperature              [K]
+           "mdot_gas_dry",  # dryer gas mass flow rate                 [kg/s]
+           "Y_in",          # dryer gas inlet absolute humidity        [kg/kg]
            "T_feed",        # feed / atomizing air temperature         [K]
+           "t_hold",        # pressurized hold time before nozzle      [s]
            "C_monomer",     # residual monomer concentration           [-]
            "C_plasticizer", # plasticizer concentration                [-]
            "C_binder",      # binder concentration                     [-]
            "C_surfactant",  # formulated surfactant concentration      [-]
            "Delta_pH",      # delta pH vs isoelectric point            [-]
            "I_strength",    # ionic strength                           [M]
-           "v_tip",         # impeller tip speed (feed conditioning)   [m/s]
            "Tg_polymer"),   # dry-polymer glass transition             [K]
   min  = c( 1.0, 2.0e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05, 330,
-            0.01, 280, 0.000, 0.000, 0.000, 1.0e-4, 0.2, 1.0e-3,  2.0, 280),
+            0.10, 0.001, 280,   5, 0.000, 0.000, 0.000, 1.0e-4, 0.2, 1.0e-3, 280),
   max  = c(10.0, 7.0e5, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40, 470,
-            0.30, 330, 0.020, 0.050, 0.050, 2.0e-2, 4.0, 5.0e-1, 15.0, 380),
+            1.00, 0.020, 330, 600, 0.020, 0.050, 0.050, 2.0e-2, 4.0, 5.0e-1, 380),
   # sample wide-ranging positive factors log-uniformly
   log  = c(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE,
-           FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE),
+           TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE,
+           FALSE),
   stringsAsFactors = FALSE
 )
 k <- nrow(factors)
@@ -117,10 +139,13 @@ N_Av     <- 6.02214e23
 MW_surf  <- 0.400     # surfactant molecular weight             [kg/mol]
 A_molec  <- 0.5e-18   # surfactant molecule area capacity       [m2]
 HLB      <- 12        # surfactant HLB (foam stability driver)  [-]
-D_imp    <- 0.20      # impeller diameter                       [m]
 phi_m    <- 0.63      # Krieger-Dougherty max packing           [-]
 Tg_solv  <- 150       # solvent (monomer/plasticizer) Tg, Fox   [K]
 d_ratio  <- 0.10      # primary particle / aggregate size ratio [-]
+d_o_eff  <- 5.0e-4    # effervescent-stage orifice diameter     [m]
+k_rip0   <- 4.0e-15   # Ostwald ripening rate at 1 atm          [m3/s]
+cp_gas   <- 1005      # dryer gas heat capacity                 [J/kg K]
+h_fg     <- 2.30e6    # latent heat of water evaporation        [J/kg]
 
 spray_dry_model <- function(x) {
   ALR    <- x[["ALR"]];        P_G    <- x[["P_system"]]
@@ -128,12 +153,13 @@ spray_dry_model <- function(x) {
   mu_L   <- x[["mu_L"]];       rho_L  <- x[["rho_L"]]
   alpha0 <- x[["alpha_g_0"]];  D_b    <- x[["D_b"]]
   C_sol  <- x[["C_solid_mass"]]
-  T_gas  <- x[["T_system"]];   RH     <- x[["RH_gas"]]
-  T_feed <- x[["T_feed"]]
+  T_in   <- x[["T_system"]];   mdot_g <- x[["mdot_gas_dry"]]
+  Y_in   <- x[["Y_in"]];       T_feed <- x[["T_feed"]]
+  t_hold <- x[["t_hold"]]
   C_mono <- x[["C_monomer"]];  C_plas <- x[["C_plasticizer"]]
   C_bind <- x[["C_binder"]];   C_surf <- x[["C_surfactant"]]
   dpH    <- x[["Delta_pH"]];   I_str  <- x[["I_strength"]]
-  v_tip  <- x[["v_tip"]];      Tg_pol <- x[["Tg_polymer"]]
+  Tg_pol <- x[["Tg_polymer"]]
 
   ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
   # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
@@ -147,21 +173,22 @@ spray_dry_model <- function(x) {
   mu_slurry <- mu_serum *
                (1 - min(phi_s, 0.60) / phi_m)^(-2.5 * phi_m)
 
-  ## --- Module 0c: Impeller dissipation & bubble conditioning (v47 Sect. 2) -
-  eps_0D    <- 0.005 * v_tip^3 / D_imp
-  epsilon_A <- 1000 * tanh((eps_0D + 1e-4) / 1000)  # regularized driver
-  D_b_eff   <- D_b / (1 + 0.15 * epsilon_A^0.4)     # shear tears bubbles finer
-
-  ## --- Module 0d: Surfactant molar stoichiometry (v47 Sect. 5) -------------
+  ## --- Module 0c: Surfactant molar stoichiometry (v47 Sect. 5) -------------
   # monolayer capacity vs total interfacial demand: primary colloid surface
   # (3*phi_s/a per m3, the dominant sink) plus bubble surface (6*alpha/D_b)
   cap_area   <- (C_surf / MW_surf) * rho_L * N_Av * A_molec   # [m2/m3]
   part_area  <- 3 * phi_s / a_prim                            # [m2/m3]
-  gas_area   <- 6 * alpha0 / D_b_eff                          # [m2/m3]
+  gas_area   <- 6 * alpha0 / D_b                              # [m2/m3]
   theta_surf <- min(1, cap_area / (part_area + gas_area))
   Foam_Stab  <- 1 + 5 * theta_surf * (HLB / 10)
   # under-stabilized foam sheds entrained gas before the nozzle
   alpha_g    <- alpha0 * (0.3 + 0.7 * theta_surf)
+
+  ## --- Module 0d: Pressurized hold - coalescence / Ostwald ripening --------
+  # LSW kinetics D^3 ~ t; Henry's-law gas solubility makes ripening faster
+  # under pressure, surfactant film coverage retards both mechanisms
+  k_rip <- k_rip0 * (P_G / P_atm) * (1 - 0.8 * theta_surf)
+  D_b_h <- (D_b^3 + k_rip * t_hold)^(1/3)         # coarsened bubble size
 
   ## --- Module 0e: DLVO electrostatics (v47 Sect. 6) ------------------------
   E_rep     <- dpH * (1 / (1 + 10 * I_str)) * (1 - theta_surf)
@@ -177,7 +204,7 @@ spray_dry_model <- function(x) {
   r_exp   <- P_G / P_atm                          # expansion ratio
   alpha_e <- alpha_g * r_exp / (1 - alpha_g + alpha_g * r_exp)
   alpha_e <- min(alpha_e, 0.97)
-  D_b_e   <- D_b_eff * r_exp^(1/3)                # bubble growth D_b ~ P^-1/3
+  D_b_e   <- D_b_h * r_exp^(1/3)                  # bubble growth D_b ~ P^-1/3
   rho_Ge  <- P_atm / (R_air * T_feed)
   rho_eff <- (1 - alpha_e) * rho_L + alpha_e * rho_Ge
 
@@ -189,20 +216,42 @@ spray_dry_model <- function(x) {
   U_rel <- max(U_G - U_L, 5)
   rho_A <- P_atm / (R_air * T_feed)               # ambient air density
 
-  ## --- Module 4: Primary atomization (Rizk & Lefebvre plain-jet airblast) --
-  SMD <- 0.48 * D_h * (sigma_eff / (rho_A * U_rel^2 * D_h))^0.4 *
-           (1 + 1 / ALR)^0.4 +
-         0.15 * D_h * sqrt(mu_eff^2 / (sigma_eff * rho_L * D_h)) *
-           (1 + 1 / ALR)
+  ## --- Module 4a: Stage 1 - effervescent atomization (Lund-type) -----------
+  # at the primary orifice the entrained gas expands to a core; the liquid
+  # occupies an annular film whose thickness sets the ligament diameter
+  P_throat <- max(P_atm, 0.53 * P_G)              # near-choked throat pressure
+  r_th     <- P_G / P_throat
+  alpha_th <- min(alpha_g * r_th / (1 - alpha_g + alpha_g * r_th), 0.97)
+  t_film   <- (d_o_eff / 2) * (1 - sqrt(alpha_th))  # annular film thickness
+  # ligament ~ film thickness; Rayleigh breakup (x1.89), then flash-expansion
+  # bubble bursting shatters ligaments on depressurization to ambient
+  d_eff1   <- 1.89 * t_film / (1 + alpha_th * (r_exp - 1))^(1/3)
+
+  ## --- Module 4b: Stage 2 - bi-fluid airblast (Rizk & Lefebvre) ------------
+  SMD_ab <- 0.48 * D_h * (sigma_eff / (rho_A * U_rel^2 * D_h))^0.4 *
+              (1 + 1 / ALR)^0.4 +
+            0.15 * D_h * sqrt(mu_eff^2 / (sigma_eff * rho_L * D_h)) *
+              (1 + 1 / ALR)
+  # the airblast stage re-atomizes the stage-1 spray: soft-minimum blend
+  SMD <- (d_eff1^-3 + SMD_ab^-3)^(-1/3)
 
   ## --- Module 5: Secondary breakup (Weber-number correction) ---------------
   We_g <- rho_A * U_rel^2 * SMD / sigma_eff       # gas Weber number of drop
   f_sec <- 0.55 + 0.45 / (1 + We_g / 80)          # ~20-45 % diameter reduction
   d_drop <- SMD * f_sec                           # droplet Dv50 entering dryer
 
-  ## --- Module 6: Drying / particle formation -------------------------------
-  # d2-law evaporation coefficient, scaled by dryer driving force
-  kappa <- 5e-8 * pmax(T_gas - T_feed, 1) / 100 * (1 - RH)      # [m2/s]
+  ## --- Module 6a: Dryer energy / moisture balance (co-current) -------------
+  mdot_w <- mdot_L * (1 - C_sol)                  # water evaporation load
+  T_out  <- T_in - mdot_w * h_fg / (mdot_g * cp_gas)
+  T_out  <- max(T_out, T_feed + 2)                # saturated / underpowered dryer
+  Y_out  <- Y_in + mdot_w / mdot_g                # outlet absolute humidity
+  p_v    <- Y_out / (Y_out + 0.622) * P_atm       # vapour partial pressure
+  p_sat  <- 610.94 * exp(17.625 * (T_out - 273.15) / (T_out - 273.15 + 243.04))
+  RH_out <- min(p_v / p_sat, 0.99)                # outlet relative humidity
+
+  ## --- Module 6b: Drying kinetics -------------------------------------------
+  # d2-law evaporation coefficient, scaled by outlet-state driving force
+  kappa <- 5e-8 * pmax(T_out - T_feed, 1) / 100 * (1 - RH_out)  # [m2/s]
   # Stokes-Einstein diffusivity of primary colloid particles
   D_diff <- kB * T_feed / (6 * pi * mu_L * a_prim)              # [m2/s]
   Pe <- kappa / (8 * D_diff)                      # drying Peclet number
@@ -233,8 +282,9 @@ spray_dry_model <- function(x) {
   w_res  <- (0.5 * C_mono + C_plas) / (0.5 * C_mono + C_plas + C_sol)
   Tg_eff <- 1 / ((1 - w_res) / Tg_pol + w_res / Tg_solv)
 
-  # stickiness: particle temperature vs Tg_eff + 20 K sticky-point offset
-  T_particle <- 0.6 * T_gas + 0.4 * T_feed
+  # stickiness: particle temperature vs Tg_eff + 20 K sticky-point offset;
+  # in co-current drying particles approach the outlet gas temperature
+  T_particle <- 0.85 * T_out + 0.15 * T_feed
   S_stick <- 1 / (1 + exp(-(T_particle - (Tg_eff + 20)) / 10))
 
   # above Tg the matrix flows: pores collapse (unless skin-locked)
@@ -259,7 +309,8 @@ spray_dry_model <- function(x) {
               (1 - 0.15 * min(Softness / 25, 1))
   rho_tapped <- rho_env * f_pack
 
-  c(D_particle_um  = D_particle * 1e6,
+  c(d_droplet_um   = d_drop * 1e6,
+    D_particle_um  = D_particle * 1e6,
     theta_skin_z   = theta_skin,
     Omega_struct_z = Omega_struct,
     phi_porosity_z = phi_porosity,
@@ -357,7 +408,8 @@ stats_list <- setNames(lapply(ee_list, morris_stats), outputs)
 # -----------------------------------------------------------------------------
 dir.create("output", showWarnings = FALSE)
 
-titles <- c(D_particle_um  = "Final particle size  D_particle [um]",
+titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
+            D_particle_um  = "Final particle size  D_particle [um]",
             theta_skin_z   = "Skin formation  theta_skin,z [-]",
             Omega_struct_z = "Sphericity  Omega_struct,z [-]",
             phi_porosity_z = "Porosity  phi_porosity,z [-]",
@@ -381,8 +433,8 @@ plot_morris_panel <- function(st, title, n_label = 10) {
 }
 
 png(file.path("output", "morris_sensitivity_plots.png"),
-    width = 2400, height = 1500, res = 160)
-op <- par(mfrow = c(2, 3), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
+    width = 3000, height = 1500, res = 160)
+op <- par(mfrow = c(2, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
 for (o in outputs) plot_morris_panel(stats_list[[o]], titles[[o]])
 mtext(sprintf(paste("Morris screening: %d trajectories, %d levels, %d model",
                     "runs | dashed: sigma = mu* (non-linear/interacting),",
