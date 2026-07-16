@@ -6,8 +6,17 @@ spray
 `morris_sensitivity_analysis.R` implements the reduced-order two-fluid
 atomization + drying model from the deep-research report (Feed Properties →
 Two-Phase Conditioning → Nozzle Hydraulics → Primary Atomization → Secondary
-Breakup → Drying / Particle Formation) and screens its inputs with the Morris
-elementary-effects method for five outputs:
+Breakup → Drying / Particle Formation), extended with closures from the Latex
+Coagulation Engine Integrated Master Specification (v30.0.0 / R-Engine v47):
+Flory–Huggins free-volume swelling by residual solvent (`C_monomer`,
+`C_plasticizer`, `C_binder`), a Fox-equation product glass transition with
+stickiness / pore-collapse / caking above `Tg_eff`, surfactant molar
+stoichiometry (`theta_surf` from `C_surfactant`, `MW_surfactant`,
+`A_molecule`), DLVO electrostatics (`Delta_pH`, `I_strength`),
+Krieger–Dougherty crowding from feed solids (`phi_s`), and impeller
+dissipation (`v_tip`) conditioning bubble size and gas entrainment. It
+screens 20 input factors with the Morris elementary-effects method for six
+outputs:
 
 | Output | Nomenclature symbol |
 |---|---|
@@ -16,6 +25,7 @@ elementary-effects method for five outputs:
 | Particle sphericity | `Omega_struct,z` |
 | Particle porosity | `phi_porosity,z` |
 | Powder tapped density | `rho_tapped` (bulk analogue of `rho_colloid,out` / `SG_out`) |
+| Product glass transition | `Tg_eff` (Fox equation on residual solvent) |
 
 Run with:
 

@@ -2,18 +2,32 @@
 # =============================================================================
 # Morris (Elementary Effects) sensitivity analysis of the reduced-order
 # two-fluid (internal-mix) atomization + drying model described in
-# "deepresearchreport.md" (Feed Properties -> Two-Phase Conditioning ->
-# Nozzle Hydraulics -> Primary Atomization -> Secondary Breakup ->
-# Drying / Particle Formation).
+# "deepresearchreport.md", extended with closures from the Latex Coagulation
+# Engine Integrated Master Specification (v30.0.0 / R-Engine v47):
 #
-# Outputs screened (naming follows the "Latex Coagulation Engine: Master
-# Nomenclature" sheet where a symbol exists):
+#   * Flory-Huggins free-volume swelling: residual solvent (C_monomer +
+#     C_plasticizer) softens the matrix, Softness = (1+5 C_binder) exp(25 phi_solvent)
+#   * Product glass transition: Fox equation on residual solvent -> Tg_eff,
+#     driving stickiness / pore collapse / caking above Tg
+#   * Surfactant molar stoichiometry: theta_surf from C_surfactant, MW and
+#     A_molecule vs dynamically sheared bubble surface area
+#   * DLVO electrostatics: E_repulsion = dpH * Debye screening * (1-theta_surf),
+#     gating aggregation (skin onset) and fractal openness (D_f -> porosity)
+#   * Krieger-Dougherty crowding viscosity from feed solids (phi_s)
+#   * Impeller dissipation (v_tip) tearing bubbles and driving entrainment
+#
+# Module chain: Feed Properties -> Two-Phase Conditioning -> Nozzle
+# Hydraulics -> Primary Atomization -> Secondary Breakup -> Drying /
+# Particle Formation.
+#
+# Outputs screened (nomenclature-sheet symbols where they exist):
 #   1. D_particle     - final (dry) particle size                    [um]
 #   2. theta_skin_z   - skin network fraction (skin formation)       [-]
 #   3. Omega_struct_z - structural memory / sphericity state         [-]
 #   4. phi_porosity_z - total porosity (void fraction state)         [-]
 #   5. rho_tapped     - powder tapped density (bulk analogue of
 #                       rho_colloid_out / SG_out)                    [kg/m3]
+#   6. Tg_product     - effective product glass transition T_g,eff   [K]
 #
 # Method: Morris one-at-a-time screening. Uses the `sensitivity` package
 # (morris()) when installed; otherwise falls back to an internal base-R
@@ -29,29 +43,44 @@ set.seed(42)
 # -----------------------------------------------------------------------------
 # 1. Input factors and ranges
 # -----------------------------------------------------------------------------
-# Symbols follow the nomenclature sheet where available:
-#   C_solid_mass : solid mass fraction in feed (wt/wt)
-#   alpha_g_0    : total gas holdup of the feed (foam quality)      [-]
-#   T_system     : dryer gas temperature                            [K]
-#   P_system     : atomizing air (gas) supply pressure              [Pa]
-# Others use the report's spray notation (sigma, mu_L, ALR, D_b, ...).
-# Ranges are taken from the report's stated validity ranges / worked example.
+# Symbols follow the master nomenclature sheet where available:
+#   C_solid_mass, C_monomer, C_plasticizer, C_binder, C_surfactant : feed
+#     composition (wt/wt)
+#   alpha_g_0  : total gas holdup entrained in the feed foam        [-]
+#   P_system   : atomizing air / system supply pressure             [Pa]
+#   T_system   : dryer gas temperature                              [K]
+#   Delta_pH   : system delta pH vs isoelectric point               [pH units]
+#   I_strength : ionic strength (Debye screening driver)            [M]
+#   v_tip      : feed-tank impeller tip speed                       [m/s]
+# Others use the spray report's notation (sigma, mu_L, ALR, D_b, ...).
 factors <- data.frame(
-  name = c("ALR",          # air-liquid mass ratio  m_G/m_L            [-]
-           "P_system",     # atomizing air pressure                    [Pa]
-           "mdot_L",       # liquid feed mass flow                     [kg/s]
-           "sigma",        # liquid surface tension                    [N/m]
-           "mu_L",         # liquid (continuous phase) viscosity       [Pa s]
-           "rho_L",        # liquid (slurry) density                   [kg/m3]
-           "alpha_g_0",    # feed foam quality / gas holdup            [-]
-           "D_b",          # feed bubble diameter                      [m]
-           "C_solid_mass", # solid mass fraction in feed               [-]
-           "T_system",     # dryer gas temperature                     [K]
-           "RH_gas"),      # dryer gas relative humidity               [-]
-  min  = c( 1.0, 2.0e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05, 330, 0.01),
-  max  = c(10.0, 7.0e5, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40, 470, 0.30),
+  name = c("ALR",           # air-liquid mass ratio  m_G/m_L           [-]
+           "P_system",      # atomizing air pressure                   [Pa]
+           "mdot_L",        # liquid feed mass flow                    [kg/s]
+           "sigma",         # liquid surface tension                   [N/m]
+           "mu_L",          # serum (continuous phase) viscosity       [Pa s]
+           "rho_L",         # liquid (slurry) density                  [kg/m3]
+           "alpha_g_0",     # feed foam quality / gas entrainment      [-]
+           "D_b",           # feed bubble diameter (before shear)      [m]
+           "C_solid_mass",  # solid mass fraction in feed              [-]
+           "T_system",      # dryer gas temperature                    [K]
+           "RH_gas",        # dryer gas relative humidity              [-]
+           "T_feed",        # feed / atomizing air temperature         [K]
+           "C_monomer",     # residual monomer concentration           [-]
+           "C_plasticizer", # plasticizer concentration                [-]
+           "C_binder",      # binder concentration                     [-]
+           "C_surfactant",  # formulated surfactant concentration      [-]
+           "Delta_pH",      # delta pH vs isoelectric point            [-]
+           "I_strength",    # ionic strength                           [M]
+           "v_tip",         # impeller tip speed (feed conditioning)   [m/s]
+           "Tg_polymer"),   # dry-polymer glass transition             [K]
+  min  = c( 1.0, 2.0e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05, 330,
+            0.01, 280, 0.000, 0.000, 0.000, 1.0e-4, 0.2, 1.0e-3,  2.0, 280),
+  max  = c(10.0, 7.0e5, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40, 470,
+            0.30, 330, 0.020, 0.050, 0.050, 2.0e-2, 4.0, 5.0e-1, 15.0, 380),
   # sample wide-ranging positive factors log-uniformly
-  log  = c(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE),
+  log  = c(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE,
+           FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE),
   stringsAsFactors = FALSE
 )
 k <- nrow(factors)
@@ -72,47 +101,90 @@ scale_design <- function(X01) {
 }
 
 # -----------------------------------------------------------------------------
-# 2. Built-in reduced-order model (one row of physical inputs -> 5 outputs)
+# 2. Built-in reduced-order model (one row of physical inputs -> 6 outputs)
 # -----------------------------------------------------------------------------
-# Fixed constants / nozzle geometry (report worked example)
-P_atm   <- 1.013e5   # ambient pressure                     [Pa]
-T_feed  <- 300       # feed / ambient temperature           [K]
-R_air   <- 287       # gas constant, air                    [J/kg K]
-gamma_a <- 1.4       # heat capacity ratio, air             [-]
-A_L     <- 1.0e-6    # liquid passage area                  [m2]
-A_G     <- 5.0e-6    # gas passage area                     [m2]
-D_h     <- 1.0e-3    # nozzle hydraulic diameter            [m]
-rho_s   <- 1400      # dry solid (polymer) density          [kg/m3]
-a_prim  <- 1.0e-7    # primary colloid particle radius      [m]
-kB      <- 1.380649e-23
+# Fixed constants / nozzle geometry (report worked example + v47 defaults)
+P_atm    <- 1.013e5   # ambient pressure                        [Pa]
+R_air    <- 287       # gas constant, air                       [J/kg K]
+gamma_a  <- 1.4       # heat capacity ratio, air                [-]
+A_L      <- 1.0e-6    # liquid passage area                     [m2]
+A_G      <- 5.0e-6    # gas passage area                        [m2]
+D_h      <- 1.0e-3    # nozzle hydraulic diameter               [m]
+rho_s    <- 1400      # dry solid (polymer) density             [kg/m3]
+a_prim   <- 1.0e-7    # primary colloid particle radius         [m]
+kB       <- 1.380649e-23
+N_Av     <- 6.02214e23
+MW_surf  <- 0.400     # surfactant molecular weight             [kg/mol]
+A_molec  <- 0.5e-18   # surfactant molecule area capacity       [m2]
+HLB      <- 12        # surfactant HLB (foam stability driver)  [-]
+D_imp    <- 0.20      # impeller diameter                       [m]
+phi_m    <- 0.63      # Krieger-Dougherty max packing           [-]
+Tg_solv  <- 150       # solvent (monomer/plasticizer) Tg, Fox   [K]
+d_ratio  <- 0.10      # primary particle / aggregate size ratio [-]
 
 spray_dry_model <- function(x) {
-  ALR    <- x[["ALR"]];       P_G   <- x[["P_system"]]
-  mdot_L <- x[["mdot_L"]];    sigma <- x[["sigma"]]
-  mu_L   <- x[["mu_L"]];      rho_L <- x[["rho_L"]]
-  alpha0 <- x[["alpha_g_0"]]; D_b   <- x[["D_b"]]
+  ALR    <- x[["ALR"]];        P_G    <- x[["P_system"]]
+  mdot_L <- x[["mdot_L"]];     sigma  <- x[["sigma"]]
+  mu_L   <- x[["mu_L"]];       rho_L  <- x[["rho_L"]]
+  alpha0 <- x[["alpha_g_0"]];  D_b    <- x[["D_b"]]
   C_sol  <- x[["C_solid_mass"]]
-  T_gas  <- x[["T_system"]];  RH    <- x[["RH_gas"]]
+  T_gas  <- x[["T_system"]];   RH     <- x[["RH_gas"]]
+  T_feed <- x[["T_feed"]]
+  C_mono <- x[["C_monomer"]];  C_plas <- x[["C_plasticizer"]]
+  C_bind <- x[["C_binder"]];   C_surf <- x[["C_surfactant"]]
+  dpH    <- x[["Delta_pH"]];   I_str  <- x[["I_strength"]]
+  v_tip  <- x[["v_tip"]];      Tg_pol <- x[["Tg_polymer"]]
+
+  ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
+  # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
+  # matrix exponentially and independently of temperature
+  phi_solvent <- C_mono + C_plas
+  Softness    <- (1 + 5 * C_bind) * exp(25 * phi_solvent)
+
+  ## --- Module 0b: Feed rheology (Krieger-Dougherty crowding) ---------------
+  phi_s     <- C_sol * rho_L / rho_s              # solid phase volume fraction
+  mu_serum  <- mu_L * (1 + 10 * C_bind)           # binder thickening (K_fluid)
+  mu_slurry <- mu_serum *
+               (1 - min(phi_s, 0.60) / phi_m)^(-2.5 * phi_m)
+
+  ## --- Module 0c: Impeller dissipation & bubble conditioning (v47 Sect. 2) -
+  eps_0D    <- 0.005 * v_tip^3 / D_imp
+  epsilon_A <- 1000 * tanh((eps_0D + 1e-4) / 1000)  # regularized driver
+  D_b_eff   <- D_b / (1 + 0.15 * epsilon_A^0.4)     # shear tears bubbles finer
+
+  ## --- Module 0d: Surfactant molar stoichiometry (v47 Sect. 5) -------------
+  # monolayer capacity vs total interfacial demand: primary colloid surface
+  # (3*phi_s/a per m3, the dominant sink) plus bubble surface (6*alpha/D_b)
+  cap_area   <- (C_surf / MW_surf) * rho_L * N_Av * A_molec   # [m2/m3]
+  part_area  <- 3 * phi_s / a_prim                            # [m2/m3]
+  gas_area   <- 6 * alpha0 / D_b_eff                          # [m2/m3]
+  theta_surf <- min(1, cap_area / (part_area + gas_area))
+  Foam_Stab  <- 1 + 5 * theta_surf * (HLB / 10)
+  # under-stabilized foam sheds entrained gas before the nozzle
+  alpha_g    <- alpha0 * (0.3 + 0.7 * theta_surf)
+
+  ## --- Module 0e: DLVO electrostatics (v47 Sect. 6) ------------------------
+  E_rep     <- dpH * (1 / (1 + 10 * I_str)) * (1 - theta_surf)
+  stability <- 1 + E_rep + 5 * theta_surf         # electrostatic + steric
 
   ## --- Module 1: Feed properties -------------------------------------------
-  rho_G0   <- P_G / (R_air * T_feed)              # gas density at feed P
-  rho_eff0 <- (1 - alpha0) * rho_L + alpha0 * rho_G0   # rho_eff,z (HEM)
-  mu_eff   <- mu_L * (1 + 2.5 * alpha0)           # mu_eff,z (dilute-bubble)
-  sigma_eff<- sigma * (1 - 0.5 * alpha0)          # foam-reduced surface tension
+  rho_G0    <- P_G / (R_air * T_feed)             # gas density at feed P
+  rho_eff0  <- (1 - alpha_g) * rho_L + alpha_g * rho_G0   # rho_eff,z (HEM)
+  mu_eff    <- mu_slurry * (1 + 2.5 * alpha_g)    # mu_eff,z (dilute-bubble)
+  sigma_eff <- sigma * (1 - 0.5 * alpha_g)        # foam-reduced surface tension
 
   ## --- Module 2: Two-phase conditioning (Boyle expansion to exit) ----------
   r_exp   <- P_G / P_atm                          # expansion ratio
-  alpha_e <- alpha0 * r_exp / (1 - alpha0 + alpha0 * r_exp)  # exact volume rule
+  alpha_e <- alpha_g * r_exp / (1 - alpha_g + alpha_g * r_exp)
   alpha_e <- min(alpha_e, 0.97)
-  D_b_e   <- D_b * r_exp^(1/3)                    # bubble growth D_b ~ P^-1/3
+  D_b_e   <- D_b_eff * r_exp^(1/3)                # bubble growth D_b ~ P^-1/3
   rho_Ge  <- P_atm / (R_air * T_feed)
   rho_eff <- (1 - alpha_e) * rho_L + alpha_e * rho_Ge
 
   ## --- Module 3: Nozzle hydraulics ------------------------------------------
   U_L <- mdot_L / (rho_L * A_L)                   # liquid exit velocity
   # gas: fully-expanded isentropic velocity (choked upstream if P_G/P_atm>1.89)
-  T_exit <- T_gas * 0 + T_feed                    # air enters at feed temp
-  U_G <- 0.9 * sqrt(pmax(2 * gamma_a / (gamma_a - 1) * R_air * T_exit *
+  U_G <- 0.9 * sqrt(pmax(2 * gamma_a / (gamma_a - 1) * R_air * T_feed *
                          (1 - (P_atm / P_G)^((gamma_a - 1) / gamma_a)), 0))
   U_rel <- max(U_G - U_L, 5)
   rho_A <- P_atm / (R_air * T_feed)               # ambient air density
@@ -135,38 +207,64 @@ spray_dry_model <- function(x) {
   D_diff <- kB * T_feed / (6 * pi * mu_L * a_prim)              # [m2/s]
   Pe <- kappa / (8 * D_diff)                      # drying Peclet number
 
-  # theta_skin,z : skin network fraction, driven by Pe x solids loading
-  S_skin <- Pe * C_sol
-  theta_skin <- S_skin / (S_skin + 500)
+  # theta_skin,z : skin network fraction. Colloidal instability (low DLVO
+  # stability) accelerates shell aggregation; Flory-Huggins softness delays
+  # rigid lock-in (soft particles film-form instead of jamming)
+  S_skin <- Pe * C_sol * (1 + 1 / stability)
+  S_crit <- 500 * (1 + 0.05 * Softness)
+  theta_skin <- S_skin / (S_skin + S_crit)
+
+  # Fractal openness (v47 Sect. 9): unstable colloid -> DLCA, open flocs
+  # (low D_f, high structural porosity); stable -> compact RLCA packing
+  D_f <- 1.8 + 0.7 * min((stability - 1) / 5, 1)
+  phi_struct <- 0.30 * theta_skin * (1 - d_ratio^(3 - D_f))
 
   # alpha_trap,z : gas retained inside droplets - bubbles comparable to or
-  # larger than the droplet are shed during breakup, small ones survive
-  alpha_trap <- alpha_e / (1 + D_b_e / d_drop)
-  # drying-induced (skin-locked) porosity
-  phi_dry <- 0.25 * theta_skin * (1 - exp(-Pe / 2000))
-  # phi_porosity,z : total porosity (void fraction state)
-  phi_porosity <- alpha_trap + (1 - alpha_trap) * phi_dry
+  # larger than the droplet are shed during breakup; surfactant-stabilized
+  # films (theta_surf) resist rupture and hold gas in
+  alpha_trap <- alpha_e / (1 + D_b_e / d_drop) * (0.5 + 0.5 * theta_surf)
 
-  # Omega_struct,z : sphericity; high sigma & mu resist skin buckling/collapse
+  # phi_porosity,z : total porosity (void fraction state)
+  phi_porosity <- alpha_trap + (1 - alpha_trap) * phi_struct
+
+  ## --- Module 7: Product glass transition & thermal state ------------------
+  # Fox equation on residual solvent retained in the dry particle
+  # (monomer partially evaporates; plasticizer stays)
+  w_res  <- (0.5 * C_mono + C_plas) / (0.5 * C_mono + C_plas + C_sol)
+  Tg_eff <- 1 / ((1 - w_res) / Tg_pol + w_res / Tg_solv)
+
+  # stickiness: particle temperature vs Tg_eff + 20 K sticky-point offset
+  T_particle <- 0.6 * T_gas + 0.4 * T_feed
+  S_stick <- 1 / (1 + exp(-(T_particle - (Tg_eff + 20)) / 10))
+
+  # above Tg the matrix flows: pores collapse (unless skin-locked)
+  phi_porosity <- phi_porosity * (1 - 0.6 * S_stick * (1 - 0.5 * theta_skin))
+
+  # Omega_struct,z : sphericity; high sigma & mu resist skin buckling, a
+  # plasticized (soft) matrix re-rounds, and stickiness anneals dents
   resist <- (sigma_eff / 0.05) * (mu_eff / 0.01)^0.3
-  Omega_struct <- 1 - 0.55 * theta_skin / (1 + resist)
+  Omega_struct <- 1 - 0.55 * theta_skin / ((1 + resist) * (1 + 0.1 * Softness))
+  Omega_struct <- Omega_struct + (1 - Omega_struct) * 0.4 * S_stick
 
   # Final particle size: solids mass balance on one droplet
-  # solid volume fraction of droplet liquid phase (phi_s in nomenclature)
   D_particle <- d_drop * ((1 - alpha_trap) * rho_L * C_sol /
                           (rho_s * (1 - phi_porosity)))^(1/3)
 
-  # Envelope density and tapped density (bulk analogue of rho_colloid,out)
-  rho_env  <- (1 - phi_porosity) * rho_s
+  # Envelope density and tapped density (v47 Sect. 10 density closure);
+  # sticky / plasticized powders cake and pack worse, fines cohere
+  rho_env  <- (1 - phi_porosity) * rho_s + phi_porosity * 1.2
   f_pack   <- 0.64 * (0.55 + 0.45 * Omega_struct) *
-              (D_particle / (D_particle + 8e-6))   # cohesion penalty for fines
+              (D_particle / (D_particle + 8e-6)) *
+              (1 - 0.2 * S_stick) *
+              (1 - 0.15 * min(Softness / 25, 1))
   rho_tapped <- rho_env * f_pack
 
-  c(D_particle_um = D_particle * 1e6,
-    theta_skin_z  = theta_skin,
+  c(D_particle_um  = D_particle * 1e6,
+    theta_skin_z   = theta_skin,
     Omega_struct_z = Omega_struct,
     phi_porosity_z = phi_porosity,
-    rho_tapped    = rho_tapped)
+    rho_tapped     = rho_tapped,
+    Tg_product_K   = Tg_eff)
 }
 
 run_model <- function(X01) {
@@ -263,12 +361,12 @@ titles <- c(D_particle_um  = "Final particle size  D_particle [um]",
             theta_skin_z   = "Skin formation  theta_skin,z [-]",
             Omega_struct_z = "Sphericity  Omega_struct,z [-]",
             phi_porosity_z = "Porosity  phi_porosity,z [-]",
-            rho_tapped     = "Tapped density  rho_tapped [kg/m3]")
+            rho_tapped     = "Tapped density  rho_tapped [kg/m3]",
+            Tg_product_K   = "Product glass transition  Tg_eff [K]")
 
-plot_morris_panel <- function(st, title) {
-  xr <- range(st$mu.star); pad <- 0.12 * diff(xr); if (pad == 0) pad <- 1
+plot_morris_panel <- function(st, title, n_label = 10) {
   plot(st$mu.star, st$sigma,
-       xlim = c(0, max(st$mu.star) * 1.25 + pad * 0.01),
+       xlim = c(0, max(st$mu.star) * 1.25),
        ylim = c(0, max(st$sigma) * 1.30),
        pch = 21, bg = "steelblue", cex = 1.3,
        xlab = expression(mu * "*  (mean |elementary effect|)"),
@@ -276,20 +374,22 @@ plot_morris_panel <- function(st, title) {
        main = title, cex.main = 0.95)
   abline(0, 1, lty = 2, col = "grey55")           # sigma = mu* (non-linear)
   abline(0, 0.1, lty = 3, col = "grey70")         # sigma = 0.1 mu* (~linear)
-  text(st$mu.star, st$sigma, labels = st$factor, pos = 3, cex = 0.72,
-       offset = 0.35, xpd = NA)
+  # label only the strongest factors to keep panels readable
+  top <- order(-st$mu.star)[seq_len(min(n_label, nrow(st)))]
+  text(st$mu.star[top], st$sigma[top], labels = st$factor[top], pos = 3,
+       cex = 0.70, offset = 0.35, xpd = NA)
 }
 
 png(file.path("output", "morris_sensitivity_plots.png"),
-    width = 2200, height = 1500, res = 160)
-op <- par(mfrow = c(2, 3), mar = c(4.5, 4.5, 2.5, 1))
+    width = 2400, height = 1500, res = 160)
+op <- par(mfrow = c(2, 3), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
 for (o in outputs) plot_morris_panel(stats_list[[o]], titles[[o]])
-plot.new()
-legend("center", bty = "n", cex = 1.0, title = "Morris screening",
-       legend = c(sprintf("%d trajectories, %d levels", r_traj, levels),
-                  sprintf("%d model runs", nrow(Y)),
-                  "dashed: sigma = mu* (interaction / non-linear)",
-                  "dotted: sigma = 0.1 mu* (near-linear)"))
+mtext(sprintf(paste("Morris screening: %d trajectories, %d levels, %d model",
+                    "runs | dashed: sigma = mu* (non-linear/interacting),",
+                    "dotted: sigma = 0.1 mu* (near-linear) |",
+                    "top 10 factors labelled per panel"),
+              r_traj, levels, nrow(Y)),
+      side = 1, outer = TRUE, cex = 0.75, line = 1)
 par(op); dev.off()
 
 # -----------------------------------------------------------------------------
