@@ -26,12 +26,16 @@ pressure ladder (`P_feed` → chamber `0.8·P_system` → near-choked throat →
 ambient), and a co-current dryer energy/moisture balance (`mdot_gas_dry`,
 `Y_in` → outlet temperature and humidity driving the drying Péclet number
 and the sticky-point state). The v47 impeller closure (`v_tip`) was removed
-as belonging to an upstream unit operation. It screens 22 input factors with
-the Morris elementary-effects method for seven outputs:
+as belonging to an upstream unit operation. The droplet population is a
+three-mode volume mixture (main atomized mode, starved-air coarse tail,
+shear-strip/bubble-debris fine mode), so distribution quantiles and
+bimodality are screened alongside the means. It screens 22 input factors
+with the Morris elementary-effects method for twelve outputs:
 
 | Output | Nomenclature symbol |
 |---|---|
 | Spray droplet size | `Dv50` |
+| Distribution tails | `d10`, `d90`, `d99`, span, bimodality index |
 | Final particle size | `D_particle` |
 | Particle skin formation | `theta_skin,z` |
 | Particle sphericity | `Omega_struct,z` |

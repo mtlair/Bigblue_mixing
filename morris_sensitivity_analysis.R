@@ -248,10 +248,37 @@ spray_dry_model <- function(x) {
   F_flash <- (1 + alpha_th * (r_flash - 1))^(-1/3)
   SMD     <- SMD_ab * (1 - g_in * (1 - F_flash))
 
-  ## --- Module 5: Secondary breakup (Weber-number correction) ---------------
+  ## --- Module 5a: Secondary breakup (Weber-number correction) --------------
   We_g <- rho_A * U_rel^2 * SMD / sigma_eff       # gas Weber number of drop
   f_sec <- 0.55 + 0.45 / (1 + We_g / 80)          # ~20-45 % diameter reduction
-  d_drop <- SMD * f_sec                           # droplet Dv50 entering dryer
+  d_drop <- SMD * f_sec                           # droplet scale entering dryer
+
+  ## --- Module 5b: Droplet size distribution (three-mode volume mixture) ----
+  # Main atomized mode plus two tail mechanisms observed with pre-gassed
+  # feeds: (i) starved atomizing air leaves unbroken ligaments -> coarse
+  # tail (raises d90/d99), amplified by viscous resistance (Ohnesorge);
+  # (ii) excess atomizing air shear-strips satellites, and bursting bubble
+  # films add fine debris -> fine mode (bimodality, pulls d10 down)
+  E_a  <- ALR * U_rel^2                           # specific atomizing energy
+  Oh_e <- mu_eff / sqrt(rho_L * sigma_eff * L_c)  # viscous breakup resistance
+  w_c  <- min(0.6, 0.5 / (1 + E_a / 1.5e5) * (1 + 3 * Oh_e))   # coarse tail
+  w_f  <- min(0.35, 0.30 / (1 + 6e5 / E_a) +      # shear-strip satellites
+                    0.15 * g_in * alpha_th)       # + bubble-film debris
+  if ((w_c + w_f) > 0.7) { sc <- 0.7 / (w_c + w_f); w_c <- w_c * sc; w_f <- w_f * sc }
+  w_m  <- 1 - w_c - w_f                           # main mode weight
+
+  m_main <- 1.2 * d_drop                          # volume median ~ 1.2 x D32
+  modes_w <- c(w_m, w_c, w_f)
+  modes_m <- c(m_main, 3.2 * m_main, 0.25 * m_main)
+  modes_s <- c(1.9, 1.5, 1.6)                     # geometric std devs
+
+  gr  <- seq(log(0.02 * m_main), log(20 * m_main), length.out = 400)
+  cdf <- Reduce(`+`, Map(function(w, m, s)
+           w * pnorm((gr - log(m)) / log(s)), modes_w, modes_m, modes_s))
+  q_at <- function(p) exp(approx(cdf, gr, xout = p, ties = "ordered")$y)
+  d10 <- q_at(0.10); d50 <- q_at(0.50); d90 <- q_at(0.90); d99 <- q_at(0.99)
+  span <- (d90 - d10) / d50
+  BI   <- 2 * min(w_f, 1 - w_f)                   # fine-mode bimodality index
 
   ## --- Module 6a: Dryer energy / moisture balance (co-current) -------------
   mdot_w <- mdot_L * (1 - C_sol)                  # water evaporation load
@@ -322,7 +349,12 @@ spray_dry_model <- function(x) {
               (1 - 0.15 * min(Softness / 25, 1))
   rho_tapped <- rho_env * f_pack
 
-  c(d_droplet_um   = d_drop * 1e6,
+  c(d_droplet_um   = d50 * 1e6,
+    d10_um         = d10 * 1e6,
+    d90_um         = d90 * 1e6,
+    d99_um         = d99 * 1e6,
+    span           = span,
+    BI_bimodal     = BI,
     D_particle_um  = D_particle * 1e6,
     theta_skin_z   = theta_skin,
     Omega_struct_z = Omega_struct,
@@ -422,6 +454,11 @@ stats_list <- setNames(lapply(ee_list, morris_stats), outputs)
 dir.create("output", showWarnings = FALSE)
 
 titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
+            d10_um         = "Fines tail  d10 [um]",
+            d90_um         = "Coarse tail  d90 [um]",
+            d99_um         = "Extreme coarse tail  d99 [um]",
+            span           = "Span  (d90-d10)/d50 [-]",
+            BI_bimodal     = "Bimodality index [-]",
             D_particle_um  = "Final particle size  D_particle [um]",
             theta_skin_z   = "Skin formation  theta_skin,z [-]",
             Omega_struct_z = "Sphericity  Omega_struct,z [-]",
@@ -446,8 +483,8 @@ plot_morris_panel <- function(st, title, n_label = 10) {
 }
 
 png(file.path("output", "morris_sensitivity_plots.png"),
-    width = 3000, height = 1500, res = 160)
-op <- par(mfrow = c(2, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
+    width = 3000, height = 2250, res = 160)
+op <- par(mfrow = c(3, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
 for (o in outputs) plot_morris_panel(stats_list[[o]], titles[[o]])
 mtext(sprintf(paste("Morris screening: %d trajectories, %d levels, %d model",
                     "runs | dashed: sigma = mu* (non-linear/interacting),",
