@@ -69,3 +69,52 @@ It uses the `sensitivity` package when installed and otherwise falls back to a
 built-in base-R Morris OAT design (no dependencies required). Results are
 written to `output/morris_sensitivity_plots.png` (μ* vs σ Morris plots, one
 panel per output) and `output/morris_indices.csv`.
+
+## Unified process model (UP1 mixer → spray dryer)
+
+`unified_model.R` connects the two standalone modules end-to-end through a
+common feed-stream interface:
+
+```
+UP1 gassed/templated mixer  ──►  intermediate stage 1 (placeholder)
+                                  └►  intermediate stage 2 (placeholder)
+                                        └►  UP2 spray dryer / particle formation
+```
+
+- `unified/up1_mixer_module.R` — the rev38 mixer physics
+  (`up1_module_rev38_dryer_risk.r`) packaged as a pure function
+  `up1_run_mixer()`, with no study driver.
+- `unified/up2_spray_dryer_module.R` — the spray-drying physics from
+  `morris_sensitivity_analysis.R` refactored as `up2_run_dryer(feed, x)`,
+  where `feed` is the stream handed over by the upstream chain.
+- `unified/interface_stream.R` — the stream definition (composition,
+  physical state, particulate/gas/template state, structure history), the
+  UP1→stream adapter, and the two identity placeholder stages reserved for
+  the unit operations to be inserted later (e.g. transfer line/pump, hold
+  tank/pre-conditioner).
+
+Factors the two standalone screens used to duplicate (solids, additives,
+surface chemistry, template) are now defined once at the mixer, and the
+dryer receives their transformed values through the stream: diluted solids,
+slurry density, exit temperature, trapped-gas holdup → `alpha_g_0`, wet-skin
+fraction → dryer skin seed, primary/aggregate size → `a_prim`/`d_ratio`,
+surfactant MW/area/HLB → the dryer's surfactant stoichiometry, and the
+liquid template split by the rev38 `Residual_Template_Fraction` into free
+interstitial droplets (pore templating) vs core-absorbed plasticizer
+(`w_core`: enters Flory–Huggins softness, shell permeability, Fox residual
+solvent, and the micro-explosion volatile inventory — the rev38 collapse-risk
+pathway wired into the dryer).
+
+Run with:
+
+```sh
+Rscript unified_model.R
+```
+
+(needs `deSolve`; everything else is base R). It writes to `unified_output/`:
+a nominal end-to-end run for each templating strategy
+(`nominal_chain_summary.txt`, `nominal_chain_outputs.csv`) and a Morris
+elementary-effects screen over the full 41-factor chain
+(`unified_morris_indices.csv`, zone-classified
+`unified_morris_{process,surface,polymer}_variables.png`; circles = mixer-side
+factors, triangles = dryer-side factors).

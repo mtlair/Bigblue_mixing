@@ -125,6 +125,19 @@ factors <- rbind(
   fac("D_template",    5.0e-7, 1.0e-5, TRUE,  "m",     "pre-processed emulsion droplet diameter"),
   fac("T_bp_solv",     300,    360,    FALSE, "K",     "template solvent boiling point (ambient)")
 )
+
+# Add variable type categorization for grouped visualization
+factor_type <- c(
+  "Process", "Process", "Process", "Process",         # ALR, P_system, P_feed, mdot_L
+  "Surface", "Process", "Process", "Process",         # sigma, mu_L, rho_L, alpha_g_0
+  "Process", "Process", "Process", "Process",         # D_b, C_solid_mass, T_system, mdot_gas_dry
+  "Process", "Process", "Process",                    # Y_in, T_feed, t_hold
+  "Polymer", "Polymer", "Polymer", "Surface",         # C_monomer, C_plasticizer, C_binder, C_surfactant
+  "Surface", "Surface", "Polymer", "Polymer",         # Delta_pH, I_strength, Tg_polymer, n_flow
+  "Polymer", "Polymer", "Polymer", "Polymer",         # k_perm_mono, k_perm_plast, k_perm_bind, phi_emulsion
+  "Process", "Process"                                # D_template, T_bp_solv
+)
+factors$type <- factor_type
 k <- nrow(factors)
 
 # Map the unit-hypercube Morris design onto physical values
@@ -582,6 +595,7 @@ outputs <- colnames(Y)
 
 morris_stats <- function(ee) {
   data.frame(factor  = factors$name,
+             type    = factors$type,
              mu      = colMeans(ee),
              mu.star = colMeans(abs(ee)),
              sigma   = apply(ee, 2, sd))
@@ -613,39 +627,90 @@ titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
             f_burst_solv   = "Template micro-explosion severity  f_burst [-]",
             sigma_y_cake_MPa = "Cake yield strength  sigma_y [MPa]")
 
-plot_morris_panel <- function(st, title, n_label = 10) {
+plot_morris_categorized <- function(st, title, n_label = 8, var_type = NULL) {
+  # Classify each factor by interaction type based on sigma/mu* ratio
+  # No interaction: sigma < 0.05*mu*       (gray)
+  # Linear:        0.05*mu* <= sigma < 0.3*mu*  (green)
+  # Complex:       0.3*mu* <= sigma < 1.0*mu*   (light orange)
+  # Volatile:      sigma >= 1.0*mu*        (red)
+
+  ratio <- st$sigma / pmax(st$mu.star, 1e-6)
+  interaction_type <- numeric(nrow(st))
+  interaction_type[ratio < 0.05] <- 1  # No interaction -> Gray
+  interaction_type[ratio >= 0.05 & ratio < 0.3] <- 2   # Linear -> Green
+  interaction_type[ratio >= 0.3 & ratio < 1.0] <- 3    # Complex -> Light orange
+  interaction_type[ratio >= 1.0] <- 4                   # Volatile -> Red
+
+  colors <- c("#999999", "#2ecc71", "#ffa500", "#e74c3c")[interaction_type]
+
+  # Filter to specific type if requested
+  if (!is.null(var_type)) {
+    idx <- factors$type == var_type
+    st <- st[idx, ]
+    colors <- colors[idx]
+  }
+
   plot(st$mu.star, st$sigma,
        xlim = c(0, max(st$mu.star) * 1.25),
        ylim = c(0, max(st$sigma) * 1.30),
-       pch = 21, bg = "steelblue", cex = 1.3,
+       pch = 21, bg = colors, cex = 1.4, col = "black", lwd = 0.7,
        xlab = expression(mu * "*  (mean |elementary effect|)"),
        ylab = expression(sigma * "  (sd of elementary effects)"),
-       main = title, cex.main = 0.95)
-  abline(0, 1, lty = 2, col = "grey55")           # sigma = mu* (non-linear)
-  abline(0, 0.1, lty = 3, col = "grey70")         # sigma = 0.1 mu* (~linear)
+       main = title, cex.main = 0.90)
+
+  abline(0, 1, lty = 2, col = "grey55", lwd = 1.2)      # sigma = mu* (volatile)
+  abline(0, 0.3, lty = 3, col = "grey60", lwd = 1.0)    # sigma = 0.3 mu* (complex)
+  abline(0, 0.05, lty = 3, col = "grey75", lwd = 0.8)   # sigma = 0.05 mu* (linear)
+
   # label only the strongest factors to keep panels readable
   top <- order(-st$mu.star)[seq_len(min(n_label, nrow(st)))]
   text(st$mu.star[top], st$sigma[top], labels = st$factor[top], pos = 3,
-       cex = 0.70, offset = 0.35, xpd = NA)
+       cex = 0.65, offset = 0.3, xpd = NA)
 }
 
-png(file.path("output", "morris_sensitivity_plots.png"),
-    width = 3000, height = 3750, res = 160)
-op <- par(mfrow = c(5, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
-for (o in outputs) plot_morris_panel(stats_list[[o]], titles[[o]])
-mtext(sprintf(paste("Morris screening: %d trajectories, %d levels, %d model",
-                    "runs | dashed: sigma = mu* (non-linear/interacting),",
-                    "dotted: sigma = 0.1 mu* (near-linear) |",
-                    "top 10 factors labelled per panel"),
-              r_traj, levels, nrow(Y)),
-      side = 1, outer = TRUE, cex = 0.75, line = 1)
-par(op); dev.off()
+# Create 3 separate plots, one per variable type
+var_types <- c("Surface", "Process", "Polymer")
+var_type_labels <- c("Surface Chemistry Related", "Process Related", "Polymer Chemistry Related")
+
+for (type_idx in seq_len(3)) {
+  var_type <- var_types[type_idx]
+  type_label <- var_type_labels[type_idx]
+
+  png(file.path("output", sprintf("morris_%s_variables.png", tolower(var_type))),
+      width = 3200, height = 3750, res = 160)
+  op <- par(mfrow = c(5, 4), mar = c(4.5, 4.5, 2.8, 1), oma = c(3.5, 0, 0, 0))
+
+  for (o in outputs) {
+    plot_morris_categorized(stats_list[[o]], titles[[o]], n_label = 6, var_type = var_type)
+  }
+
+  # Add subtitle and legend info
+  mtext(sprintf("Morris Sensitivity: %s Variables | %d trajectories, %d levels, %d runs",
+                type_label, r_traj, levels, nrow(Y)),
+        side = 1, outer = TRUE, cex = 0.80, line = 2.5)
+
+  mtext("Color code: Gray = no interaction | Green = linear | Orange = complex | Red = volatile",
+        side = 1, outer = TRUE, cex = 0.70, line = 1.2, font = 3)
+
+  par(op); dev.off()
+}
+
+message("Wrote output/morris_surface_variables.png, output/morris_process_variables.png,
+and output/morris_polymer_variables.png")
 
 # -----------------------------------------------------------------------------
 # 5. Console summary + CSV export
 # -----------------------------------------------------------------------------
 all_stats <- do.call(rbind, lapply(outputs, function(o)
   cbind(output = o, stats_list[[o]])))
+
+# Add interaction classification to exported data
+all_stats$sigma_mu_ratio <- all_stats$sigma / pmax(all_stats$mu.star, 1e-6)
+all_stats$interaction_type <- cut(all_stats$sigma_mu_ratio,
+  breaks = c(0, 0.05, 0.3, 1.0, Inf),
+  labels = c("No_interaction", "Linear", "Complex", "Volatile"),
+  right = FALSE)
+
 write.csv(all_stats, file.path("output", "morris_indices.csv"),
           row.names = FALSE)
 
@@ -654,4 +719,43 @@ for (o in outputs) {
   cat("\n==", titles[[o]], "==\n")
   print(st, row.names = FALSE, digits = 3)
 }
-cat("\nWrote output/morris_sensitivity_plots.png and output/morris_indices.csv\n")
+
+# Summary: interaction classification by variable type
+cat("\n", paste(rep("=", 70), collapse = ""), "\n")
+cat("INTERACTION CLASSIFICATION SUMMARY\n")
+cat(paste(rep("=", 70), collapse = ""), "\n")
+
+all_stats_df <- do.call(rbind, lapply(outputs, function(o)
+  cbind(output = o, stats_list[[o]])))
+
+# Classify each factor
+all_stats_df$ratio <- all_stats_df$sigma / pmax(all_stats_df$mu.star, 1e-6)
+all_stats_df$interaction <- cut(all_stats_df$ratio,
+  breaks = c(0, 0.05, 0.3, 1.0, Inf),
+  labels = c("No interaction", "Linear", "Complex", "Volatile"),
+  right = FALSE)
+
+# Summary by type and interaction
+interaction_summary <- table(all_stats_df$type, all_stats_df$interaction)
+cat("\nInteraction type counts by variable category:\n")
+print(interaction_summary)
+
+# Identify high-interaction factors per type
+for (type in c("Surface", "Process", "Polymer")) {
+  cat(sprintf("\n%s Variables with Complex/Volatile interactions:\n", type))
+  high_int <- all_stats_df[all_stats_df$type == type &
+                           all_stats_df$interaction %in% c("Complex", "Volatile"), ]
+  if (nrow(high_int) > 0) {
+    high_int <- high_int[order(-high_int$mu.star), ]
+    print(high_int[, c("factor", "output", "mu.star", "sigma", "interaction")],
+          row.names = FALSE, digits = 3)
+  } else {
+    cat("  (none)\n")
+  }
+}
+
+cat("\nWrote:\n")
+cat("  - output/morris_surface_variables.png\n")
+cat("  - output/morris_process_variables.png\n")
+cat("  - output/morris_polymer_variables.png\n")
+cat("  - output/morris_indices.csv\n")
