@@ -235,11 +235,44 @@ the current closure ignores it; see recommendation 4.)
    SG_Gassed (barrier-controlled flocculation/breakage set how much gas gets locked into the
    network) more than on nominal size — a plausible, DLVO-consistent outcome.
 
-### 5.5 Result artifacts
+### 5.5 rev36 finer-sweep omnibus (design-audit follow-up)
 
-- `Morris_Omnibus_rev35_r25.rds` — full design matrices, raw outputs, and regime metadata (162 scenarios)
-- `Lens_Chemistry_*.png`, `Lens_Additives_*.png`, `Lens_Physical_*.png` — 24 regime-trellis μ*–σ maps (8 targets × 3 factor lenses)
-- `morris_run.log` — execution log (97,200 runs, no solver failures)
+A pooled audit of all 97,200 rev35 runs showed the sweep design itself needed work: 92% of runs
+sat above Mixing_Potential = 10 (cavern saturated), 97% of the sphericity response occurred below
+~5 m/s tip speed, tau (the top-ranked driver) was not a sweep dimension, ionic strength's steep
+Debye end was split in its flat region, C_surfactant's top chunk was CMC-capped by construction
+(and its sweep bounds disagreed with the dictionary: 1e-5 vs 5e-5), and the decade-spanning
+factors (MW_surfactant, D_surf, C_surfactant) were sampled linearly.
+
+`up1_module_rev36_finer_sweep.r` (v50) addresses all of these: v_tip extended down to 0.5 m/s
+with non-uniform chunk breaks [0.5–4 | 4–12 | 12–32]; tau chunked ×3; ionic strength chunked
+[0.01–0.05 | 0.05–0.15 | 0.15–0.5]; C_surfactant bounds aligned and split at the CMC floor
+(1e-3); log-uniform sampling for the three decade-spanning factors (their elementary effects are
+per log10-unit). Total: 486 regimes × 600 runs = 291,600 ODE solves, zero failures.
+
+Verification that the redesign worked:
+
+| v_tip chunk | fraction MP < 1 | median MP | Sphericity p10–p90 |
+|---|---|---|---|
+| [0.5, 4] | 0.067 | 16 | 0.20 – 0.93 |
+| (4, 12] | 0.000 | 147 | 0.99 – 1.01 |
+| (12, 32] | 0.000 | 664 | 1.01 – 1.01 |
+
+The cavern-collapse transition and the entire sphericity dynamic range now live inside a
+dedicated regime slice instead of being averaged away, and the trellis maps (`rev36_Lens_*.png`)
+show regime-resolved rankings for tau and the electrostatics chunks.
+
+Note on cross-revision comparison: chunking a variable narrows its within-regime range, which
+shrinks its elementary effects proportionally (tau's apparent global rank drops after being
+chunked — that is a design consequence, not a physics change), and log-sampled factors report
+EEs per decade. rev35 and rev36 rankings are therefore each internally consistent but not
+directly comparable number-to-number.
+
+### 5.6 Result artifacts
+
+- `Morris_Omnibus_rev35_r25.rds` / `Morris_Omnibus_rev36_r25.rds` — full design matrices, raw outputs, and regime metadata (162 / 486 scenarios)
+- `Lens_*.png` (rev35) and `rev36_Lens_*.png` — 24 + 24 regime-trellis μ*–σ maps (8 targets × 3 factor lenses each)
+- `morris_run.log` / `morris_run_rev36.log` — execution logs (97,200 + 291,600 runs, no solver failures)
 
 ---
 
