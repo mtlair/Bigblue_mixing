@@ -71,55 +71,45 @@ set.seed(42)
 # -----------------------------------------------------------------------------
 # 1. Input factors and ranges
 # -----------------------------------------------------------------------------
-# Symbols follow the master nomenclature sheet where available:
-#   C_solid_mass, C_monomer, C_plasticizer, C_binder, C_surfactant : feed
-#     composition (wt/wt)
-#   alpha_g_0  : total gas holdup entrained in the feed foam        [-]
-#   P_system   : atomizing air / system supply pressure             [Pa]
-#   T_system   : dryer gas temperature                              [K]
-#   Delta_pH   : system delta pH vs isoelectric point               [pH units]
-#   I_strength : ionic strength (Debye screening driver)            [M]
-# Others use the spray report's notation (sigma, mu_L, ALR, D_b, ...).
-# t_hold, mdot_gas_dry and Y_in are spray-line additions (pressurized
-# residence before the nozzle; dryer gas flow and inlet humidity).
-factors <- data.frame(
-  name = c("ALR",           # air-liquid mass ratio  m_G/m_L           [-]
-           "P_system",      # atomizing air supply pressure            [Pa]
-           "P_feed",        # liquid feed line (hold) pressure         [Pa]
-           "mdot_L",        # liquid feed mass flow                    [kg/s]
-           "sigma",         # liquid surface tension                   [N/m]
-           "mu_L",          # serum (continuous phase) viscosity       [Pa s]
-           "rho_L",         # liquid (slurry) density                  [kg/m3]
-           "alpha_g_0",     # feed foam quality / gas entrainment      [-]
-           "D_b",           # feed bubble diameter (before shear)      [m]
-           "C_solid_mass",  # solid mass fraction in feed              [-]
-           "T_system",      # dryer gas INLET temperature              [K]
-           "mdot_gas_dry",  # dryer gas mass flow rate                 [kg/s]
-           "Y_in",          # dryer gas inlet absolute humidity        [kg/kg]
-           "T_feed",        # feed / atomizing air temperature         [K]
-           "t_hold",        # pressurized hold time before nozzle      [s]
-           "C_monomer",     # residual monomer concentration           [-]
-           "C_plasticizer", # plasticizer concentration                [-]
-           "C_binder",      # binder concentration                     [-]
-           "C_surfactant",  # formulated surfactant concentration      [-]
-           "Delta_pH",      # delta pH vs isoelectric point            [-]
-           "I_strength",    # ionic strength                           [M]
-           "Tg_polymer",    # dry-polymer glass transition             [K]
-           "n_flow",        # power-law shear-thinning flow index      [-]
-           "k_perm_mono",   # monomer free-volume permeation coeff.    [-]
-           "k_perm_plast",  # plasticizer free-volume permeation coeff.[-]
-           "k_perm_bind"),  # binder pore-blocking coefficient         [-]
-  min  = c( 1.0, 2.0e5, 1.5e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05,
-            330, 0.10, 0.001, 280,   5, 0.000, 0.000, 0.000, 1.0e-4, 0.2,
-            1.0e-3, 280, 0.40, 5.0, 5.0, 2.0),
-  max  = c(10.0, 7.0e5, 1.0e6, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40,
-            470, 1.00, 0.020, 330, 600, 0.020, 0.050, 0.050, 2.0e-2, 4.0,
-            5.0e-1, 380, 1.00, 60.0, 60.0, 40.0),
-  # sample wide-ranging positive factors log-uniformly
-  log  = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE,
-           FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE,
-           TRUE, FALSE, FALSE, FALSE, FALSE, FALSE),
-  stringsAsFactors = FALSE
+# One row per factor: name, min, max, log (TRUE = sampled log-uniformly over
+# its range, used for wide-ranging positive factors), unit, and description.
+# Symbols follow the master nomenclature sheet where they exist; others use
+# the spray report's notation. t_hold, mdot_gas_dry and Y_in are spray-line
+# additions (pressurized residence before the nozzle; dryer gas flow and
+# inlet humidity); k_perm_* are the shell permeability coefficients for
+# monomer / plasticizer / binder.
+fac <- function(name, min, max, log, unit, desc)
+  data.frame(name = name, min = min, max = max, log = log,
+             unit = unit, desc = desc, stringsAsFactors = FALSE)
+
+factors <- rbind(
+  #   name             min     max     log    unit     description
+  fac("ALR",           1.0,    10.0,   FALSE, "-",     "air-liquid mass ratio m_G/m_L"),
+  fac("P_system",      2.0e5,  7.0e5,  FALSE, "Pa",    "atomizing air supply pressure"),
+  fac("P_feed",        1.5e5,  1.0e6,  FALSE, "Pa",    "liquid feed line (hold) pressure"),
+  fac("mdot_L",        0.002,  0.020,  FALSE, "kg/s",  "liquid feed mass flow"),
+  fac("sigma",         0.030,  0.070,  FALSE, "N/m",   "liquid surface tension"),
+  fac("mu_L",          0.0012, 0.0560, TRUE,  "Pa s",  "serum (continuous phase) viscosity"),
+  fac("rho_L",         1000,   1300,   FALSE, "kg/m3", "liquid (slurry) density"),
+  fac("alpha_g_0",     0.05,   0.60,   FALSE, "-",     "feed foam quality / entrained gas holdup"),
+  fac("D_b",           2.0e-5, 2.0e-4, TRUE,  "m",     "feed bubble diameter (before shear)"),
+  fac("C_solid_mass",  0.05,   0.40,   FALSE, "-",     "solid mass fraction in feed (wt/wt)"),
+  fac("T_system",      330,    470,    FALSE, "K",     "dryer gas INLET temperature"),
+  fac("mdot_gas_dry",  0.10,   1.00,   TRUE,  "kg/s",  "dryer gas mass flow rate"),
+  fac("Y_in",          0.001,  0.020,  FALSE, "kg/kg", "dryer gas inlet absolute humidity"),
+  fac("T_feed",        280,    330,    FALSE, "K",     "feed / atomizing air temperature"),
+  fac("t_hold",        5,      600,    TRUE,  "s",     "pressurized hold time before nozzle"),
+  fac("C_monomer",     0.000,  0.020,  FALSE, "-",     "residual monomer concentration (wt/wt)"),
+  fac("C_plasticizer", 0.000,  0.050,  FALSE, "-",     "plasticizer concentration (wt/wt)"),
+  fac("C_binder",      0.000,  0.050,  FALSE, "-",     "binder concentration (wt/wt)"),
+  fac("C_surfactant",  1.0e-4, 2.0e-2, TRUE,  "-",     "formulated surfactant concentration (wt/wt)"),
+  fac("Delta_pH",      0.2,    4.0,    FALSE, "pH",    "delta pH vs isoelectric point"),
+  fac("I_strength",    1.0e-3, 5.0e-1, TRUE,  "M",     "ionic strength (Debye screening driver)"),
+  fac("Tg_polymer",    280,    380,    FALSE, "K",     "dry-polymer glass transition"),
+  fac("n_flow",        0.40,   1.00,   FALSE, "-",     "power-law shear-thinning flow index"),
+  fac("k_perm_mono",   5.0,    60.0,   FALSE, "-",     "monomer free-volume permeation coeff."),
+  fac("k_perm_plast",  5.0,    60.0,   FALSE, "-",     "plasticizer free-volume permeation coeff."),
+  fac("k_perm_bind",   2.0,    40.0,   FALSE, "-",     "binder pore-blocking coefficient")
 )
 k <- nrow(factors)
 
