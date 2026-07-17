@@ -165,7 +165,81 @@ no longer zero).
 
 ## 5. Morris sensitivity results (rev35)
 
-<!-- RESULTS_PLACEHOLDER -->
+### 5.1 Run configuration
+
+- **Design:** Morris OAT, r = 25 trajectories, 5 levels, grid jump 1 (via bundled `morris_shim.R`)
+- **Factors:** 23 (all `base_vars`)
+- **Regimes:** 162 chunked sub-domains (v_tip 3 × C_solid_mass 3 × ΔpH 3 × ionic strength 2 × C_surfactant 3)
+- **Model runs:** 162 × 25 × 24 = 97,200 ODE solves, `lsoda`, **zero failed/NA cells**, all 162 regimes valid for all 8 targets
+- **Outputs:** μ* (mean |elementary effect|, main influence) and σ (EE standard deviation, interaction/nonlinearity), averaged over regimes; 24 lens plots (`Lens_{Chemistry,Additives,Physical}_{target}.png`)
+
+### 5.2 Global factor rankings (μ* averaged over all 162 regimes, top 5 per target)
+
+| Target | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| **Mixing_Potential** | tau (1.00) | Q_template (0.58) | C_plasticizer (0.47) | v_tip (0.42) | C_monomer (0.39) |
+| **Blended_Porosity** | tau (1.00) | Q_template (0.70) | Q_gas (0.57) | Q_colloid (0.33) | Delta_pH (0.18) |
+| **Blended_Sphericity** | v_tip (1.00) | tau (0.18) | Q_colloid (0.10) | C_plasticizer (0.08) | C_monomer (0.07) |
+| **Blended_WetSkin** | v_tip (1.00) | tau (0.51) | C_plasticizer (0.27) | Q_colloid (0.27) | C_monomer (0.22) |
+| **Blended_Size_um** | Q_template (1.00) | C_solid_mass (0.68) | Q_colloid (0.48) | tau (0.38) | Q_gas (0.37) |
+| **Blended_Viscosity_PaS** | Q_template (1.00) | C_solid_mass (0.60) | Q_colloid (0.36) | C_temp_mass (0.04) | v_tip (0.01) |
+| **SG_Colloid** | Q_template (1.00) | Q_colloid (0.69) | C_solid_mass (0.66) | — | — |
+| **Blended_SG_Gassed** | tau (1.00) | Q_template (0.67) | Q_gas (0.57) | Q_colloid (0.33) | Delta_pH (0.18) |
+
+(Numbers in parentheses are μ* normalized by the target's largest μ*.)
+
+### 5.3 Verification that the restored factors are alive
+
+The point of the exercise: in rev34, `CMC` was structurally guaranteed to screen at exactly zero,
+and `D_template`/`C_temp_mass` were gated to near-nothing. In the rev35 omnibus:
+
+- **CMC** now registers finite μ* on every gas/coverage-coupled target (Porosity, SG_Gassed,
+  Size, WetSkin, Sphericity, Mixing_Potential). It stays a *low-ranked* factor — expected, since
+  it only acts by capping `C_surfactant` in the sub-CMC corner of the sweep — but it is no longer
+  a dead input silently wasting a Morris dimension.
+- **HLB** likewise contributes through both foam stability and the restored packing-efficiency
+  optimum (visible in the Chemistry-lens plots).
+- **C_temp_mass** jumped to **rank 4 for Blended_Viscosity** (μ*/max ≈ 0.04) and **rank 7 for
+  Blended_Size** (≈ 0.14) — the rigid-template inventory now crowds the exit envelope exactly as
+  spec §4.3/Eq. 17 requires.
+- **D_template** is live but weak (it survives only through seed surface area in `R_het`;
+  its volumetric contribution cancels because n·v_single = φ_template). See recommendation 4.
+- **Delta_pH / ionic_strength** now reach the top-6 for Porosity and SG_Gassed with the
+  spec-conformant breakage asymmetry (stability suppresses flocculation, repulsion assists
+  breakage).
+
+Structural zeros that remain are *correct* zeros: `SG_Colloid` depends only on the solids
+volume fraction, so only C_solid_mass / Q_colloid / Q_template can move it — all 20 other
+factors screen at exactly 0, a useful integrity check on the design matrix and the shim.
+(Per production-spec §2.12 the outlet density should eventually also carry template mass —
+the current closure ignores it; see recommendation 4.)
+
+### 5.4 Interpretation
+
+1. **Residence time (tau) dominates the gas-structural outputs** (Mixing_Potential, Porosity,
+   SG_Gassed): longer residence lets trapped-gas and foam states develop, which feeds back into
+   yield stress and cavern collapse. Its σ/μ* ≈ 0.7–1.2 says this is strongly interaction-coupled,
+   not additive — consistent with the tanh-saturated gas trapping kinetics.
+2. **The feed-ratio group (Q_template, Q_colloid) is a first-order lever everywhere**, mostly via
+   dilution (it rescales effective solids, residence time, and dissolved-gas load simultaneously).
+   Note this is the *stream flow* effect, distinct from the template-phase physics restored in
+   rev35.
+3. **Morphology outputs (Sphericity, WetSkin) belong to v_tip** — shear-driven compaction and
+   skin erosion — with the plasticizer/monomer softness group as the chemistry-side moderator,
+   exactly the Flory–Huggins pathway the v30 spec added.
+4. **Almost every active factor has σ ≥ μ*** (the "Interacting/Complex" zone of the trellis
+   maps). The engine is dominated by regime-dependent interactions rather than additive effects —
+   which justifies the chunked-regime Morris design over a single global screen, and warns
+   against tuning any single factor in isolation.
+5. **Electrostatics matter most for gas retention**: ΔpH and ionic strength act on Porosity and
+   SG_Gassed (barrier-controlled flocculation/breakage set how much gas gets locked into the
+   network) more than on nominal size — a plausible, DLVO-consistent outcome.
+
+### 5.5 Result artifacts
+
+- `Morris_Omnibus_rev35_r25.rds` — full design matrices, raw outputs, and regime metadata (162 scenarios)
+- `Lens_Chemistry_*.png`, `Lens_Additives_*.png`, `Lens_Physical_*.png` — 24 regime-trellis μ*–σ maps (8 targets × 3 factor lenses)
+- `morris_run.log` — execution log (97,200 runs, no solver failures)
 
 ---
 
