@@ -5,27 +5,36 @@
 #   * Swelling_Softness_exit — bulk matrix softness at mixer exit; the same
 #     exp(25*(C_monomer+C_plasticizer)) computed in the post-processor but now
 #     returned as an explicit output for the downstream spray-dryer thread.
-#   * Residual_Template_Fraction — fraction of loaded template volume that has
+#   * Residual_Template_Fraction — fraction of the loaded template that has
 #     diffused into particle cores by mixer exit (spray-dryer collapse risk).
-#     Physics: Fickian short-time penetration into a sphere:
-#       tau_D = r^2 / (D_ref * Swelling_Softness * T_scale^1.5)
-#       f_diff = 1 - exp(-3 * tau_eff / tau_D)
-#     Gated by template_type: only surface_weld (type 3) has significant core
-#     penetration (polymer-soluble); capillary_bridge (type 4) stays mostly
-#     interstitial; rigid/gas (1/2) carry no liquid template.
+#     Effective first-order (linear-driving-force-type) uptake into a sphere:
+#       tau_D  = r^2 / (D_ref * Swelling_Softness * (T/298)^1.5)
+#       f_diff = 1 - exp(-k_ldf * tau_eff / tau_D),  k_ldf = 3
+#     NOTE: k_ldf and D_ref are EFFECTIVE screening constants, not derived/
+#     calibrated values (cf. parent-report caveat). Exact Fickian sphere uptake
+#     is ~4x faster at k_ldf=3 (the standard sphere LDF coefficient is 15), so
+#     f_diff UNDER-predicts absolute penetration — treat RTF as a RELATIVE risk
+#     index, not a probability. Gated by template_type: surface_weld (3)=f_diff
+#     (polymer-soluble); capillary_bridge (4)=small interstitial residual;
+#     rigid/gas (1/2)=0 (no liquid template).
 #   * Deterministic collapse-risk dose sweep: Swelling_Softness_exit and
 #     Residual_Template_Fraction vs template_dose (rev38_Dryer_Collapse_Risk.png).
 #   * Morris screen extended to the two new outputs.
 #
 # Design rationale (2026-07-17 discussion):
 #   Spray-dryer failure = "hard shell around soft interior" with confined vapor.
-#   If template stays interstitial (pendular dose, theta-solvent choice) the
+#   If template stays interstitial (pendular dose) and cores stay glassy, the
 #   pore network stays open and the failure geometry never forms. If template
 #   has diffused into particle cores, cores are plasticized and the volatile
 #   solvent flashes under confinement → inflation or rupture.
-#   Theta solvent (chi ≈ 0.5): D_eff ~ 10-100× lower than a good solvent;
-#   tau_D >> mixer residence time → cores intact. Monomer (chi ≈ 0): D_eff
-#   maximized, sub-minute penetration → worst case.
+#   Kinetic core protection is dominated by the GLASSY-CORE diffusivity (matrix
+#   below Tg): for the model's sub-micron cores, even a theta solvent only
+#   10-100x slower than a good solvent (D~1e-14) still gives tau_D~30 s and
+#   fully penetrates within a minute — so a hard/glassy core, not solvent
+#   quality alone, is what keeps cores intact. Theta quality (chi ≈ 0.5) mainly
+#   limits the swelling DRIVING FORCE so the surface weld does not run away;
+#   D_ref below bundles the glassy-core + theta effect into one effective
+#   constant. Monomer (chi ≈ 0, good solvent, rubbery): fastest D → worst case.
 #
 # rev37 (on top of rev36): liquid/gas/rigid TEMPLATING strategy study.
 #   * template_type switch: 1=rigid seed, 2=gas (non-penetrating), 3=surface-
@@ -551,36 +560,39 @@ run_single_simulation <- function(parameters) {
 
   # ==========================================================================
   # SPRAY-DRYER COLLAPSE RISK (rev38)
-  # Residual_Template_Fraction: fraction of loaded template that has diffused
-  # into particle cores by mixer exit.  High value means cores are plasticised
-  # and contain volatile solvent -> inflation / rupture in the dryer.
+  # Residual_Template_Fraction: fraction of the loaded template that has
+  # diffused into particle cores by mixer exit.  High value = plasticised cores
+  # holding volatile solvent -> inflation / rupture in the dryer.
   #
-  # Fickian penetration into a sphere (short-time):
-  #   tau_D = r_particle^2 / D_polymer_eff      (diffusion timescale)
-  #   f_diff = 1 - exp(-3 * tau / tau_D)        (fraction reached core)
+  # Effective first-order (linear-driving-force-type) uptake into a sphere:
+  #   tau_D  = r_particle^2 / D_polymer_eff       (diffusion timescale, s)
+  #   f_diff = 1 - exp(-k_ldf * tau_eff / tau_D)  (fraction reaching core)
+  # k_ldf (=3) and D_ref are EFFECTIVE screening constants (parent-report
+  # caveat), NOT derived Fickian values: exact sphere uptake is ~4x faster at
+  # k_ldf=3 (the standard sphere LDF coefficient is 15), so RTF is a relative
+  # ranking index that UNDER-states absolute penetration.
   # D_polymer_eff = D_ref * Swelling_Softness * (T/298)^1.5
-  #   D_ref = 2e-13 m^2/s  (theta-solvent diffusivity in dry polymer at 298 K;
-  #   good-solvent D is 10-100x higher, captured by Swelling_Softness proxy)
   #
   # Type gating:
   #   rigid (1), gas (2) : no liquid template -> 0
-  #   surface_weld  (3)  : polymer-soluble -> full f_diff
-  #   capillary_bridge(4): polymer-immiscible, stays interstitial;
-  #                        small residual wetting fraction (0.05 * f_diff)
+  #   surface_weld  (3)  : polymer-soluble -> f_diff (a fraction: dose-independent)
+  #   capillary_bridge(4): polymer-immiscible, stays interstitial; small
+  #                        dose-weighted wetting residual (0.05 * f_diff * fill)
   # ==========================================================================
   r_particle_m  <- (p$D_particle * 1e-6) / 2.0
-  # D_polymer_ref: theta-solvent diffusivity in near-Tg latex at 298 K.
-  # For a good solvent (monomer, chi~0): D ~ 1e-13 to 1e-12 m^2/s -> tau_D < 1 s
-  #   -> 100% penetration at any mixer tau (captured via Swelling_Softness path).
-  # For theta solvent (chi~0.5): D ~ 5e-17 m^2/s -> tau_D ~ 40 min at r=0.6 µm
-  #   -> partial penetration; tau and D_particle are the key controlling variables.
-  # Swelling_Softness (1.2 - 5.8x over model range) scales D_eff upward when
-  # pre-existing monomer/plasticizer has already opened the polymer network.
-  D_polymer_ref <- 5e-17                             # m^2/s, theta condition, 298 K
-  T_scale_38    <- (p$T_system / 298.15)^1.5        # Arrhenius-like scaling
+  # D_ref: EFFECTIVE template diffusivity in a GLASSY (sub-Tg) latex core at
+  # 298 K, chosen so tau_D lands on the mixer timescale (minutes) for the
+  # model's sub-micron particles -> Morris-resolvable partial penetration.
+  #   good solvent / rubbery core : D ~ 1e-13..1e-12 -> tau_D < 1 s   (RTF -> 1)
+  #   theta solvent / glassy core : D ~ 5e-17        -> tau_D ~ 30 min at
+  #     r=0.3 um (D_particle=0.6 um); ~120 min at r=0.6 um (D_particle=1.2 um)
+  # Swelling_Softness (1.2-5.8x over range) scales D_eff up when pre-existing
+  # monomer/plasticizer has already opened the polymer network.
+  D_polymer_ref <- 5e-17                             # m^2/s, effective (see above)
+  T_scale_38    <- (p$T_system / 298.15)^1.5         # mild T proxy (not full WLF)
   D_polymer_eff <- D_polymer_ref * Swelling_Softness * T_scale_38  # always > 0
   tau_D_s       <- (r_particle_m^2) / D_polymer_eff               # always > 0; no s_pos (would swamp 1e-16)
-  f_diff        <- s_clamp(1.0 - exp(-3.0 * (p$tau * 60.0) / tau_D_s), 0.0, 1.0)  # p$tau in min -> sec
+  f_diff        <- s_clamp(1.0 - exp(-3.0 * (p$tau * 60.0) / tau_D_s), 0.0, 1.0)  # p$tau (=tau_eff) min -> s
 
   Swelling_Softness_exit <- Swelling_Softness        # alias for downstream thread
 
@@ -745,7 +757,7 @@ p_collapse <- ggplot(collapse_long, aes(x = dose, y = value, color = template)) 
   facet_wrap(~ metric, ncol = 1, scales = "free_y") +
   labs(title = "Spray-dryer collapse risk vs template dose",
        subtitle = paste0("Green band = pendular (target, low risk); orange = funicular.\n",
-         "Residual_Template_Fraction > 0 only for surface_weld (polymer-soluble template)."),
+         "RTF dominated by surface_weld (polymer-soluble); capillary_bridge carries a small residual; rigid/gas = 0."),
        x = "template_dose (template liquid / interstitial void volume)", y = NULL,
        color = "Template type") +
   theme_bw() + theme(legend.position = "bottom",
