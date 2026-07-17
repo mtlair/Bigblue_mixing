@@ -1,0 +1,32 @@
+
+>>> Pendular dose-window sweep...
+   > Saved Pendular_Dose_Window.csv
+   Pendular optima (fraction of void):
+         template opt_dose max_score
+ capillary_bridge    0.789     0.101
+              gas    0.020     0.000
+            rigid    0.166     0.137
+     surface_weld    0.240     0.239
+   > Saved rev37_Pendular_Dose_Window.png
+
+>>> Morris screen per template type...
+   - Template: rigid
+   - Template: gas
+   - Template: surface_weld
+   - Template: capillary_bridge
+   > Saved Morris_Templating_rev37_r25.rds
+
+>>> Rendering grouped zone plots (fixed per-feature axes)...
+   > rev37_Morris_Template_Target_Score.png
+   > rev37_Morris_Bond_Strength.png
+   > rev37_Morris_Retained_Porosity.png
+   > rev37_Morris_Blended_Porosity.png
+   > rev37_Morris_Blended_Sphericity.png
+   > rev37_Morris_Mixing_Potential.png
+   > rev37_Morris_Blended_WetSkin.png
+   > rev37_Morris_Blended_Size_um.png
+   > rev37_Morris_Blended_Viscosity_PaS.png
+   > rev37_Morris_SG_Colloid.png
+   > rev37_Morris_Blended_SG_Gassed.png
+
+>>> rev37 TEMPLATING STUDY COMPLETE.
