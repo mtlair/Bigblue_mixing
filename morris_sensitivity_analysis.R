@@ -39,6 +39,17 @@
 #     inter-particle pores; the relative permeability gates the falling-rate
 #     drying resistance and the vapor entrapment (vacuole inflation /
 #     blowhole rupture) of skinned droplets
+#   * Immiscible template-solvent emulsion: low-boiling (T_bp < T_bp,water)
+#     solvent droplets, pre-processed to a target size, ride through the
+#     nozzle incompressibly (no expansion work; only superheat flash at the
+#     letdown assists atomization) and survive early drying because their
+#     escape is solubility-limited. Once the particle crosses the solvent
+#     boiling point the fate splits three ways: clean D_e-sized templated
+#     pores (permeable shell), balloon inflation (vapor trapped under the
+#     skin), or micro-explosion bursting (Clausius-Clapeyron overpressure
+#     beats the cake yield stress). The sparged-gas foam chain (holdup,
+#     hold-time ripening, effervescent exit, per-mode gas trapping) is
+#     retained unchanged and acts in parallel.
 #
 # NOTE: the v47 impeller dissipation closure (v_tip) was removed - it belongs
 # to an upstream unit operation; its history is carried by the feed bubble
@@ -109,7 +120,10 @@ factors <- rbind(
   fac("n_flow",        0.40,   1.00,   FALSE, "-",     "power-law shear-thinning flow index"),
   fac("k_perm_mono",   5.0,    60.0,   FALSE, "-",     "monomer free-volume permeation coeff."),
   fac("k_perm_plast",  5.0,    60.0,   FALSE, "-",     "plasticizer free-volume permeation coeff."),
-  fac("k_perm_bind",   2.0,    40.0,   FALSE, "-",     "binder pore-blocking coefficient")
+  fac("k_perm_bind",   2.0,    40.0,   FALSE, "-",     "binder pore-blocking coefficient"),
+  fac("phi_emulsion",  0.00,   0.30,   FALSE, "-",     "template solvent emulsion volume fraction"),
+  fac("D_template",    5.0e-7, 1.0e-5, TRUE,  "m",     "pre-processed emulsion droplet diameter"),
+  fac("T_bp_solv",     300,    360,    FALSE, "K",     "template solvent boiling point (ambient)")
 )
 k <- nrow(factors)
 
@@ -156,6 +170,10 @@ gamma_ref <- 100      # rheometer reference shear rate          [1/s]
 t_res    <- 8         # dryer residence time                    [s]
 Tg_water <- 138       # glass transition of water (Fox)         [K]
 sig_y0   <- 4.0e6     # cake yield strength scale (Rumpf-type)  [Pa]
+rho_solv <- 750       # template solvent liquid density         [kg/m3]
+h_fg_solv <- 3.5e5    # template solvent latent heat            [J/kg]
+k_emu0   <- 2.0e-20   # emulsion LSW ripening rate (solubility-
+                      # limited; immiscible in water)           [m3/s]
 
 spray_dry_model <- function(x) {
   ALR    <- x[["ALR"]];        P_G    <- x[["P_system"]]
@@ -174,6 +192,9 @@ spray_dry_model <- function(x) {
   k_pm   <- x[["k_perm_mono"]]
   k_pp   <- x[["k_perm_plast"]]
   k_pb   <- x[["k_perm_bind"]]
+  phi_e  <- x[["phi_emulsion"]]
+  D_e    <- x[["D_template"]]
+  T_bpS  <- x[["T_bp_solv"]]
 
   ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
   # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
@@ -190,11 +211,18 @@ spray_dry_model <- function(x) {
   # (no monomer, plasticizer, or binder present).
   Perm_shell <- exp(k_pm * C_mono + k_pp * C_plas) / (1 + k_pb * C_bind)
 
+  # Template solvent emulsion: immiscible, incompressible liquid droplets
+  # pre-processed to target size D_e; they occupy liquid volume without
+  # contributing solids, and their mass rides the feed until the dryer
+  rho_lm <- (1 - phi_e) * rho_L + phi_e * rho_solv  # liquid mixture density
+  w_e    <- phi_e * rho_solv / rho_lm               # solvent mass fraction
+
   ## --- Module 0b: Feed rheology (Krieger-Dougherty + power-law thinning) ---
   phi_s      <- C_sol * rho_L / rho_s             # solid phase volume fraction
+  phi_disp   <- phi_s * (1 - phi_e) + phi_e       # solids + emulsion droplets
   mu_serum   <- mu_L * (1 + 10 * C_bind)          # binder thickening (K_fluid)
   mu_slurry0 <- mu_serum *
-                (1 - min(phi_s, 0.60) / phi_m)^(-2.5 * phi_m)
+                (1 - min(phi_disp, 0.60) / phi_m)^(-2.5 * phi_m)
   # power-law slurry: mu_app(g) = K g^(n-1), anchored so mu_slurry0 is the
   # measured apparent viscosity at the rheometer reference rate gamma_ref;
   # floored at the serum high-shear limit
@@ -205,9 +233,10 @@ spray_dry_model <- function(x) {
   # monolayer capacity vs total interfacial demand: primary colloid surface
   # (3*phi_s/a per m3, the dominant sink) plus bubble surface (6*alpha/D_b)
   cap_area   <- (C_surf / MW_surf) * rho_L * N_Av * A_molec   # [m2/m3]
-  part_area  <- 3 * phi_s / a_prim                            # [m2/m3]
+  part_area  <- 3 * phi_s * (1 - phi_e) / a_prim              # [m2/m3]
   gas_area   <- 6 * alpha0 / D_b                              # [m2/m3]
-  theta_surf <- min(1, cap_area / (part_area + gas_area))
+  emu_area   <- 6 * phi_e / D_e                               # [m2/m3]
+  theta_surf <- min(1, cap_area / (part_area + gas_area + emu_area))
   Foam_Stab  <- 1 + 5 * theta_surf * (HLB / 10)
   # under-stabilized foam sheds entrained gas before the nozzle
   alpha_g    <- alpha0 * (0.3 + 0.7 * theta_surf)
@@ -217,6 +246,12 @@ spray_dry_model <- function(x) {
   # under the liquid-line pressure, surfactant coverage retards both
   k_rip <- k_rip0 * (P_F / P_atm) * (1 - 0.8 * theta_surf)
   D_b_h <- (D_b^3 + k_rip * t_hold)^(1/3)         # coarsened bubble size
+  # emulsion coarsening is solubility-limited (immiscible solvent, no
+  # Henry's-law pressure acceleration) and strongly retarded by surfactant
+  # coverage: an under-covered emulsion drifts off its pre-processed
+  # target size during the pressurized hold
+  k_emu <- k_emu0 * (1 - 0.9 * theta_surf)
+  D_e_h <- (D_e^3 + k_emu * t_hold)^(1/3)         # coarsened template size
 
   ## --- Module 0e: DLVO electrostatics (v47 Sect. 6) ------------------------
   E_rep     <- dpH * (1 / (1 + 10 * I_str)) * (1 - theta_surf)
@@ -224,7 +259,7 @@ spray_dry_model <- function(x) {
 
   ## --- Module 1: Feed properties (at liquid-line pressure P_feed) ----------
   rho_G0    <- P_F / (R_air * T_feed)             # entrained gas density
-  rho_eff0  <- (1 - alpha_g) * rho_L + alpha_g * rho_G0   # rho_eff,z (HEM)
+  rho_eff0  <- (1 - alpha_g) * rho_lm + alpha_g * rho_G0  # rho_eff,z (HEM)
   mu_eff0   <- mu_slurry0 * (1 + 2.5 * alpha_g)   # low-shear mu_eff,z (bubbly)
   sigma_eff <- sigma * (1 - 0.5 * alpha_g)        # foam-reduced surface tension
 
@@ -240,10 +275,10 @@ spray_dry_model <- function(x) {
   alpha_e  <- min(alpha_g * r_exp / (1 - alpha_g + alpha_g * r_exp), 0.97)
   D_b_e    <- D_b_h * r_exp^(1/3)                 # bubble growth D_b ~ P^-1/3
   rho_Ge   <- P_atm / (R_air * T_feed)
-  rho_eff  <- (1 - alpha_e) * rho_L + alpha_e * rho_Ge
+  rho_eff  <- (1 - alpha_e) * rho_lm + alpha_e * rho_Ge
 
   ## --- Module 3: Nozzle hydraulics ------------------------------------------
-  U_L <- mdot_L / (rho_L * A_L)                   # liquid exit velocity
+  U_L <- mdot_L / (rho_lm * A_L)                  # liquid exit velocity
   # gas: fully-expanded isentropic velocity (choked upstream if P_G/P_atm>1.89)
   U_G <- 0.9 * sqrt(pmax(2 * gamma_a / (gamma_a - 1) * R_air * T_feed *
                          (1 - (P_atm / P_G)^((gamma_a - 1) / gamma_a)), 0))
@@ -262,7 +297,7 @@ spray_dry_model <- function(x) {
   mu_eff_hs <- mu_app(gdot_noz) * (1 + 2.5 * alpha_g)
   SMD_ab <- 0.48 * L_c * (sigma_eff / (rho_A * U_rel^2 * L_c))^0.4 *
               (1 + 1 / ALR)^0.4 +
-            0.15 * L_c * sqrt(mu_eff_hs^2 / (sigma_eff * rho_L * L_c)) *
+            0.15 * L_c * sqrt(mu_eff_hs^2 / (sigma_eff * rho_lm * L_c)) *
               (1 + 1 / ALR)
   # (b) bubbles small enough to ride inside the films burst on the final
   #     letdown and subdivide the fragments (multiplicative refinement);
@@ -271,6 +306,14 @@ spray_dry_model <- function(x) {
   g_in    <- 1 / (1 + D_b_th / t_film)            # fraction riding inside film
   F_flash <- (1 + alpha_th * (r_flash - 1))^(-1/3)
   SMD     <- SMD_ab * (1 - g_in * (1 - F_flash))
+  # (c) template-solvent flash: the letdown to ambient superheats the
+  #     low-boiling emulsion droplets riding in the fragments (T_feed vs
+  #     T_bp at 1 atm); partial nucleation flash-shatters them further
+  #     (liquid-to-vapor expansion O(200x), damped by the ~20 % fraction
+  #     that nucleates on the nozzle timescale)
+  S_flashn <- 1 / (1 + exp(-(T_feed - T_bpS) / 5))
+  F_fs     <- (1 + 40 * phi_e * S_flashn)^(-1/3)
+  SMD      <- SMD * F_fs
 
   ## --- Module 5a: Secondary breakup (Weber-number correction) --------------
   We_g <- rho_A * U_rel^2 * SMD / sigma_eff       # gas Weber number of drop
@@ -284,10 +327,11 @@ spray_dry_model <- function(x) {
   # (ii) excess atomizing air shear-strips satellites, and bursting bubble
   # films add fine debris -> fine mode (bimodality, pulls d10 down)
   E_a  <- ALR * U_rel^2                           # specific atomizing energy
-  Oh_e <- mu_eff_hs / sqrt(rho_L * sigma_eff * L_c)  # viscous breakup resistance
+  Oh_e <- mu_eff_hs / sqrt(rho_lm * sigma_eff * L_c) # viscous breakup resistance
   w_c  <- min(0.6, 0.5 / (1 + E_a / 1.5e5) * (1 + 3 * Oh_e))   # coarse tail
   w_f  <- min(0.35, 0.30 / (1 + 6e5 / E_a) +      # shear-strip satellites
-                    0.15 * g_in * alpha_th)       # + bubble-film debris
+                    0.15 * g_in * alpha_th +      # + bubble-film debris
+                    0.50 * phi_e * S_flashn)      # + solvent-flash satellites
   if ((w_c + w_f) > 0.7) { sc <- 0.7 / (w_c + w_f); w_c <- w_c * sc; w_f <- w_f * sc }
   w_m  <- 1 - w_c - w_f                           # main mode weight
 
@@ -305,8 +349,9 @@ spray_dry_model <- function(x) {
   BI   <- 2 * min(w_f, 1 - w_f)                   # fine-mode bimodality index
 
   ## --- Module 6a: Dryer energy / moisture balance (co-current) -------------
-  mdot_w <- mdot_L * (1 - C_sol)                  # water evaporation load
-  T_out  <- T_in - mdot_w * h_fg / (mdot_g * cp_gas)
+  mdot_w <- mdot_L * (1 - w_e) * (1 - C_sol)      # water evaporation load
+  mdot_e <- mdot_L * w_e                          # template solvent load
+  T_out  <- T_in - (mdot_w * h_fg + mdot_e * h_fg_solv) / (mdot_g * cp_gas)
   T_out  <- max(T_out, T_feed + 2)                # saturated / underpowered dryer
   Y_out  <- Y_in + mdot_w / mdot_g                # outlet absolute humidity
   p_v    <- Y_out / (Y_out + 0.622) * P_atm       # vapour partial pressure
@@ -343,17 +388,25 @@ spray_dry_model <- function(x) {
   X_moist <- sum(modes_w * X_j)                   # fraction of initial water
 
   ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
-  # residual solvent (monomer partially evaporates; plasticizer stays) plus
-  # water carried out by the under-dried coarse tail - moisture plasticizes
-  w_res  <- (0.5 * C_mono + C_plas) / (0.5 * C_mono + C_plas + C_sol)
+  # in co-current drying particles approach the outlet gas temperature
+  T_particle <- 0.85 * T_out + 0.15 * T_feed
+  # template solvent boils only if the particle crosses its boiling point;
+  # below it the immiscible solvent has no escape route (solubility-limited
+  # diffusion through water is negligible) and stays liquid in the matrix
+  S_bs   <- 1 / (1 + exp(-(T_particle - T_bpS) / 8))
+  R_solv <- 1 - S_bs                              # retained solvent fraction
+
+  # residual solvent (monomer partially evaporates; plasticizer stays;
+  # unboiled template solvent adds to the load) plus water carried out by
+  # the under-dried coarse tail - moisture plasticizes
+  w_res  <- (0.5 * C_mono + C_plas + w_e * R_solv) /
+            (0.5 * C_mono + C_plas + w_e * R_solv + C_sol)
   w_wat  <- min(0.12, X_moist * (1 - C_sol) /
                       (X_moist * (1 - C_sol) + C_sol))
   Tg_dry <- 1 / ((1 - w_res) / Tg_pol + w_res / Tg_solv)
   Tg_eff <- 1 / ((1 - w_wat) / Tg_dry + w_wat / Tg_water)
 
-  # stickiness: particle temperature vs Tg_eff + 20 K sticky-point offset;
-  # in co-current drying particles approach the outlet gas temperature
-  T_particle <- 0.85 * T_out + 0.15 * T_feed
+  # stickiness: particle temperature vs Tg_eff + 20 K sticky-point offset
   S_stick <- 1 / (1 + exp(-(T_particle - (Tg_eff + 20)) / 10))
 
   ## --- Module 7b: Cake (consolidated shell) mechanics -----------------------
@@ -368,6 +421,20 @@ spray_dry_model <- function(x) {
   f_col    <- Pi_col^2 / (1 + Pi_col^2)           # 0 = locks open, 1 = yields
 
   ## --- Module 7c: Per-mode porosity, sphericity, particle distribution -----
+  # Template-solvent fate: vapor generated under the skin must permeate the
+  # shell (same f_trap resistance as water); the Clausius-Clapeyron
+  # overpressure of the superheated solvent plays against the cake yield
+  # stress - a strong shell balloons (inflated pores), a weak one bursts
+  # (micro-explosion -> broken hollow shells); a permeable shell vents
+  # cleanly, leaving pores at the pre-processed template size
+  f_trap_s <- theta_skin / (theta_skin + Perm_shell)
+  dP_vap   <- P_atm * pmax(exp(0.025 * (T_particle - T_bpS)) - 1, 0)
+  Pi_b     <- dP_vap * f_trap_s * S_bs / max(sigma_y, 1e3)
+  f_burst  <- Pi_b^2 / (1 + Pi_b^2)
+  B_infl   <- 1.5 * f_trap_s * (1 - f_burst)      # balloon inflation factor
+  phi_templ <- min(0.6, phi_e * S_bs * (1 + B_infl) * (1 - 0.5 * f_burst))
+  D_pore    <- D_e_h * (1 + B_infl)^(1/3)         # templated pore size
+
   # gas retention per droplet mode (coarse droplets keep more bubbles)
   a_trap_j <- alpha_e / (1 + D_b_e / modes_m) * (0.5 + 0.5 * theta_surf)
   phi_str_eff <- phi_struct * (1 - 0.7 * f_col)   # yielding crushes pores
@@ -377,7 +444,8 @@ spray_dry_model <- function(x) {
   f_trap  <- theta_skin / (theta_skin + Perm_shell)
   S_boil  <- 1 / (1 + exp(-(T_particle - 373.15) / 8))  # superheat propensity
   phi_vac <- 0.30 * f_trap * S_boil
-  phi_int <- 1 - (1 - phi_str_eff) * (1 - phi_vac)      # structural + vacuole
+  phi_int <- 1 - (1 - phi_str_eff) * (1 - phi_vac) *    # structural + vacuole
+                 (1 - phi_templ)                        # + templated pores
   phi_j <- a_trap_j + (1 - a_trap_j) * phi_int
   phi_j <- phi_j * (1 - 0.6 * S_stick * (1 - 0.5 * theta_skin))
   phi_porosity <- sum(modes_w * phi_j)            # mass-weighted mixture
@@ -388,12 +456,13 @@ spray_dry_model <- function(x) {
   Omega_struct <- 1 - 0.55 * theta_skin * (0.3 + 0.7 * f_col) /
                     ((1 + resist) * (1 + 0.1 * Softness))
   Omega_struct <- Omega_struct + (1 - Omega_struct) * 0.4 * S_stick
-  # over-pressurized impermeable shells rupture (blowholes), denting the
-  # sphericity that the inflation would otherwise restore
-  Omega_struct <- Omega_struct * (1 - 0.30 * phi_vac)
+  # over-pressurized impermeable shells rupture (blowholes and template
+  # micro-explosions), denting the sphericity inflation would restore
+  Omega_struct <- Omega_struct * (1 - 0.30 * phi_vac) *
+                  (1 - 0.35 * f_burst * min(3 * phi_e, 1))
 
   # per-mode particle diameters (solids balance) and mixture quantiles
-  Dp_j <- modes_m * ((1 - a_trap_j) * rho_L * C_sol /
+  Dp_j <- modes_m * ((1 - a_trap_j) * (1 - phi_e) * rho_L * C_sol /
                      (rho_s * (1 - phi_j)))^(1/3)
   grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)
   cdfp <- Reduce(`+`, Map(function(w, m, s)
@@ -428,6 +497,9 @@ spray_dry_model <- function(x) {
     Tg_product_K   = Tg_eff,
     X_moisture     = X_moist,
     Perm_shell_rel = Perm_shell,
+    D_pore_um      = D_pore * 1e6,
+    solv_retained  = R_solv,
+    f_burst_solv   = f_burst,
     sigma_y_cake_MPa = sigma_y / 1e6)
 }
 
@@ -536,6 +608,9 @@ titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
             Tg_product_K   = "Product glass transition  Tg_eff [K]",
             X_moisture     = "Residual moisture (frac. of feed water) [-]",
             Perm_shell_rel = "Shell permeability (relative)  Perm_shell [-]",
+            D_pore_um      = "Templated pore size  D_pore [um]",
+            solv_retained  = "Retained template solvent (frac. of load) [-]",
+            f_burst_solv   = "Template micro-explosion severity  f_burst [-]",
             sigma_y_cake_MPa = "Cake yield strength  sigma_y [MPa]")
 
 plot_morris_panel <- function(st, title, n_label = 10) {
@@ -555,8 +630,8 @@ plot_morris_panel <- function(st, title, n_label = 10) {
 }
 
 png(file.path("output", "morris_sensitivity_plots.png"),
-    width = 3000, height = 3000, res = 160)
-op <- par(mfrow = c(4, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
+    width = 3000, height = 3750, res = 160)
+op <- par(mfrow = c(5, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
 for (o in outputs) plot_morris_panel(stats_list[[o]], titles[[o]])
 mtext(sprintf(paste("Morris screening: %d trajectories, %d levels, %d model",
                     "runs | dashed: sigma = mu* (non-linear/interacting),",
