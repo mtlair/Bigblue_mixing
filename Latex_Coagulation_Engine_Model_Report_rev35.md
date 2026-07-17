@@ -268,11 +268,57 @@ chunked — that is a design consequence, not a physics change), and log-sampled
 EEs per decade. rev35 and rev36 rankings are therefore each internally consistent but not
 directly comparable number-to-number.
 
-### 5.6 Result artifacts
+### 5.6 rev37 templating strategy study + pendular dose window
 
-- `Morris_Omnibus_rev35_r25.rds` / `Morris_Omnibus_rev36_r25.rds` — full design matrices, raw outputs, and regime metadata (162 / 486 scenarios)
+`up1_module_rev37_templating.r` (v51) adds a `template_type` switch — `rigid` seed, `gas`
+(non-penetrating), `surface_weld` liquid (polymer-soluble, volatile → Frenkel neck welding),
+`capillary_bridge` liquid (both-immiscible, wetting → Rumpf pendular bridges) — plus a continuous
+`template_dose` factor (template liquid as a fraction of interstitial void volume) and three new
+terminal outputs: `Bond_Strength`, `Retained_Porosity`, and `Template_Target_Score`
+(= Bond_Strength × Retained_Porosity/ε_rcp, the "stick-but-porous" objective). Physics rationale
+and the full liquid-template analysis are in `Liquid_Template_Summary.md`.
+
+**Pendular dose window** (deterministic dose sweep at nominal formulation,
+`Pendular_Dose_Window.csv` / `rev37_Pendular_Dose_Window.png`):
+
+| Template type | Optimal dose (fraction of void) | Max target score | Regime of optimum |
+|---|---|---|---|
+| surface_weld | 0.240 | 0.239 | pendular boundary (best fit) |
+| rigid | 0.166 | 0.137 | pendular |
+| capillary_bridge | 0.789 | 0.101 | funicular/capillary edge |
+| gas | 0.020 | 0.000 | no bonding |
+
+The optimum for the polymer-soluble volatile (surface-weld) template sits right at the pendular /
+funicular boundary (dose ≈ 0.24 of void ≈ 6 wt% of solids) and gives the highest score — matching
+the hand analysis: welded necks that survive solvent stripping preserve voids, and over-dosing past
+the pendular window collapses them via coalescence. Capillary bridging tolerates higher fill before
+densifying (optimum ≈ 0.79) but yields a lower peak score because the bonds are reversible; gas
+templating scores ~0 (it makes voids but no interparticle bonds).
+
+**Morris screen per template type** (r = 25, 24 factors including `template_dose`, full-range;
+`rev37_Morris_<target>.png`, `rev37_templating_summary.md`). Top drivers of the target score:
+
+- **rigid:** template_dose, Q_template, D_template, C_temp_mass — all **linear/additive** (green).
+  Rigid templating behaves predictably; loading and seed geometry set the outcome.
+- **surface_weld:** template_dose (dominant), tau (weld kinetics), then the surfactant group
+  (A_molecule, C_surfactant, MW_surfactant) — all **complex/interacting** (orange). Surfactant
+  lowers interfacial tension and weakens welds, coupling surface chemistry to bond strength.
+- **capillary_bridge:** D_particle (dominant — Rumpf strength ∝ 1/d), template_dose, and the
+  surfactant group — all **interacting**. Particle size is the master variable for capillary bonds.
+- **gas:** target score ~0; only the solids-loading factors move the (porosity-only) response.
+
+The grouped zone plots (rows = template type, columns = Process / Surface Chemistry / Polymer,
+fixed axes per feature, colours green=linear / orange=complex / red=volatile / grey=no interaction)
+make the rigid-vs-liquid contrast visually immediate: the rigid row is additive, the liquid rows
+are interaction-dominated.
+
+### 5.7 Result artifacts
+
+- `Morris_Omnibus_rev35_r25.rds` / `Morris_Omnibus_rev36_r25.rds` / `Morris_Templating_rev37_r25.rds` — design matrices, raw outputs, metadata (162 / 486 / 4-template scenarios)
 - `Lens_*.png` (rev35) and `rev36_Lens_*.png` — 24 + 24 regime-trellis μ*–σ maps (8 targets × 3 factor lenses each)
-- `morris_run.log` / `morris_run_rev36.log` — execution logs (97,200 + 291,600 runs, no solver failures)
+- `rev37_Morris_*.png` — 11 grouped zone maps (template × variable-group, fixed per-feature axes); `rev37_Pendular_Dose_Window.png` + `Pendular_Dose_Window.csv` — dose sweep
+- `Liquid_Template_Summary.md` — standalone liquid-templating physics note; `rev37_templating_summary.md` — templating rankings
+- `morris_run.log` / `morris_run_rev36.log` / `morris_run_rev37.log` — execution logs (no solver failures)
 
 ---
 
