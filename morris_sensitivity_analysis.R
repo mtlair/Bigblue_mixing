@@ -98,17 +98,18 @@ factors <- data.frame(
            "C_surfactant",  # formulated surfactant concentration      [-]
            "Delta_pH",      # delta pH vs isoelectric point            [-]
            "I_strength",    # ionic strength                           [M]
-           "Tg_polymer"),   # dry-polymer glass transition             [K]
+           "Tg_polymer",    # dry-polymer glass transition             [K]
+           "n_flow"),       # power-law shear-thinning flow index      [-]
   min  = c( 1.0, 2.0e5, 1.5e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05,
             330, 0.10, 0.001, 280,   5, 0.000, 0.000, 0.000, 1.0e-4, 0.2,
-            1.0e-3, 280),
+            1.0e-3, 280, 0.40),
   max  = c(10.0, 7.0e5, 1.0e6, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40,
             470, 1.00, 0.020, 330, 600, 0.020, 0.050, 0.050, 2.0e-2, 4.0,
-            5.0e-1, 380),
+            5.0e-1, 380, 1.00),
   # sample wide-ranging positive factors log-uniformly
   log  = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE,
            FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE,
-           TRUE, FALSE),
+           TRUE, FALSE, FALSE),
   stringsAsFactors = FALSE
 )
 k <- nrow(factors)
@@ -152,6 +153,10 @@ C_cham   <- 0.80      # mixing chamber / air supply pressure    [-]
 k_rip0   <- 4.0e-15   # Ostwald ripening rate at 1 atm          [m3/s]
 cp_gas   <- 1005      # dryer gas heat capacity                 [J/kg K]
 h_fg     <- 2.30e6    # latent heat of water evaporation        [J/kg]
+gamma_ref <- 100      # rheometer reference shear rate          [1/s]
+t_res    <- 8         # dryer residence time                    [s]
+Tg_water <- 138       # glass transition of water (Fox)         [K]
+sig_y0   <- 4.0e6     # cake yield strength scale (Rumpf-type)  [Pa]
 
 spray_dry_model <- function(x) {
   ALR    <- x[["ALR"]];        P_G    <- x[["P_system"]]
@@ -166,7 +171,7 @@ spray_dry_model <- function(x) {
   C_mono <- x[["C_monomer"]];  C_plas <- x[["C_plasticizer"]]
   C_bind <- x[["C_binder"]];   C_surf <- x[["C_surfactant"]]
   dpH    <- x[["Delta_pH"]];   I_str  <- x[["I_strength"]]
-  Tg_pol <- x[["Tg_polymer"]]
+  Tg_pol <- x[["Tg_polymer"]]; n_fl   <- x[["n_flow"]]
 
   ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
   # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
@@ -174,11 +179,16 @@ spray_dry_model <- function(x) {
   phi_solvent <- C_mono + C_plas
   Softness    <- (1 + 5 * C_bind) * exp(25 * phi_solvent)
 
-  ## --- Module 0b: Feed rheology (Krieger-Dougherty crowding) ---------------
-  phi_s     <- C_sol * rho_L / rho_s              # solid phase volume fraction
-  mu_serum  <- mu_L * (1 + 10 * C_bind)           # binder thickening (K_fluid)
-  mu_slurry <- mu_serum *
-               (1 - min(phi_s, 0.60) / phi_m)^(-2.5 * phi_m)
+  ## --- Module 0b: Feed rheology (Krieger-Dougherty + power-law thinning) ---
+  phi_s      <- C_sol * rho_L / rho_s             # solid phase volume fraction
+  mu_serum   <- mu_L * (1 + 10 * C_bind)          # binder thickening (K_fluid)
+  mu_slurry0 <- mu_serum *
+                (1 - min(phi_s, 0.60) / phi_m)^(-2.5 * phi_m)
+  # power-law slurry: mu_app(g) = K g^(n-1), anchored so mu_slurry0 is the
+  # measured apparent viscosity at the rheometer reference rate gamma_ref;
+  # floored at the serum high-shear limit
+  mu_app <- function(gdot)
+    pmax(1e-3, mu_slurry0 * (gdot / gamma_ref)^(n_fl - 1))
 
   ## --- Module 0c: Surfactant molar stoichiometry (v47 Sect. 5) -------------
   # monolayer capacity vs total interfacial demand: primary colloid surface
@@ -204,7 +214,7 @@ spray_dry_model <- function(x) {
   ## --- Module 1: Feed properties (at liquid-line pressure P_feed) ----------
   rho_G0    <- P_F / (R_air * T_feed)             # entrained gas density
   rho_eff0  <- (1 - alpha_g) * rho_L + alpha_g * rho_G0   # rho_eff,z (HEM)
-  mu_eff    <- mu_slurry * (1 + 2.5 * alpha_g)    # mu_eff,z (dilute-bubble)
+  mu_eff0   <- mu_slurry0 * (1 + 2.5 * alpha_g)   # low-shear mu_eff,z (bubbly)
   sigma_eff <- sigma * (1 - 0.5 * alpha_g)        # foam-reduced surface tension
 
   ## --- Module 2: Nozzle pressure ladder & two-phase conditioning -----------
@@ -236,9 +246,12 @@ spray_dry_model <- function(x) {
   #     shrinking the characteristic length the airblast correlation sees
   t_film <- (D_h / 2) * (1 - sqrt(alpha_th))      # annular film thickness
   L_c    <- max(2 * t_film, 0.02 * D_h)           # characteristic length
+  # atomization sees the power-law apparent viscosity at the film shear rate
+  gdot_noz  <- U_rel / max(t_film, 1e-5)          # nozzle shear rate ~1e5-1e7
+  mu_eff_hs <- mu_app(gdot_noz) * (1 + 2.5 * alpha_g)
   SMD_ab <- 0.48 * L_c * (sigma_eff / (rho_A * U_rel^2 * L_c))^0.4 *
               (1 + 1 / ALR)^0.4 +
-            0.15 * L_c * sqrt(mu_eff^2 / (sigma_eff * rho_L * L_c)) *
+            0.15 * L_c * sqrt(mu_eff_hs^2 / (sigma_eff * rho_L * L_c)) *
               (1 + 1 / ALR)
   # (b) bubbles small enough to ride inside the films burst on the final
   #     letdown and subdivide the fragments (multiplicative refinement);
@@ -260,7 +273,7 @@ spray_dry_model <- function(x) {
   # (ii) excess atomizing air shear-strips satellites, and bursting bubble
   # films add fine debris -> fine mode (bimodality, pulls d10 down)
   E_a  <- ALR * U_rel^2                           # specific atomizing energy
-  Oh_e <- mu_eff / sqrt(rho_L * sigma_eff * L_c)  # viscous breakup resistance
+  Oh_e <- mu_eff_hs / sqrt(rho_L * sigma_eff * L_c)  # viscous breakup resistance
   w_c  <- min(0.6, 0.5 / (1 + E_a / 1.5e5) * (1 + 3 * Oh_e))   # coarse tail
   w_f  <- min(0.35, 0.30 / (1 + 6e5 / E_a) +      # shear-strip satellites
                     0.15 * g_in * alpha_th)       # + bubble-film debris
@@ -308,46 +321,73 @@ spray_dry_model <- function(x) {
   D_f <- 1.8 + 0.7 * min((stability - 1) / 5, 1)
   phi_struct <- 0.30 * theta_skin * (1 - d_ratio^(3 - D_f))
 
-  # alpha_trap,z : gas retained inside droplets - bubbles comparable to or
-  # larger than the droplet are shed during breakup; surfactant-stabilized
-  # films (theta_surf) resist rupture and hold gas in
-  alpha_trap <- alpha_e / (1 + D_b_e / d_drop) * (0.5 + 0.5 * theta_surf)
+  ## --- Module 6c: Per-mode drying & residual moisture ----------------------
+  # d2-law drying time per droplet mode, retarded by the skin (falling-rate
+  # period); the coarse tail can leave the tower wet
+  tau_dry <- (modes_m^2 / kappa) * (1 + 20 * theta_skin)
+  X_j     <- exp(-t_res / tau_dry)                # residual water per mode
+  X_moist <- sum(modes_w * X_j)                   # fraction of initial water
 
-  # phi_porosity,z : total porosity (void fraction state)
-  phi_porosity <- alpha_trap + (1 - alpha_trap) * phi_struct
-
-  ## --- Module 7: Product glass transition & thermal state ------------------
-  # Fox equation on residual solvent retained in the dry particle
-  # (monomer partially evaporates; plasticizer stays)
+  ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
+  # residual solvent (monomer partially evaporates; plasticizer stays) plus
+  # water carried out by the under-dried coarse tail - moisture plasticizes
   w_res  <- (0.5 * C_mono + C_plas) / (0.5 * C_mono + C_plas + C_sol)
-  Tg_eff <- 1 / ((1 - w_res) / Tg_pol + w_res / Tg_solv)
+  w_wat  <- min(0.12, X_moist * (1 - C_sol) /
+                      (X_moist * (1 - C_sol) + C_sol))
+  Tg_dry <- 1 / ((1 - w_res) / Tg_pol + w_res / Tg_solv)
+  Tg_eff <- 1 / ((1 - w_wat) / Tg_dry + w_wat / Tg_water)
 
   # stickiness: particle temperature vs Tg_eff + 20 K sticky-point offset;
   # in co-current drying particles approach the outlet gas temperature
   T_particle <- 0.85 * T_out + 0.15 * T_feed
   S_stick <- 1 / (1 + exp(-(T_particle - (Tg_eff + 20)) / 10))
 
-  # above Tg the matrix flows: pores collapse (unless skin-locked)
-  phi_porosity <- phi_porosity * (1 - 0.6 * S_stick * (1 - 0.5 * theta_skin))
+  ## --- Module 7b: Cake (consolidated shell) mechanics -----------------------
+  # Rumpf-type yield strength of the particulate cake vs meniscus capillary
+  # stress decides collapse vs lock-in. Coagulated (low-stability) cakes
+  # bond rigidly; Flory-Huggins softness and above-Tg mobility weaken them
+  phi_cake <- 0.45 + 0.19 * min((stability - 1) / 5, 1)
+  sigma_y  <- sig_y0 * (phi_cake / 0.64)^4 * (1 + 2 / stability) /
+              sqrt(Softness) * (1 - 0.85 * S_stick)
+  P_cap    <- 2 * sigma_eff / (0.3 * a_prim)      # meniscus capillary stress
+  Pi_col   <- P_cap / max(sigma_y, 1e3)           # collapse severity number
+  f_col    <- Pi_col^2 / (1 + Pi_col^2)           # 0 = locks open, 1 = yields
 
-  # Omega_struct,z : sphericity; high sigma & mu resist skin buckling, a
-  # plasticized (soft) matrix re-rounds, and stickiness anneals dents
-  resist <- (sigma_eff / 0.05) * (mu_eff / 0.01)^0.3
-  Omega_struct <- 1 - 0.55 * theta_skin / ((1 + resist) * (1 + 0.1 * Softness))
+  ## --- Module 7c: Per-mode porosity, sphericity, particle distribution -----
+  # gas retention per droplet mode (coarse droplets keep more bubbles)
+  a_trap_j <- alpha_e / (1 + D_b_e / modes_m) * (0.5 + 0.5 * theta_surf)
+  phi_str_eff <- phi_struct * (1 - 0.7 * f_col)   # yielding crushes pores
+  phi_j <- a_trap_j + (1 - a_trap_j) * phi_str_eff
+  phi_j <- phi_j * (1 - 0.6 * S_stick * (1 - 0.5 * theta_skin))
+  phi_porosity <- sum(modes_w * phi_j)            # mass-weighted mixture
+
+  # Omega_struct,z : pre-shell rounding resisted by sigma and low-shear
+  # viscosity; post-shell buckling requires the cake to yield (f_col)
+  resist <- (sigma_eff / 0.05) * (mu_eff0 / 0.01)^0.3
+  Omega_struct <- 1 - 0.55 * theta_skin * (0.3 + 0.7 * f_col) /
+                    ((1 + resist) * (1 + 0.1 * Softness))
   Omega_struct <- Omega_struct + (1 - Omega_struct) * 0.4 * S_stick
 
-  # Final particle size: solids mass balance on one droplet
-  D_particle <- d_drop * ((1 - alpha_trap) * rho_L * C_sol /
-                          (rho_s * (1 - phi_porosity)))^(1/3)
+  # per-mode particle diameters (solids balance) and mixture quantiles
+  Dp_j <- modes_m * ((1 - a_trap_j) * rho_L * C_sol /
+                     (rho_s * (1 - phi_j)))^(1/3)
+  grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)
+  cdfp <- Reduce(`+`, Map(function(w, m, s)
+            w * pnorm((grp - log(m)) / log(s)), modes_w, Dp_j, modes_s))
+  qp_at <- function(p) exp(approx(cdfp, grp, xout = p, ties = "ordered")$y)
+  Dp50 <- qp_at(0.50); Dp90 <- qp_at(0.90)
 
-  # Envelope density and tapped density (v47 Sect. 10 density closure);
-  # sticky / plasticized powders cake and pack worse, fines cohere
-  rho_env  <- (1 - phi_porosity) * rho_s + phi_porosity * 1.2
-  f_pack   <- 0.64 * (0.55 + 0.45 * Omega_struct) *
-              (D_particle / (D_particle + 8e-6)) *
-              (1 - 0.2 * S_stick) *
-              (1 - 0.15 * min(Softness / 25, 1))
-  rho_tapped <- rho_env * f_pack
+  ## --- Module 7d: Tapped density (v47 Sect. 10 density closure) ------------
+  # bimodal blends pack better (fines fill interstices); sticky, plasticized
+  # or moist powders cake and pack worse
+  rho_env <- sum(modes_w * ((1 - phi_j) * rho_s + phi_j * 1.2))
+  f_pack  <- 0.64 * (0.55 + 0.45 * Omega_struct) *
+             (Dp50 / (Dp50 + 8e-6)) *
+             (1 + 0.5 * modes_w[3] * modes_w[1]) *
+             (1 - 0.2 * S_stick) *
+             (1 - 0.15 * min(Softness / 25, 1)) *
+             (1 - 2 * min(X_moist, 0.2))
+  rho_tapped <- rho_env * max(f_pack, 0.05)
 
   c(d_droplet_um   = d50 * 1e6,
     d10_um         = d10 * 1e6,
@@ -355,12 +395,15 @@ spray_dry_model <- function(x) {
     d99_um         = d99 * 1e6,
     span           = span,
     BI_bimodal     = BI,
-    D_particle_um  = D_particle * 1e6,
+    D_particle_um  = Dp50 * 1e6,
+    Dp90_um        = Dp90 * 1e6,
     theta_skin_z   = theta_skin,
     Omega_struct_z = Omega_struct,
     phi_porosity_z = phi_porosity,
     rho_tapped     = rho_tapped,
-    Tg_product_K   = Tg_eff)
+    Tg_product_K   = Tg_eff,
+    X_moisture     = X_moist,
+    sigma_y_cake_MPa = sigma_y / 1e6)
 }
 
 run_model <- function(X01) {
@@ -459,12 +502,15 @@ titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
             d99_um         = "Extreme coarse tail  d99 [um]",
             span           = "Span  (d90-d10)/d50 [-]",
             BI_bimodal     = "Bimodality index [-]",
-            D_particle_um  = "Final particle size  D_particle [um]",
+            D_particle_um  = "Final particle size  Dp50 [um]",
+            Dp90_um        = "Particle coarse tail  Dp90 [um]",
             theta_skin_z   = "Skin formation  theta_skin,z [-]",
             Omega_struct_z = "Sphericity  Omega_struct,z [-]",
             phi_porosity_z = "Porosity  phi_porosity,z [-]",
             rho_tapped     = "Tapped density  rho_tapped [kg/m3]",
-            Tg_product_K   = "Product glass transition  Tg_eff [K]")
+            Tg_product_K   = "Product glass transition  Tg_eff [K]",
+            X_moisture     = "Residual moisture (frac. of feed water) [-]",
+            sigma_y_cake_MPa = "Cake yield strength  sigma_y [MPa]")
 
 plot_morris_panel <- function(st, title, n_label = 10) {
   plot(st$mu.star, st$sigma,
@@ -483,8 +529,8 @@ plot_morris_panel <- function(st, title, n_label = 10) {
 }
 
 png(file.path("output", "morris_sensitivity_plots.png"),
-    width = 3000, height = 2250, res = 160)
-op <- par(mfrow = c(3, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
+    width = 3000, height = 3000, res = 160)
+op <- par(mfrow = c(4, 4), mar = c(4.5, 4.5, 2.5, 1), oma = c(2.5, 0, 0, 0))
 for (o in outputs) plot_morris_panel(stats_list[[o]], titles[[o]])
 mtext(sprintf(paste("Morris screening: %d trajectories, %d levels, %d model",
                     "runs | dashed: sigma = mu* (non-linear/interacting),",
