@@ -33,6 +33,12 @@
 #     inlet absolute humidity Y_in give co-current outlet temperature and
 #     relative humidity, which drive the drying Peclet number and the
 #     sticky-point state (replaces the former independent RH_gas knob)
+#   * Shell permeability closure: residual monomer and plasticizer open
+#     free-volume diffusion pathways through the forming skin (permeability
+#     rises exponentially with solvent load) while binder films plug
+#     inter-particle pores; the relative permeability gates the falling-rate
+#     drying resistance and the vapor entrapment (vacuole inflation /
+#     blowhole rupture) of skinned droplets
 #
 # NOTE: the v47 impeller dissipation closure (v_tip) was removed - it belongs
 # to an upstream unit operation; its history is carried by the feed bubble
@@ -99,17 +105,20 @@ factors <- data.frame(
            "Delta_pH",      # delta pH vs isoelectric point            [-]
            "I_strength",    # ionic strength                           [M]
            "Tg_polymer",    # dry-polymer glass transition             [K]
-           "n_flow"),       # power-law shear-thinning flow index      [-]
+           "n_flow",        # power-law shear-thinning flow index      [-]
+           "k_perm_mono",   # monomer free-volume permeation coeff.    [-]
+           "k_perm_plast",  # plasticizer free-volume permeation coeff.[-]
+           "k_perm_bind"),  # binder pore-blocking coefficient         [-]
   min  = c( 1.0, 2.0e5, 1.5e5, 0.002, 0.030, 0.0012, 1000, 0.05, 2.0e-5, 0.05,
             330, 0.10, 0.001, 280,   5, 0.000, 0.000, 0.000, 1.0e-4, 0.2,
-            1.0e-3, 280, 0.40),
+            1.0e-3, 280, 0.40, 5.0, 5.0, 2.0),
   max  = c(10.0, 7.0e5, 1.0e6, 0.020, 0.070, 0.0560, 1300, 0.60, 2.0e-4, 0.40,
             470, 1.00, 0.020, 330, 600, 0.020, 0.050, 0.050, 2.0e-2, 4.0,
-            5.0e-1, 380, 1.00),
+            5.0e-1, 380, 1.00, 60.0, 60.0, 40.0),
   # sample wide-ranging positive factors log-uniformly
   log  = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE,
            FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE,
-           TRUE, FALSE, FALSE),
+           TRUE, FALSE, FALSE, FALSE, FALSE, FALSE),
   stringsAsFactors = FALSE
 )
 k <- nrow(factors)
@@ -172,12 +181,24 @@ spray_dry_model <- function(x) {
   C_bind <- x[["C_binder"]];   C_surf <- x[["C_surfactant"]]
   dpH    <- x[["Delta_pH"]];   I_str  <- x[["I_strength"]]
   Tg_pol <- x[["Tg_polymer"]]; n_fl   <- x[["n_flow"]]
+  k_pm   <- x[["k_perm_mono"]]
+  k_pp   <- x[["k_perm_plast"]]
+  k_pb   <- x[["k_perm_bind"]]
 
   ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
   # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
   # matrix exponentially and independently of temperature
   phi_solvent <- C_mono + C_plas
   Softness    <- (1 + 5 * C_bind) * exp(25 * phi_solvent)
+
+  # Shell permeability (free-volume theory): residual monomer and
+  # plasticizer swell the polymer shell and open diffusive pathways for
+  # water vapor - permeability grows exponentially with each solvent load,
+  # with species-specific permeation coefficients. Binder films spread over
+  # the primary particles and plug the inter-particle pore throats
+  # (hydraulic blocking). Perm_shell = 1 for a clean formulation
+  # (no monomer, plasticizer, or binder present).
+  Perm_shell <- exp(k_pm * C_mono + k_pp * C_plas) / (1 + k_pb * C_bind)
 
   ## --- Module 0b: Feed rheology (Krieger-Dougherty + power-law thinning) ---
   phi_s      <- C_sol * rho_L / rho_s             # solid phase volume fraction
@@ -323,8 +344,11 @@ spray_dry_model <- function(x) {
 
   ## --- Module 6c: Per-mode drying & residual moisture ----------------------
   # d2-law drying time per droplet mode, retarded by the skin (falling-rate
-  # period); the coarse tail can leave the tower wet
-  tau_dry <- (modes_m^2 / kappa) * (1 + 20 * theta_skin)
+  # period); the skin resistance scales inversely with the shell
+  # permeability - plasticized/swollen shells stay open to vapor transport
+  # while binder-blocked shells choke it; the coarse tail can leave the
+  # tower wet
+  tau_dry <- (modes_m^2 / kappa) * (1 + 20 * theta_skin / Perm_shell)
   X_j     <- exp(-t_res / tau_dry)                # residual water per mode
   X_moist <- sum(modes_w * X_j)                   # fraction of initial water
 
@@ -357,7 +381,14 @@ spray_dry_model <- function(x) {
   # gas retention per droplet mode (coarse droplets keep more bubbles)
   a_trap_j <- alpha_e / (1 + D_b_e / modes_m) * (0.5 + 0.5 * theta_surf)
   phi_str_eff <- phi_struct * (1 - 0.7 * f_col)   # yielding crushes pores
-  phi_j <- a_trap_j + (1 - a_trap_j) * phi_str_eff
+  # vapor entrapment: water evaporating beneath a formed skin must permeate
+  # the shell; low-permeability shells on superheated droplets build
+  # internal vapor pressure and inflate vacuoles (hollow particles)
+  f_trap  <- theta_skin / (theta_skin + Perm_shell)
+  S_boil  <- 1 / (1 + exp(-(T_particle - 373.15) / 8))  # superheat propensity
+  phi_vac <- 0.30 * f_trap * S_boil
+  phi_int <- 1 - (1 - phi_str_eff) * (1 - phi_vac)      # structural + vacuole
+  phi_j <- a_trap_j + (1 - a_trap_j) * phi_int
   phi_j <- phi_j * (1 - 0.6 * S_stick * (1 - 0.5 * theta_skin))
   phi_porosity <- sum(modes_w * phi_j)            # mass-weighted mixture
 
@@ -367,6 +398,9 @@ spray_dry_model <- function(x) {
   Omega_struct <- 1 - 0.55 * theta_skin * (0.3 + 0.7 * f_col) /
                     ((1 + resist) * (1 + 0.1 * Softness))
   Omega_struct <- Omega_struct + (1 - Omega_struct) * 0.4 * S_stick
+  # over-pressurized impermeable shells rupture (blowholes), denting the
+  # sphericity that the inflation would otherwise restore
+  Omega_struct <- Omega_struct * (1 - 0.30 * phi_vac)
 
   # per-mode particle diameters (solids balance) and mixture quantiles
   Dp_j <- modes_m * ((1 - a_trap_j) * rho_L * C_sol /
@@ -403,6 +437,7 @@ spray_dry_model <- function(x) {
     rho_tapped     = rho_tapped,
     Tg_product_K   = Tg_eff,
     X_moisture     = X_moist,
+    Perm_shell_rel = Perm_shell,
     sigma_y_cake_MPa = sigma_y / 1e6)
 }
 
@@ -510,6 +545,7 @@ titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
             rho_tapped     = "Tapped density  rho_tapped [kg/m3]",
             Tg_product_K   = "Product glass transition  Tg_eff [K]",
             X_moisture     = "Residual moisture (frac. of feed water) [-]",
+            Perm_shell_rel = "Shell permeability (relative)  Perm_shell [-]",
             sigma_y_cake_MPa = "Cake yield strength  sigma_y [MPa]")
 
 plot_morris_panel <- function(st, title, n_label = 10) {
