@@ -117,7 +117,7 @@ unified_centrifuge_model <- function(run) {
   # keep the pond physical even if equipment geometry is swept
   r_pool <- min(max(r_pool, r_discharge + 0.005), r_bowl - 0.005)
 
-  rho_poly <- 1700; rho_liq <- 1000     # dry solids density (no air) [kg/m3]; water
+  rho_poly <- 1800; rho_liq <- 1000     # dry solids density (no air) [kg/m3]; water
   R_gas <- 8.314; R_air <- 287
   P_atm <- 101325; omega <- rpm * (2 * pi / 60)
 
