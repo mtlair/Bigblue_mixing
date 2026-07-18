@@ -223,15 +223,25 @@ unified_centrifuge_model <- function(run) {
   u_slip     <- D_b_eff^2 * (rho_liq - rho_gas) * g_eff / (18 * mu_film)
   f_gas_rise <- 1 - exp(-u_slip * t_pond / dist)          # free-bubble escape
 
-  # --- Degassing: pop, then two parallel centrifugal escape routes -------
-  # After mechanical popping the entrained gas splits into a foam-bound share
-  # (foam_stability) that leaves by drainage collapse, and a free-bubble share
-  # that leaves by the drift-flux buoyant rise above.
+  # --- Degassing: pop, then THREE parallel fates for the entrained gas ---
+  # After mechanical popping the gas partitions three ways:
+  #   * particle-attached (flotation): bubbles attach to the hydrophobic polymer
+  #     particles and RIDE WITH THE SOLIDS - they do not rise freely, so this
+  #     gas is RETAINED in the product. This is the residual air that keeps the
+  #     exit slurry buoyant (still floats in water, denser than a gravity foam).
+  #   * foam-bound: leaves by drainage collapse.
+  #   * free bubbles: leave by the drift-flux buoyant rise above.
   pop_frac_eff <- pop_frac * (1 - 0.6 * foam_stability)
   Q_gas_after_pop <- Q_gas_atm * (1 - pop_frac_eff)
-  Q_gas_foam <- Q_gas_after_pop * foam_stability
-  Q_gas_free <- Q_gas_after_pop * (1 - foam_stability)
-  Q_gas_surviving_atm <- Q_gas_foam * (1 - foam_drained_frac) +
+  # flotation attachment: hydrophobic (low-HLB) particles at a favourable
+  # contact angle capture the most gas
+  p_attach   <- min(1, pickering_wet * affinity_poly)
+  Q_gas_attach <- Q_gas_after_pop * p_attach              # retained with solids
+  Q_gas_disp   <- Q_gas_after_pop * (1 - p_attach)
+  Q_gas_foam   <- Q_gas_disp * foam_stability
+  Q_gas_free   <- Q_gas_disp * (1 - foam_stability)
+  Q_gas_surviving_atm <- Q_gas_attach +
+                         Q_gas_foam * (1 - foam_drained_frac) +
                          Q_gas_free * (1 - f_gas_rise)
 
   # Compression (Boyle)
@@ -439,12 +449,23 @@ unified_centrifuge_model <- function(run) {
   # ---------------------------------------------------------
   # F.5 GAS CARRIED FORWARD IN THE SLURRY (handoff to next unit)
   # ---------------------------------------------------------
-  # Entrained (bubble) gas that survived popping + drainage, as a volume
-  # fraction of the discharged slurry - this is the feed foam quality / gas
+  # Entrained gas retained in the RECOVERED product (heavy + light), mostly the
+  # particle-attached share, as a volume fraction - the feed foam quality / gas
   # holdup the downstream unit inherits. Plus the dissolved gas (Henry) still in
   # solution at discharge, a latent flash source for the next unit.
-  alpha_g_out          <- Q_gas_surviving_atm / (Q_gas_surviving_atm + Q_solid + Q_liq)
+  Q_solid_rec  <- Q_solid * (heavy_solid_yield + light_solid_yield)
+  liq_to_solid <- cake_moisture_frac / cake_solid_frac         # cake L/S ratio
+  Q_liq_rec    <- Q_solid_rec * liq_to_solid
+  alpha_g_out  <- Q_gas_surviving_atm /
+                  max(Q_gas_surviving_atm + Q_solid_rec + Q_liq_rec, 1e-12)
   dissolved_gas_mol_m3 <- min(C_gas_loaded, C_gas_final)
+
+  # Exit density of the recovered product (gas-free matrix aerated by the
+  # retained gas). Below 1000 kg/m3 -> still floats in water; a gravity-decanter
+  # foam is ~600 kg/m3, so a denser-but-still-floating exit is expected.
+  rho_pf <- (Q_solid_rec * rho_poly + Q_liq_rec * rho_liq) /
+            max(Q_solid_rec + Q_liq_rec, 1e-12)
+  exit_density_kg_m3 <- (1 - alpha_g_out) * rho_pf + alpha_g_out * rho_gas
 
   # ---------------------------------------------------------
   # G. RETURN ALL VARIABLES AS A LIST
@@ -460,6 +481,7 @@ unified_centrifuge_model <- function(run) {
     Wet_Cake_Moisture     = cake_moisture_frac,
     Gas_Template_Voidage  = cake_gas_frac,
     Entrained_Gas_Holdup  = alpha_g_out,
+    Exit_Density_kg_m3    = exit_density_kg_m3,
     Bubble_Rise_Escape    = f_gas_rise,
     Dissolved_Gas_mol_m3  = dissolved_gas_mol_m3,
     Cake_Yield_Stress_Pa  = cake_yield_stress,
