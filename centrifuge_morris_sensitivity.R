@@ -259,11 +259,15 @@ unified_centrifuge_model <- function(run) {
   # ---------------------------------------------------------
   # D. PARTICLE TRACKING: SHEAR RUPTURE, MIGRATION & CLASSIFICATION
   # ---------------------------------------------------------
-  size_bins <- seq(10, 150, length.out = 15)
+  # Log-spaced primary size grid down to sub-micron so the fine tail that
+  # escapes to the centrate (and sets the classification cut size) is resolved.
+  size_bins <- exp(seq(log(0.5), log(200), length.out = 24))
   core_bins <- seq(0.1, 0.6, length.out = 15)
   n_size <- length(size_bins)
 
-  weight_sum <- sum(dnorm(size_bins, 50, 20) %o% dnorm(core_bins, 0.3, 0.1))
+  # log-normal feed PSD (median ~25 um) with a real fine tail
+  size_pdf   <- dnorm(log(size_bins), log(25), 1.0)
+  weight_sum <- sum(size_pdf %o% dnorm(core_bins, 0.3, 0.1))
 
   heavy_solid_yield <- 0
   light_solid_yield <- 0
@@ -280,7 +284,7 @@ unified_centrifuge_model <- function(run) {
     d_um <- size_bins[i]
     for (core_frac in core_bins) {
 
-      weight <- dnorm(d_um, 50, 20) * dnorm(core_frac, 0.3, 0.1)
+      weight <- size_pdf[i] * dnorm(core_frac, 0.3, 0.1)
       if(is.na(weight) || weight <= 0) next
 
       d_primary_m <- d_um * 1e-6
@@ -419,6 +423,16 @@ unified_centrifuge_model <- function(run) {
   Foam_Potential_Ratio <- Centrate_Conc_kg_m3 / CMC_kg_m3
 
   # ---------------------------------------------------------
+  # F.5 GAS CARRIED FORWARD IN THE SLURRY (handoff to next unit)
+  # ---------------------------------------------------------
+  # Entrained (bubble) gas that survived popping + drainage, as a volume
+  # fraction of the discharged slurry - this is the feed foam quality / gas
+  # holdup the downstream unit inherits. Plus the dissolved gas (Henry) still in
+  # solution at discharge, a latent flash source for the next unit.
+  alpha_g_out          <- Q_gas_surviving_atm / (Q_gas_surviving_atm + Q_solid + Q_liq)
+  dissolved_gas_mol_m3 <- min(C_gas_loaded, C_gas_final)
+
+  # ---------------------------------------------------------
   # G. RETURN ALL VARIABLES AS A LIST
   # ---------------------------------------------------------
   return(list(
@@ -431,6 +445,8 @@ unified_centrifuge_model <- function(run) {
     Cake_d50_um           = cake_d50,
     Wet_Cake_Moisture     = cake_moisture_frac,
     Gas_Template_Voidage  = cake_gas_frac,
+    Entrained_Gas_Holdup  = alpha_g_out,
+    Dissolved_Gas_mol_m3  = dissolved_gas_mol_m3,
     Cake_Yield_Stress_Pa  = cake_yield_stress,
     Paste_Viscosity_Pa_s  = paste_viscosity_pa_s,
     Spray_Visc_Ratio      = Spray_Visc_Ratio,
