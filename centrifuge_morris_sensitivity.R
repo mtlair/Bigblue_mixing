@@ -111,7 +111,7 @@ unified_centrifuge_model <- function(run) {
   # ---------------------------------------------------------
   # B. FIXED CONSTANTS & DERIVED GEOMETRY
   # ---------------------------------------------------------
-  r_discharge <- 0.120        # solids discharge radius (fixed) [m]
+  r_discharge <- 0.110        # solids discharge radius (fixed) [m]; deeper-pond bowl
   scroll_pitch <- 0.050       # scroll pitch (fixed)            [m]
   beach_angle <- beach_angle_deg * pi / 180
   # keep the pond physical even if equipment geometry is swept
@@ -561,9 +561,9 @@ factors <- rbind(
   # --- PROCESS (operator setpoints) ------------------------------------
   fac("rpm",             1500,  4500,  3000,  "process"),   # bowl speed / g-force
   fac("delta_rpm",       1.0,   20.0,  8.0,   "process"),   # scroll differential
-  fac("r_pool",          0.130, 0.170, 0.150, "process"),   # weir / pond radius
+  fac("r_pool",          0.118, 0.175, 0.150, "process"),   # weir / pond radius (deeper pond low end)
   fac("flow_rate_lpm",   20,    150,   60,    "process"),
-  fac("feed_solid_frac", 0.05,  0.25,  0.15,  "process"),
+  fac("feed_solid_frac", 0.01,  0.25,  0.15,  "process"),   # down to 1% (heavy feed dilution)
   fac("feed_gas_frac",   0.10,  0.50,  0.25,  "process"),
   fac("pop_frac",        0.20,  0.90,  0.50,  "process"),   # mechanical degassing
   fac("T_process",       288,   343,   303,   "process"),
