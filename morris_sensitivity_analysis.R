@@ -117,7 +117,7 @@ factors <- rbind(
   fac("Delta_pH",      0.2,    4.0,    FALSE, "pH",    "delta pH vs isoelectric point"),
   fac("I_strength",    1.0e-3, 5.0e-1, TRUE,  "M",     "ionic strength (Debye screening driver)"),
   fac("Tg_polymer",    280,    380,    FALSE, "K",     "dry-polymer glass transition"),
-  fac("T_sticky_K",    350,    500,    FALSE, "K",     "melt/softening sticky (clumping) point"),
+  fac("T_sticky_K",    290,    500,    FALSE, "K",     "sticky (clumping) point: Tg+~20 amorphous, melt if semicrystalline"),
   fac("n_flow",        0.40,   1.00,   FALSE, "-",     "power-law shear-thinning flow index"),
   fac("k_perm_mono",   5.0,    60.0,   FALSE, "-",     "monomer free-volume permeation coeff."),
   fac("k_perm_plast",  5.0,    60.0,   FALSE, "-",     "plasticizer free-volume permeation coeff."),

@@ -34,9 +34,10 @@ from_centrifuge <- c("rho_L", "C_solid_mass", "alpha_g_0", "sigma", "D_b", "mu_L
 # dryer operating / formulation settings: midpoints of the spray model's ranges,
 # then overridden with the real plant dryer setpoints.
 sp_mid <- setNames((spray_factors$min + spray_factors$max) / 2, spray_factors$name)
-sp_mid["T_system"]   <- 423    # dryer inlet ~150 C (plant: 130-160 C)
-sp_mid["T_feed"]     <- 300    # feed / atomizing air ~ ambient
-sp_mid["T_sticky_K"] <- 493    # melt/clumping point ~220 C (heat-resistant product)
+sp_mid["T_system"]     <- 423  # dryer inlet ~150 C (plant: 130-160 C)
+sp_mid["T_feed"]       <- 300  # feed / atomizing air ~ ambient
+sp_mid["T_sticky_K"]   <- 493  # melt/clumping point ~220 C (heat-resistant product)
+sp_mid["mdot_gas_dry"] <- 0.25 # dummy: lands outlet ~80-85 C (plant 60-90 C)
 
 clamp_to_spray <- function(x) {
   for (nm in names(x)) {
@@ -117,3 +118,30 @@ for (m in c(0.004, 0.008, 0.012, 0.016, 0.020)) {
               m, r$spray[["DeltaT_K"]], r$spray[["D_particle_um"]], r$spray[["X_moisture"]]))
 }
 cat("\nLower feed -> lower evaporation load -> smaller DeltaT (outlet runs hotter).\n")
+
+# =============================================================================
+# 4. Product sticky point -> maximum safe dryer inlet
+# =============================================================================
+# For an AMORPHOUS product the sticky point tracks Tg (~Tg + 20 C), so a low-Tg
+# product clumps at a low particle temperature and the inlet must be dropped.
+# For a SEMI-CRYSTALLINE / heat-resistant product the sticky point is the melt
+# (~220 C) and Tg is irrelevant to clumping. This is why the inlet is tuned to
+# the product's Tg.
+max_safe_inlet <- function(T_sticky_K) {
+  op <- sp_mid; op[["T_sticky_K"]] <- T_sticky_K
+  for (inl in seq(210, 60, by = -2)) {
+    op[["T_system"]] <- inl + 273
+    r  <- chained_model(cen_nominal, 0.30, spray_op = op)
+    Tp <- 0.85 * r$spray[["T_out_K"]] + 0.15 * op[["T_feed"]]
+    if (1 / (1 + exp(-(Tp - T_sticky_K) / 10)) < 0.5) return(inl)
+  }
+  60
+}
+cat("\n== Product Tg / sticky point -> max safe dryer inlet ==\n")
+cat(sprintf("  %-26s %-14s %-14s\n", "product", "sticky pt (C)", "max inlet (C)"))
+for (tg in c(10, 30, 50, 80))
+  cat(sprintf("  amorphous, Tg=%2.0f C%9s %-14.0f %-14.0f\n",
+              tg, "", tg + 20, max_safe_inlet(tg + 20 + 273)))
+cat(sprintf("  semicrystalline (melt)%6s %-14.0f %-14.0f\n", "", 220, max_safe_inlet(493)))
+cat("\nLower-Tg amorphous products must run a cooler inlet to stay below the\n",
+    "sticky point; semi-crystalline products are limited only by the melt.\n", sep = "")
