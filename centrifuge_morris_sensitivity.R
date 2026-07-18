@@ -149,6 +149,18 @@ unified_centrifuge_model <- function(run) {
   foam_HLB      <- 1 / (1 + exp(-(HLB_value - 10) / 2))            # hydrophilic -> foams
   foam_stability <- theta_surf * foam_HLB                          # 0..1
 
+  # Effective serum surface tension: surfactant lowers it from the clean-serum
+  # value toward the surfactant-saturated (CMC) plateau as coverage rises. This
+  # is the surface-tension STATE handed to the downstream (spray) unit, whose
+  # atomization model consumes sigma directly.
+  sigma_clean <- 0.072; sigma_cmc <- 0.030
+  sigma_eff   <- sigma_clean - (sigma_clean - sigma_cmc) * theta_surf
+
+  # Continuous-phase (film) viscosity that resists drainage: dissolved polymer,
+  # binder and plasticizer thicken the draining films (polymer makeup + added
+  # stabilizers) on top of the temperature-dependent water base.
+  mu_film <- visc_water * (1 + 12 * C_binder + 3 * plasticizer_frac)
+
   # --- Foam drainage (centrifugal Plateau-border drainage) --------------
   # Liquid drains from the films under the centrifugal body force; the
   # surfactant monolayer immobilizes the interfaces (Marangoni) and strongly
@@ -159,8 +171,8 @@ unified_centrifuge_model <- function(run) {
   eps_foam <- 0.20                                       # initial foam liquid fraction
   R_bub    <- 50e-6                                      # bubble radius [m]
   r_pb     <- R_bub * sqrt(eps_foam)                     # Plateau-border radius
-  C_drain  <- 50 * (1 + 20 * theta_surf)                 # interface mobility drag (rigid if covered)
-  v_drain  <- rho_liq * g_eff * r_pb^2 / (C_drain * visc_water)   # drainage velocity [m/s]
+  C_drain  <- 50 * (1 + 20 * theta_surf)                 # interfacial rigidity (surfactant)
+  v_drain  <- rho_liq * g_eff * r_pb^2 / (C_drain * mu_film)      # drainage velocity [m/s]
   t_drain  <- dist / max(v_drain, 1e-9)                   # time to drain the foam layer [s]
   foam_drained_frac <- 1 - exp(-t_pond / t_drain)         # collapsed over the residence
 
@@ -295,8 +307,10 @@ unified_centrifuge_model <- function(run) {
   v_convey <- (delta_rpm / 60) * scroll_pitch
   t_gap <- ((r_pool - r_discharge) / tan(beach_angle)) / v_convey
 
-  # Binder holds interstitial moisture in the cake
-  cake_moisture_frac <- 0.15 + 0.35 * exp(-t_gap / 5.0) + 0.10 * plasticizer_frac + 0.30 * C_binder
+  # Capillary-held moisture floor scales with surface tension (surfactant lowers
+  # it, aiding dewatering); binder holds extra interstitial moisture.
+  cake_moisture_frac <- 0.15 * (sigma_eff / sigma_clean) + 0.35 * exp(-t_gap / 5.0) +
+                        0.10 * plasticizer_frac + 0.30 * C_binder
 
   gas_frac_local   <- Q_gas_local / Q_local_m3s
   cake_gas_sparged <- (0.02 + 0.20 * exp(-t_gap / 3.0)) * (0.5 + 2.5 * gas_frac_local)
@@ -308,13 +322,12 @@ unified_centrifuge_model <- function(run) {
   # Herschel-Bulkley wet-cake rheology (yield-stress paste / mousse); binder
   # bridging stiffens the frictional network.
   phi_pack <- 0.64; p_exp <- 3.0
-  tau_y0   <- 5.0e4
-  sigma_lg <- 0.030; R_bub <- 50e-6
+  tau_y0   <- 5.0e4          # frictional yield scale [Pa]  (R_bub, sigma_eff from Section C)
   n_hb <- 0.5; K_hb <- 200; gamma_disc <- 10
 
   phi_ratio  <- min(cake_solid_frac, 0.98 * phi_pack) / phi_pack
   tau_y_fric <- tau_y0 * phi_ratio^p_exp * (1 + 5.0 * C_binder)
-  tau_y_foam <- (sigma_lg / R_bub) * max(cake_gas_frac - 0.10, 0)
+  tau_y_foam <- (sigma_eff / R_bub) * max(cake_gas_frac - 0.10, 0)   # Princen foam yield
   soften     <- exp(-2.0 * (plasticizer_frac + C_mono_retained)) * exp(-0.02 * (T_process - 293))
   cake_yield_stress <- (tau_y_fric + tau_y_foam) * soften
 
@@ -366,6 +379,7 @@ unified_centrifuge_model <- function(run) {
     Monomer_Retained      = 1 - mono_flash_frac,
     Foam_Stability        = foam_stability,
     Foam_Drainage_Frac    = foam_drained_frac,
+    Serum_Surface_Tension_N_m = sigma_eff,
     Centrate_Foam_Ratio   = Foam_Potential_Ratio
   ))
 }
