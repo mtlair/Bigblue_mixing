@@ -215,10 +215,24 @@ unified_centrifuge_model <- function(run) {
   t_drain  <- dist / max(v_drain, 1e-9)
   foam_drained_frac <- 1 - exp(-t_pond / t_drain)
 
-  # --- Degassing: mechanical pop (retarded by a stable foam) + drainage --
+  # --- Drift-flux slip: buoyant rise of FREE bubbles to the air core -----
+  # Bubbles are far lighter than the serum, so in the centrifugal field they
+  # slip radially inward at a Stokes rise velocity relative to the liquid and
+  # escape to the air core (the light-phase analogue of solids settling). This
+  # is a genuine gas-liquid slip term, separate from foam drainage.
+  u_slip     <- D_b_eff^2 * (rho_liq - rho_gas) * g_eff / (18 * mu_film)
+  f_gas_rise <- 1 - exp(-u_slip * t_pond / dist)          # free-bubble escape
+
+  # --- Degassing: pop, then two parallel centrifugal escape routes -------
+  # After mechanical popping the entrained gas splits into a foam-bound share
+  # (foam_stability) that leaves by drainage collapse, and a free-bubble share
+  # that leaves by the drift-flux buoyant rise above.
   pop_frac_eff <- pop_frac * (1 - 0.6 * foam_stability)
-  Q_gas_after_pop     <- Q_gas_atm * (1 - pop_frac_eff)
-  Q_gas_surviving_atm <- Q_gas_after_pop * (1 - foam_drained_frac)
+  Q_gas_after_pop <- Q_gas_atm * (1 - pop_frac_eff)
+  Q_gas_foam <- Q_gas_after_pop * foam_stability
+  Q_gas_free <- Q_gas_after_pop * (1 - foam_stability)
+  Q_gas_surviving_atm <- Q_gas_foam * (1 - foam_drained_frac) +
+                         Q_gas_free * (1 - f_gas_rise)
 
   # Compression (Boyle)
   Q_gas_local <- Q_gas_surviving_atm * (P_atm / P_local)
@@ -446,6 +460,7 @@ unified_centrifuge_model <- function(run) {
     Wet_Cake_Moisture     = cake_moisture_frac,
     Gas_Template_Voidage  = cake_gas_frac,
     Entrained_Gas_Holdup  = alpha_g_out,
+    Bubble_Rise_Escape    = f_gas_rise,
     Dissolved_Gas_mol_m3  = dissolved_gas_mol_m3,
     Cake_Yield_Stress_Pa  = cake_yield_stress,
     Paste_Viscosity_Pa_s  = paste_viscosity_pa_s,
