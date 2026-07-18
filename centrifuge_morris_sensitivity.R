@@ -59,11 +59,12 @@
 # (comparable elementary effects), mapped to physical ranges, all outputs from
 # one design. CSV + mu* vs sigma panel grid written to output/.
 #
-# Requires the `sensitivity` package.  Run: Rscript centrifuge_morris_sensitivity.R
+# Uses the `sensitivity` package when installed; otherwise falls back to a
+# built-in base-R Morris OAT design (no hard dependency). A smoke test evaluates
+# the model at all-nominal first.  Run: Rscript centrifuge_morris_sensitivity.R
 # =============================================================================
 
-# install.packages("sensitivity")
-library(sensitivity)
+# install.packages("sensitivity")   # optional; a base-R Morris fallback is built in
 
 # ---- Temperature-dependent physical property helpers ------------------------
 mu_water_T <- function(T) 2.414e-5 * 10^(247.8 / (T - 140))          # water viscosity [Pa s]
@@ -487,24 +488,77 @@ build_row <- function(x01) {
 }
 
 # =========================================================================
-# 3. EXECUTE MORRIS SCREENING FOR ALL OUTPUTS
+# 3. SMOKE TEST + MORRIS SCREENING (sensitivity pkg, else base-R fallback)
 # =========================================================================
+# --- Smoke test: evaluate the model at all-nominal and print every output ----
+smoke <- unlist(unified_centrifuge_model(nominal_vec))
+cat("== Smoke test: all factors at nominal ==\n")
+print(round(smoke, 5))
+if (!all(is.finite(smoke)))
+  stop("Smoke test FAILED - non-finite outputs: ",
+       paste(names(smoke)[!is.finite(smoke)], collapse = ", "))
+cat(sprintf("Smoke test PASSED: %d finite outputs\n\n", length(smoke)))
+
+# --- Base-R Morris OAT design + elementary effects (no package needed) --------
+r_traj <- 25L; levels <- 6L; grid_jump <- 3L
+
+build_oat_design <- function(k, r, levels, grid_jump) {
+  delta <- grid_jump / (levels - 1)
+  grid  <- seq(0, 1 - delta, length.out = max(2L, levels - grid_jump))
+  X <- matrix(0, r * (k + 1), k); info <- vector("list", r); row <- 1L
+  for (t in seq_len(r)) {
+    base <- sample(grid, k, replace = TRUE); ord <- sample.int(k)
+    dirs <- numeric(k); x <- base; X[row, ] <- x
+    for (s in seq_len(k)) {
+      j <- ord[s]
+      d <- if (x[j] + delta <= 1) delta else -delta
+      x[j] <- x[j] + d; dirs[s] <- d; X[row + s, ] <- x
+    }
+    info[[t]] <- list(order = ord, dirs = dirs); row <- row + k + 1L
+  }
+  list(X = X, info = info)
+}
+
+elementary_effects <- function(design, Y, k, r) {
+  n_out <- ncol(Y)
+  ee <- lapply(seq_len(n_out), function(i) matrix(NA_real_, r, k))
+  for (t in seq_len(r)) {
+    off <- (t - 1) * (k + 1); ord <- design$info[[t]]$order; dirs <- design$info[[t]]$dirs
+    for (s in seq_len(k)) {
+      j <- ord[s]; dy <- Y[off + s + 1, ] - Y[off + s, ]
+      for (i in seq_len(n_out)) ee[[i]][t, j] <- dy[i] / dirs[s]
+    }
+  }
+  ee
+}
+
 set.seed(42)
+use_pkg <- requireNamespace("sensitivity", quietly = TRUE)
 
-mor <- morris(model = NULL, factors = params_active, r = 25,
-              design = list(type = "oat", levels = 6, grid.jump = 3),
-              binf = 0, bsup = 1)
-
-Y <- t(apply(mor$X, 1, function(x01) unlist(unified_centrifuge_model(build_row(x01)))))
+if (use_pkg) {
+  message("Using sensitivity::morris()")
+  mor  <- sensitivity::morris(model = NULL, factors = params_active, r = r_traj,
+                              design = list(type = "oat", levels = levels,
+                                            grid.jump = grid_jump),
+                              binf = 0, bsup = 1)
+  X01  <- mor$X; colnames(X01) <- params_active
+  Y <- t(apply(X01, 1, function(x01) unlist(unified_centrifuge_model(build_row(x01)))))
+  ee_list <- lapply(seq_len(ncol(Y)), function(i) sensitivity::tell(mor, Y[, i])$ee)
+} else {
+  message("Package 'sensitivity' not found - using built-in Morris OAT design")
+  design <- build_oat_design(k_act, r_traj, levels, grid_jump)
+  X01 <- design$X; colnames(X01) <- params_active
+  Y <- t(apply(X01, 1, function(x01) unlist(unified_centrifuge_model(build_row(x01)))))
+  ee_list <- elementary_effects(design, Y, k_act, r_traj)
+}
 outputs <- colnames(Y)
 
 dir.create("output", showWarnings = FALSE)
 
 grp_of <- setNames(factors$group, factors$name)
-stats_list <- lapply(outputs, function(o) {
-  m  <- sensitivity::tell(mor, Y[, o])
-  ee <- m$ee
-  data.frame(output  = o,
+stats_list <- lapply(seq_along(outputs), function(i) {
+  ee <- ee_list[[i]]
+  data.frame(output  = outputs[i],
              group   = grp_of[params_active],
              factor  = params_active,
              mu      = colMeans(ee),
