@@ -603,7 +603,7 @@ factors <- rbind(
   fac("chi_parameter",   0.1,   0.9,   0.5,   "additive"),
   fac("S_base",          0.10,  0.35,  0.25,  "additive"),   # compacted-sludge floor (vol solids)
   fac("S_ceiling",       0.45,  0.60,  0.50,  "additive"),   # max dewatered (vol solids)
-  fac("floc_strength_Pa",50,    5000,  500,   "additive", log = TRUE),  # aggregate/floc strength
+  fac("floc_strength_Pa",50,    5000,  2000,  "additive", log = TRUE),  # aggregate/floc strength (strong)
 
   # --- EQUIPMENT (MUTED by default: hard to change) -------------------
   fac("L_cyl",           0.30,  1.00,  0.60,  "equipment"),
