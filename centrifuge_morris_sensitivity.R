@@ -425,9 +425,9 @@ unified_centrifuge_model <- function(run) {
 # =========================================================================
 # 2. FACTOR TABLE, SWEEP GROUPS, AND [0,1] -> PHYSICAL MAPPING
 # =========================================================================
-fac <- function(name, lo, hi, nominal, group)
+fac <- function(name, lo, hi, nominal, group, log = FALSE)
   data.frame(name = name, lo = lo, hi = hi, nominal = nominal,
-             group = group, stringsAsFactors = FALSE)
+             group = group, log = log, stringsAsFactors = FALSE)
 
 factors <- rbind(
   # --- PROCESS (operator setpoints) ------------------------------------
@@ -441,12 +441,12 @@ factors <- rbind(
   fac("T_process",       288,   343,   303,   "process"),
   fac("P_feed",          1.0e5, 1.0e6, 3.0e5, "process"),
   fac("gas_sat_frac",    0.0,   1.0,   0.5,   "process"),
-  fac("D_b",             2.0e-5,2.0e-4,5.0e-5,"process"),   # feed bubble diameter
+  fac("D_b",             2.0e-5,2.0e-4,5.0e-5,"process", log = TRUE),  # feed bubble diameter
   # --- SURFACE CHEMISTRY / COLLOIDAL ----------------------------------
   fac("HLB_value",       4.0,   18.0,  12.0,  "surface"),
-  fac("surf_dose_kg_m3", 0.5,   4.0,   2.0,   "surface"),
-  fac("t_recover_sec",   0.5,   5.0,   2.0,   "surface"),   # foam thixotropic recovery
-  fac("I_strength",      1.0e-3,5.0e-1,5.0e-2,"surface"),   # ionic strength (DLVO / salting)
+  fac("surf_dose_kg_m3", 0.5,   4.0,   2.0,   "surface", log = TRUE),
+  fac("t_recover_sec",   0.5,   5.0,   2.0,   "surface", log = TRUE),  # foam thixotropic recovery
+  fac("I_strength",      1.0e-3,5.0e-1,5.0e-2,"surface", log = TRUE),  # ionic strength (DLVO / salting)
   fac("Delta_pH",        0.2,   4.0,   2.0,   "surface"),   # pH offset from IEP (DLVO)
   fac("contact_angle_deg",30,   150,   90,    "surface"),   # particle wettability (Pickering)
   # --- ADDITIVES ------------------------------------------------------
@@ -472,10 +472,17 @@ k_act <- nrow(act)
 nominal_vec <- setNames(factors$nominal, factors$name)
 
 # Build a full physical parameter row from a [0,1] design row over the active
-# factors; muted factors stay at their nominal value.
+# factors; muted factors stay at their nominal value. Factors flagged log=TRUE
+# are mapped geometrically (log-uniform) so a [0,1] step is a fixed number of
+# decades - appropriate for wide-range multiplicative factors (e.g. ionic
+# strength, bubble size), where the response varies per-decade not per-unit.
 build_row <- function(x01) {
   full <- nominal_vec
-  full[act$name] <- act$lo + x01[act$name] * (act$hi - act$lo)
+  x <- x01[act$name]
+  vals <- ifelse(act$log,
+                 exp(log(act$lo) + x * (log(act$hi) - log(act$lo))),
+                 act$lo + x * (act$hi - act$lo))
+  full[act$name] <- vals
   full
 }
 
