@@ -590,7 +590,7 @@ factors <- rbind(
 
   # --- EQUIPMENT (MUTED by default: hard to change) -------------------
   fac("L_cyl",           0.30,  1.00,  0.60,  "equipment"),
-  fac("beach_angle_deg", 5.0,   15.0,  10.0,  "equipment"),
+  fac("beach_angle_deg", 3.0,   15.0,  10.0,  "equipment"),
   fac("r_bowl",          0.15,  0.25,  0.20,  "equipment"),
   fac("length_feed",     0.05,  0.20,  0.10,  "equipment")
 )
@@ -598,8 +598,11 @@ factors <- rbind(
 # ---> CHOOSE WHICH GROUPS TO SWEEP HERE <---
 # e.g. c("surface") to screen surface chemistry alone, or add "equipment".
 active_groups <- c("process", "surface", "additive")
+# individual factors to sweep even if their group is muted (e.g. one piece of
+# equipment geometry without un-muting all of it)
+active_extra  <- c("beach_angle_deg")
 
-factors$active <- factors$group %in% active_groups
+factors$active <- (factors$group %in% active_groups) | (factors$name %in% active_extra)
 act <- factors[factors$active, ]
 params_active <- act$name
 k_act <- nrow(act)
