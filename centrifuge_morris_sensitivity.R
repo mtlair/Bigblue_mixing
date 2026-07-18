@@ -466,6 +466,10 @@ unified_centrifuge_model <- function(run) {
   rho_pf <- (Q_solid_rec * rho_poly + Q_liq_rec * rho_liq) /
             max(Q_solid_rec + Q_liq_rec, 1e-12)
   exit_density_kg_m3 <- (1 - alpha_g_out) * rho_pf + alpha_g_out * rho_gas
+  # product solids on a MASS basis (spray model's C_solid_mass), and the
+  # continuous-phase serum viscosity handed downstream (spray model's mu_L)
+  solids_mass_frac <- (Q_solid_rec * rho_poly) /
+                      max(Q_solid_rec * rho_poly + Q_liq_rec * rho_liq, 1e-12)
 
   # ---------------------------------------------------------
   # G. RETURN ALL VARIABLES AS A LIST
@@ -482,6 +486,9 @@ unified_centrifuge_model <- function(run) {
     Gas_Template_Voidage  = cake_gas_frac,
     Entrained_Gas_Holdup  = alpha_g_out,
     Exit_Density_kg_m3    = exit_density_kg_m3,
+    Gasfree_Density_kg_m3 = rho_pf,
+    Product_Solids_MassFrac = solids_mass_frac,
+    Serum_Viscosity_Pa_s  = mu_film,
     Bubble_Rise_Escape    = f_gas_rise,
     Dissolved_Gas_mol_m3  = dissolved_gas_mol_m3,
     Cake_Yield_Stress_Pa  = cake_yield_stress,
@@ -495,6 +502,52 @@ unified_centrifuge_model <- function(run) {
     Serum_Surface_Tension_N_m = sigma_eff,
     Centrate_Foam_Ratio   = Foam_Potential_Ratio
   ))
+}
+
+# =========================================================================
+# 1b. CENTRIFUGE -> SPRAY-DRYER HANDOFF
+# =========================================================================
+# The discharged cake is too concentrated to atomize (see Spray_Visc_Ratio), so
+# a reslurry / dilution step sits between the units. This maps every spray-model
+# input the centrifuge STREAM determines, after diluting to a target sprayable
+# solids mass fraction. Spray-unit operating settings (ALR, air/feed pressures,
+# dryer gas flow/temperature/humidity, hold time, Tg, permeabilities, emulsion
+# template) are NOT set here - they belong to the spray dryer.
+#
+# Dilution assumptions (flagged where approximate): solids mass is conserved;
+# everything dissolved/entrained in the liquid is diluted by the added water;
+# gas-free slurry density is the exact two-density mixture at the target solids;
+# bubble size is unchanged; serum surface tension and viscosity move toward the
+# clean-water limits as the surfactant/polymer are diluted (first-order).
+centrifuge_to_spray <- function(run, target_solid_mass = 0.30) {
+  o <- unified_centrifuge_model(run)
+  rho_poly <- 1800; rho_liq <- 1000; sigma_clean0 <- 0.072
+
+  Cs_cake <- o$Product_Solids_MassFrac
+  target  <- min(target_solid_mass, Cs_cake)               # only dilute, never concentrate
+  # liquid dilution factor: added-water ratio to drop solids from cake -> target
+  L_over_S_cake   <- (1 - Cs_cake) / max(Cs_cake, 1e-9)
+  L_over_S_target <- (1 - target)  / max(target, 1e-9)
+  dil <- max(1, L_over_S_target / max(L_over_S_cake, 1e-9))  # >=1 = water added
+
+  rho_L <- 1 / (target / rho_poly + (1 - target) / rho_liq)  # gas-free slurry density
+
+  c(
+    rho_L         = rho_L,                                  # slurry density   [kg/m3]
+    C_solid_mass  = target,                                 # solids mass frac [-]
+    alpha_g_0     = o$Entrained_Gas_Holdup / dil,           # gas holdup (diluted)
+    sigma         = o$Serum_Surface_Tension_N_m +
+                    (sigma_clean0 - o$Serum_Surface_Tension_N_m) * (1 - 1/dil),  # -> clean on dilution
+    D_b           = o$Bubble_Size_um * 1e-6,                # bubble diameter  [m]
+    mu_L          = 1e-3 + (o$Serum_Viscosity_Pa_s - 1e-3) / dil,  # serum viscosity [Pa s]
+    C_solid_massfrac_cake = Cs_cake,                        # (pre-dilution, for reference)
+    C_monomer     = run[["C_monomer"]]     * o$Monomer_Retained / dil,
+    C_plasticizer = run[["plasticizer_frac"]] * o$Plasticizer_Retained / dil,
+    C_binder      = run[["C_binder"]] / dil,
+    I_strength    = run[["I_strength"]] / dil,
+    Delta_pH      = run[["Delta_pH"]],
+    dilution_x    = dil
+  )
 }
 
 # =========================================================================
@@ -699,3 +752,21 @@ for (o in outputs) {
 cat("\nActive groups:", paste(active_groups, collapse = ", "),
     "|", k_act, "factors\n")
 cat("Wrote output/centrifuge_morris_plots.png and output/centrifuge_morris_indices.csv\n")
+
+# -----------------------------------------------------------------------------
+# 6. Spray-dryer handoff (nominal case, reslurried to 30% solids)
+# -----------------------------------------------------------------------------
+spray_ranges <- list(rho_L=c(1000,1300), C_solid_mass=c(0.05,0.40),
+                     alpha_g_0=c(0.05,0.60), sigma=c(0.030,0.070),
+                     D_b=c(2e-5,2e-4), mu_L=c(0.0012,0.056),
+                     C_monomer=c(0,0.02), C_plasticizer=c(0,0.05),
+                     C_binder=c(0,0.05), I_strength=c(1e-3,0.5), Delta_pH=c(0.2,4.0))
+sf <- centrifuge_to_spray(nominal_vec, target_solid_mass = 0.30)
+cat("\n== Centrifuge -> spray-dryer feed (nominal, diluted to 30% solids) ==\n")
+for (nm in names(spray_ranges)) {
+  rng <- spray_ranges[[nm]]
+  flag <- if (sf[[nm]] < rng[1] || sf[[nm]] > rng[2]) "  <-- outside spray range" else ""
+  cat(sprintf("  %-14s %11.5g   [%.4g, %.4g]%s\n", nm, sf[[nm]], rng[1], rng[2], flag))
+}
+cat(sprintf("  (cake was %.1f%% solids; diluted %.1fx to reach the spray feed)\n",
+            100 * sf[["C_solid_massfrac_cake"]], sf[["dilution_x"]]))
