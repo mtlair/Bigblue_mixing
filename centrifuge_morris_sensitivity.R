@@ -104,6 +104,7 @@ unified_centrifuge_model <- function(run) {
   chi_parameter    <- run[["chi_parameter"]]
   S_base           <- run[["S_base"]]            # compacted-sludge solids floor (vol frac)
   S_ceiling        <- run[["S_ceiling"]]         # max dewatered solids (vol frac)
+  floc_strength    <- run[["floc_strength_Pa"]]  # aggregate/floc cohesive strength [Pa]
   # equipment (muted by default)
   L_cyl            <- run[["L_cyl"]]             # cylinder length          [m]
   r_bowl           <- run[["r_bowl"]]            # bowl radius (diameter)   [m]
@@ -317,9 +318,10 @@ unified_centrifuge_model <- function(run) {
       agg_multiplier <- 1 + (10 * plasticizer_frac)
       d_intact_m <- d_primary_m * agg_multiplier
 
-      # Shear rupture: plasticizer AND binder bind the aggregate; feed-zone
-      # acceleration intensifies the disrupting shear.
-      cohesive_strength <- 1000 + (50000 * plasticizer_frac) + (30000 * C_binder)
+      # Shear rupture: cohesion is the measured floc/aggregate strength, raised
+      # by plasticizer tack and binder bridging; feed-zone acceleration
+      # intensifies the disrupting shear.
+      cohesive_strength <- floc_strength * (1 + 4 * plasticizer_frac + 10 * C_binder)
       shear_stress <- (abs(rho_poly - template_density) * r_pool * omega^2 * d_intact_m) *
                       feed_shear_factor / foam_dampening_factor
       survival_prob <- 1 / (1 + exp(-(cohesive_strength - shear_stress) / 500))
@@ -382,27 +384,33 @@ unified_centrifuge_model <- function(run) {
   beach_axial <- (r_pool - r_discharge) / tan(beach_ref) * (tan(beach_angle) / tan(beach_ref))
   t_gap <- beach_axial / v_convey
 
-  # --- Dewatering: cake solids content (gas-free basis) -----------------
-  # Solids rise toward the achievable ceiling (~50 %, a decanter dewatering
-  # limit) with beach residence t_gap; tacky/plasticized/binder cakes and a
-  # high serum surface tension hold moisture, while surfactant (low sigma) aids
-  # dewatering. Cake solids cannot exceed the ceiling.
-  # S_base (compaction floor) and S_ceiling (max dewatered) are material factors
-  S_ceiling <- max(S_ceiling, S_base + 0.02)          # keep the ceiling above the floor
-  dewater <- 1 - exp(-t_gap / 8.0)                     # residence approach to ceiling
+  # --- Cake airiness: retained gas forms a mousse structure -------------
+  # The particle-attached (flotation) gas rides into the cake with the solids,
+  # plus sparged holdup and the dissolved-gas flash. Short beach residence
+  # retains more. This aerates the cake AND holds water in its films, so an airy
+  # cake sits BELOW the compacted solids (the spin-down S_base) - the airiness
+  # is exactly the gap between the de-aerated compaction and the real cake.
+  gas_frac_local   <- Q_gas_local / Q_local_m3s
+  attach_air       <- Q_gas_attach / max(Q_gas_attach + Q_solid + Q_liq, 1e-12)
+  cake_gas_sparged <- (0.02 + 0.20 * exp(-t_gap / 3.0)) * (0.5 + 2.5 * gas_frac_local)
+  cake_gas_flash   <- V_flash_per_liq * 0.5 + 0.5 * C_monomer * mono_flash_frac
+  cake_gas_frac    <- min(0.6, attach_air + cake_gas_sparged + cake_gas_flash)
+
+  # --- Dewatering: solids (gas-free basis) toward the compaction ceiling -
+  # Solids rise with beach residence t_gap; tacky/plasticized/binder cakes and a
+  # high serum surface tension hold moisture, surfactant aids. An AIRY (mousse)
+  # cake holds water in its film structure and resists compaction -> lower
+  # solids, which can fall below S_base. S_base/S_ceiling are material factors.
+  S_ceiling <- max(S_ceiling, S_base + 0.02)
+  dewater <- 1 - exp(-t_gap / 8.0)
   aid <- 1 - 0.40 * (plasticizer_frac / 0.25) - 0.40 * (C_binder / 0.05) -
              0.20 * ((sigma_eff / sigma_clean) - 0.33) / 0.67
-  aid <- max(0.2, min(1, aid))
-  solids_gasfree <- S_base + (S_ceiling - S_base) * dewater * aid   # <= 0.50
+  aid  <- max(0.2, min(1, aid))
+  airy <- 1 - 0.6 * cake_gas_frac                     # mousse holds water -> wetter
+  solids_gasfree <- (S_base + (S_ceiling - S_base) * dewater * aid) * airy
   liq_gasfree    <- 1 - solids_gasfree
 
-  # --- Cake gas: sparged holdup + dissolved-gas flash (carried in liquid) --
-  gas_frac_local   <- Q_gas_local / Q_local_m3s
-  cake_gas_sparged <- (0.02 + 0.20 * exp(-t_gap / 3.0)) * (0.5 + 2.5 * gas_frac_local)
-  cake_gas_flash   <- V_flash_per_liq * liq_gasfree + 0.5 * C_monomer * mono_flash_frac
-  cake_gas_frac    <- min(0.5, cake_gas_sparged + cake_gas_flash)
-
-  # Compose the three phases (solids stay at / below the ~50 % ceiling)
+  # Compose the three phases
   cake_solid_frac    <- solids_gasfree * (1 - cake_gas_frac)
   cake_moisture_frac <- liq_gasfree * (1 - cake_gas_frac)
 
@@ -595,6 +603,7 @@ factors <- rbind(
   fac("chi_parameter",   0.1,   0.9,   0.5,   "additive"),
   fac("S_base",          0.10,  0.35,  0.25,  "additive"),   # compacted-sludge floor (vol solids)
   fac("S_ceiling",       0.45,  0.60,  0.50,  "additive"),   # max dewatered (vol solids)
+  fac("floc_strength_Pa",50,    5000,  500,   "additive", log = TRUE),  # aggregate/floc strength
 
   # --- EQUIPMENT (MUTED by default: hard to change) -------------------
   fac("L_cyl",           0.30,  1.00,  0.60,  "equipment"),
