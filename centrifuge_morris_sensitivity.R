@@ -373,7 +373,14 @@ unified_centrifuge_model <- function(run) {
   # E. WET-CAKE / MOUSSE RHEOLOGY & RETENTION
   # ---------------------------------------------------------
   v_convey <- (delta_rpm / 60) * scroll_pitch
-  t_gap <- ((r_pool - r_discharge) / tan(beach_angle)) / v_convey
+  # Beach dewatering residence. Per plant observation, a SMALLER beach angle
+  # gives a SHORTER effective dry-drainage zone -> WETTER cake (and a steeper
+  # beach drains more -> drier). This is opposite to the naive "shallow cone =
+  # long beach" view; decanter beach-angle conventions/designs differ, so the
+  # dry-beach length is anchored to a 10 deg reference and scales with the angle.
+  beach_ref <- 10 * pi / 180
+  beach_axial <- (r_pool - r_discharge) / tan(beach_ref) * (tan(beach_angle) / tan(beach_ref))
+  t_gap <- beach_axial / v_convey
 
   # --- Dewatering: cake solids content (gas-free basis) -----------------
   # Solids rise toward the achievable ceiling (~50 %, a decanter dewatering
