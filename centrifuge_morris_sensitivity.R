@@ -345,17 +345,28 @@ unified_centrifuge_model <- function(run) {
   v_convey <- (delta_rpm / 60) * scroll_pitch
   t_gap <- ((r_pool - r_discharge) / tan(beach_angle)) / v_convey
 
-  # Capillary-held moisture floor scales with surface tension (surfactant lowers
-  # it, aiding dewatering); binder holds extra interstitial moisture.
-  cake_moisture_frac <- 0.15 * (sigma_eff / sigma_clean) + 0.35 * exp(-t_gap / 5.0) +
-                        0.10 * plasticizer_frac + 0.30 * C_binder
+  # --- Dewatering: cake solids content (gas-free basis) -----------------
+  # Solids rise toward the achievable ceiling (~50 %, a decanter dewatering
+  # limit) with beach residence t_gap; tacky/plasticized/binder cakes and a
+  # high serum surface tension hold moisture, while surfactant (low sigma) aids
+  # dewatering. Cake solids cannot exceed the ceiling.
+  S_ceiling <- 0.50; S_base <- 0.25
+  dewater <- 1 - exp(-t_gap / 8.0)                     # residence approach to ceiling
+  aid <- 1 - 0.40 * (plasticizer_frac / 0.25) - 0.40 * (C_binder / 0.05) -
+             0.20 * ((sigma_eff / sigma_clean) - 0.33) / 0.67
+  aid <- max(0.2, min(1, aid))
+  solids_gasfree <- S_base + (S_ceiling - S_base) * dewater * aid   # <= 0.50
+  liq_gasfree    <- 1 - solids_gasfree
 
+  # --- Cake gas: sparged holdup + dissolved-gas flash (carried in liquid) --
   gas_frac_local   <- Q_gas_local / Q_local_m3s
   cake_gas_sparged <- (0.02 + 0.20 * exp(-t_gap / 3.0)) * (0.5 + 2.5 * gas_frac_local)
-  cake_gas_flash   <- V_flash_per_liq * cake_moisture_frac + 0.5 * C_monomer * mono_flash_frac
+  cake_gas_flash   <- V_flash_per_liq * liq_gasfree + 0.5 * C_monomer * mono_flash_frac
   cake_gas_frac    <- min(0.5, cake_gas_sparged + cake_gas_flash)
 
-  cake_solid_frac <- max(1e-3, 1.0 - cake_moisture_frac - cake_gas_frac)
+  # Compose the three phases (solids stay at / below the ~50 % ceiling)
+  cake_solid_frac    <- solids_gasfree * (1 - cake_gas_frac)
+  cake_moisture_frac <- liq_gasfree * (1 - cake_gas_frac)
 
   # Herschel-Bulkley wet-cake rheology (yield-stress paste / mousse); binder
   # bridging stiffens the frictional network.
@@ -370,6 +381,15 @@ unified_centrifuge_model <- function(run) {
   cake_yield_stress <- (tau_y_fric + tau_y_foam) * soften
 
   paste_viscosity_pa_s <- cake_yield_stress / gamma_disc + K_hb * gamma_disc^(n_hb - 1)
+
+  # Sprayability: apparent (Herschel-Bulkley) viscosity at an atomization shear
+  # rate vs a practical sprayable ceiling. As dewatering pushes solids toward
+  # 50 %, the yield stress climbs and the cake becomes too viscous to atomize
+  # without dilution / heating downstream (Spray_Visc_Ratio > 1).
+  gamma_spray    <- 1e4              # atomization shear rate      [1/s]
+  mu_spray_limit <- 0.5              # practical atomization ceiling [Pa s]
+  mu_spray <- cake_yield_stress / gamma_spray + K_hb * gamma_spray^(n_hb - 1)
+  Spray_Visc_Ratio <- mu_spray / mu_spray_limit
 
   # Plasticizer Retention (Flory-Huggins)
   Q_liq_safe  <- max(Q_liq, 1e-12)
@@ -413,6 +433,7 @@ unified_centrifuge_model <- function(run) {
     Gas_Template_Voidage  = cake_gas_frac,
     Cake_Yield_Stress_Pa  = cake_yield_stress,
     Paste_Viscosity_Pa_s  = paste_viscosity_pa_s,
+    Spray_Visc_Ratio      = Spray_Visc_Ratio,
     Plasticizer_Retained  = Total_Plast_Retained,
     Monomer_Retained      = 1 - mono_flash_frac,
     Foam_Stability        = foam_stability,
