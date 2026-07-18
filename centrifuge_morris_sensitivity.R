@@ -493,6 +493,7 @@ unified_centrifuge_model <- function(run) {
     Cut_Size_d50c_um      = d50c,
     Cake_d50_um           = cake_d50,
     Wet_Cake_Moisture     = cake_moisture_frac,
+    Beach_Residence_s     = t_gap,
     Gas_Template_Voidage  = cake_gas_frac,
     Entrained_Gas_Holdup  = alpha_g_out,
     Exit_Density_kg_m3    = exit_density_kg_m3,
