@@ -40,9 +40,20 @@
 #
 # FOAM DRAINAGE: liquid drains from the foam films under the centrifugal body
 # force (Plateau-border drainage), retarded by the surfactant-rigidified
-# interfaces. Drained foam collapses, releasing its gas to the air core - so a
-# high-g bowl breaks the foam (extra degassing) unless a well-covered, stable
-# foam resists it.
+# interfaces AND the bulk film viscosity (polymer / binder / plasticizer). A
+# high-g bowl breaks the foam (extra degassing) unless a stable foam resists it.
+#
+# FOAM STABILITY is a composite of four mechanisms, all driven by feed /
+# upstream colloidal properties: surfactant coverage, (1) Pickering armoring by
+# fine solids (contact_angle_deg), (2) DLVO disjoining pressure (Delta_pH vs the
+# isoelectric point, screened by I_strength), (3) Gibbs-Marangoni film
+# elasticity, and (4) the bubble size D_b (which coarsens by coalescence /
+# Ostwald ripening over the pressurized hold). (5) Electrolyte (I_strength) also
+# salts out the dissolved gas (Sechenov) and raises the clean surface tension.
+#
+# UPSTREAM/DOWNSTREAM: D_b, I_strength, Delta_pH and contact_angle_deg are feed
+# properties from the prior step; the model in turn hands downstream the coarsened
+# Bubble_Size_um, the Serum_Surface_Tension_N_m and the Foam_Stability state.
 #
 # Method: Morris OAT screening on a [0,1] hypercube over the ACTIVE factors
 # (comparable elementary effects), mapped to physical ranges, all outputs from
@@ -77,10 +88,14 @@ unified_centrifuge_model <- function(run) {
   T_process        <- run[["T_process"]]         # process temperature      [K]
   P_feed           <- run[["P_feed"]]            # feed-line pressure       [Pa]
   gas_sat_frac     <- run[["gas_sat_frac"]]      # dissolved-gas saturation [-]
-  # surface chemistry
+  D_b              <- run[["D_b"]]               # feed bubble diameter     [m]
+  # surface chemistry / colloidal
   HLB_value        <- run[["HLB_value"]]
   surf_dose_kg_m3  <- run[["surf_dose_kg_m3"]]   # surfactant dose          [kg/m3]
   t_recover_sec    <- run[["t_recover_sec"]]     # thixotropic foam recovery[s]
+  I_strength       <- run[["I_strength"]]        # ionic strength (Debye)   [mol/L]
+  Delta_pH         <- run[["Delta_pH"]]          # pH offset from IEP       [-]
+  contact_angle_deg<- run[["contact_angle_deg"]] # particle wettability (Pickering)
   # additives
   plasticizer_frac <- run[["plasticizer_frac"]]
   C_monomer        <- run[["C_monomer"]]
@@ -134,56 +149,77 @@ unified_centrifuge_model <- function(run) {
   t_pond    <- t_feed + t_clarify
   dist <- r_bowl - r_pool
 
-  # --- Surface chemistry: surfactant monolayer coverage -----------------
-  # Coverage = supply / interfacial demand at the feed. Low-HLB surfactant
-  # prefers the (hydrophobic) polymer surface; the aqueous foam is stabilized
-  # by coverage AND a hydrophilic (high-HLB) surfactant.
+  # Hydrostatic (centrifugal) pressure field
+  P_hydro <- 0.5 * rho_liq * omega^2 * (r_bowl^2 - r_pool^2)
+  P_local <- P_atm + P_hydro
+
+  # --- Surfactant monolayer coverage (feed interfacial demand) ----------
+  # Low-HLB surfactant prefers the (hydrophobic) polymer surface; bubble area
+  # uses the feed bubble size D_b (carried from the upstream step).
   MW_surf <- 500; a0_angstrom2 <- 50; CMC_kg_m3 <- 1.0
   kg_per_m2 <- (MW_surf / 1000) / ((a0_angstrom2 * 1e-20) * 6.022e23)
   affinity_poly <- 1 / (1 + exp((HLB_value - 10) / 2))       # adsorption onto polymer
-  SA_poly_feed  <- (6 / 50e-6) * Q_solid
-  SA_gas_feed   <- (6 / 50e-6) * Q_gas_atm
-  surf_demand   <- (SA_gas_feed + SA_poly_feed * affinity_poly) * kg_per_m2   # kg/s
+  SA_poly_feed  <- (6 / 50e-6) * Q_solid                     # solids interfacial area
+  SA_gas_feed   <- (6 / D_b) * Q_gas_atm                     # bubble interfacial area
+  surf_demand   <- (SA_gas_feed + SA_poly_feed * affinity_poly) * kg_per_m2
   surf_supply   <- Q_liq * surf_dose_kg_m3
   theta_surf    <- min(1, surf_supply / max(surf_demand, 1e-12))   # fractional coverage
   foam_HLB      <- 1 / (1 + exp(-(HLB_value - 10) / 2))            # hydrophilic -> foams
-  foam_stability <- theta_surf * foam_HLB                          # 0..1
 
-  # Effective serum surface tension: surfactant lowers it from the clean-serum
-  # value toward the surfactant-saturated (CMC) plateau as coverage rises. This
-  # is the surface-tension STATE handed to the downstream (spray) unit, whose
-  # atomization model consumes sigma directly.
-  sigma_clean <- 0.072; sigma_cmc <- 0.030
+  # --- Composite foam stability: four mechanisms ------------------------
+  # (3) Gibbs-Marangoni film elasticity: peaks at intermediate coverage.
+  elasticity <- 4 * theta_surf * (1 - theta_surf)
+  # (2) DLVO disjoining pressure: surface charge (pH offset from the isoelectric
+  #     point) stabilizes the thin films; ionic strength screens it (Debye).
+  #     Both Delta_pH and I_strength are feed / upstream colloidal properties.
+  I_ref <- 0.01; dpH_ref <- 2.0
+  debye_screen <- 1 / (1 + sqrt(I_strength / I_ref))
+  dlvo_raw <- (Delta_pH / dpH_ref) * debye_screen
+  dlvo <- dlvo_raw / (1 + dlvo_raw)                           # bounded 0..1
+  # (1) Pickering: fine solids adsorb at the gas-liquid interface and armor the
+  #     films, most effective near a 90 deg contact angle.
+  pickering_wet <- exp(-((contact_angle_deg - 90) / 40)^2)
+  solid_avail   <- SA_poly_feed / max(SA_gas_feed, 1e-12)
+  pickering <- min(1, 0.5 * solid_avail * pickering_wet)
+  # composite, gated by a foam-favorable (hydrophilic) HLB
+  stab_raw <- 0.35 * theta_surf + 0.20 * elasticity + 0.20 * dlvo + 0.25 * pickering
+  foam_stability <- foam_HLB * stab_raw                        # 0..1
+
+  # --- (5) Electrolyte + surfactant surface tension ---------------------
+  # Salt raises the clean surface tension slightly; surfactant lowers it toward
+  # the CMC plateau. sigma_eff is the surface-tension state handed downstream.
+  sigma_cmc   <- 0.030
+  sigma_clean <- 0.072 + 0.02 * I_strength / (I_strength + I_ref)
   sigma_eff   <- sigma_clean - (sigma_clean - sigma_cmc) * theta_surf
 
-  # Continuous-phase (film) viscosity that resists drainage: dissolved polymer,
-  # binder and plasticizer thicken the draining films (polymer makeup + added
-  # stabilizers) on top of the temperature-dependent water base.
+  # Film viscosity resisting drainage (polymer makeup + stabilizers + T)
   mu_film <- visc_water * (1 + 12 * C_binder + 3 * plasticizer_frac)
 
+  # --- (4) Bubble size: coalescence / Ostwald ripening over the hold -----
+  # Feed bubbles coarsen during the pressurized residence, faster under pressure
+  # (Henry) and retarded by a well-covered film. Feeds drainage and foam yield.
+  k_rip0 <- 4e-15
+  k_rip  <- k_rip0 * (P_local / P_atm) * (1 - 0.8 * theta_surf)
+  D_b_eff <- (D_b^3 + k_rip * t_pond)^(1/3)
+  R_bub   <- D_b_eff / 2
+
   # --- Foam drainage (centrifugal Plateau-border drainage) --------------
-  # Liquid drains from the films under the centrifugal body force; the
-  # surfactant monolayer immobilizes the interfaces (Marangoni) and strongly
-  # retards it. Drained foam collapses and its gas coalesces to the air core -
-  # extra degassing beyond the mechanical pop, and a gate on the sparged-gas
-  # pore-former reaching the cake.
-  g_eff    <- r_pool * omega^2                          # centrifugal acceleration [m/s2]
-  eps_foam <- 0.20                                       # initial foam liquid fraction
-  R_bub    <- 50e-6                                      # bubble radius [m]
-  r_pb     <- R_bub * sqrt(eps_foam)                     # Plateau-border radius
-  C_drain  <- 50 * (1 + 20 * theta_surf)                 # interfacial rigidity (surfactant)
-  v_drain  <- rho_liq * g_eff * r_pb^2 / (C_drain * mu_film)      # drainage velocity [m/s]
-  t_drain  <- dist / max(v_drain, 1e-9)                   # time to drain the foam layer [s]
-  foam_drained_frac <- 1 - exp(-t_pond / t_drain)         # collapsed over the residence
+  # Body-force drainage retarded by interfacial rigidity (surfactant) and bulk
+  # film viscosity; drained foam collapses and vents its gas to the air core.
+  g_eff    <- r_pool * omega^2
+  eps_foam <- 0.20
+  r_pb     <- R_bub * sqrt(eps_foam)
+  C_drain  <- 50 * (1 + 20 * theta_surf)
+  v_drain  <- rho_liq * g_eff * r_pb^2 / (C_drain * mu_film)
+  t_drain  <- dist / max(v_drain, 1e-9)
+  foam_drained_frac <- 1 - exp(-t_pond / t_drain)
 
   # --- Degassing: mechanical pop (retarded by a stable foam) + drainage --
   pop_frac_eff <- pop_frac * (1 - 0.6 * foam_stability)
   Q_gas_after_pop     <- Q_gas_atm * (1 - pop_frac_eff)
   Q_gas_surviving_atm <- Q_gas_after_pop * (1 - foam_drained_frac)
 
-  # Hydrostatic compression (Boyle)
-  P_hydro <- 0.5 * rho_liq * omega^2 * (r_bowl^2 - r_pool^2)
-  P_local <- P_atm + P_hydro
+  # Compression (Boyle)
   Q_gas_local <- Q_gas_surviving_atm * (P_atm / P_local)
 
   # Local suspension properties
@@ -207,7 +243,8 @@ unified_centrifuge_model <- function(run) {
   # ---------------------------------------------------------
   # C.5 THERMODYNAMIC FLASHING (T, P dependent)
   # ---------------------------------------------------------
-  kH <- k_H_T(T_process)
+  # (5) electrolyte salting-out lowers gas solubility (Sechenov)
+  kH <- k_H_T(T_process) * 10^(-0.2 * I_strength)
   C_gas_loaded <- gas_sat_frac * kH * P_feed
   C_gas_final  <- kH * P_atm
   flash_mol_per_m3 <- max(0, C_gas_loaded - C_gas_final)
@@ -379,6 +416,7 @@ unified_centrifuge_model <- function(run) {
     Monomer_Retained      = 1 - mono_flash_frac,
     Foam_Stability        = foam_stability,
     Foam_Drainage_Frac    = foam_drained_frac,
+    Bubble_Size_um        = D_b_eff * 1e6,
     Serum_Surface_Tension_N_m = sigma_eff,
     Centrate_Foam_Ratio   = Foam_Potential_Ratio
   ))
@@ -403,10 +441,14 @@ factors <- rbind(
   fac("T_process",       288,   343,   303,   "process"),
   fac("P_feed",          1.0e5, 1.0e6, 3.0e5, "process"),
   fac("gas_sat_frac",    0.0,   1.0,   0.5,   "process"),
-  # --- SURFACE CHEMISTRY ----------------------------------------------
+  fac("D_b",             2.0e-5,2.0e-4,5.0e-5,"process"),   # feed bubble diameter
+  # --- SURFACE CHEMISTRY / COLLOIDAL ----------------------------------
   fac("HLB_value",       4.0,   18.0,  12.0,  "surface"),
   fac("surf_dose_kg_m3", 0.5,   4.0,   2.0,   "surface"),
   fac("t_recover_sec",   0.5,   5.0,   2.0,   "surface"),   # foam thixotropic recovery
+  fac("I_strength",      1.0e-3,5.0e-1,5.0e-2,"surface"),   # ionic strength (DLVO / salting)
+  fac("Delta_pH",        0.2,   4.0,   2.0,   "surface"),   # pH offset from IEP (DLVO)
+  fac("contact_angle_deg",30,   150,   90,    "surface"),   # particle wettability (Pickering)
   # --- ADDITIVES ------------------------------------------------------
   fac("plasticizer_frac",0.05,  0.25,  0.12,  "additive"),
   fac("C_monomer",       0.000, 0.020, 0.005, "additive"),
