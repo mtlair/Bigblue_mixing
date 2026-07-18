@@ -31,11 +31,18 @@
 # Henry's-law dissolved-gas flash template + Clausius-Clapeyron monomer
 # volatility (both need the explicit T / P state).
 #
-# NOTE on surface chemistry (Section F): the surfactant monolayer partition is
-# grounded (coverage = MW/(a0 N_A), geometric interfacial areas, dose balance
-# vs CMC), but it currently only produces Centrate_Foam_Ratio - it does NOT
-# feed back into the foam cushion, degassing or aggregate cohesion. Dose is now
-# a swept surface factor; coupling it back is a future refinement.
+# SURFACE CHEMISTRY IS COUPLED: the surfactant monolayer coverage (theta_surf,
+# from dose vs interfacial demand) now drives foam stability, which (a) retards
+# the mechanical pop degassing, (b) slows centrifugal FOAM DRAINAGE, (c) boosts
+# the foam-cushion shear protection, and (d) keeps the light (foam-borne) solid
+# phase from shedding to the centrate. Centrate_Foam_Ratio remains the residual
+# downstream foam-potential output.
+#
+# FOAM DRAINAGE: liquid drains from the foam films under the centrifugal body
+# force (Plateau-border drainage), retarded by the surfactant-rigidified
+# interfaces. Drained foam collapses, releasing its gas to the air core - so a
+# high-g bowl breaks the foam (extra degassing) unless a well-covered, stable
+# foam resists it.
 #
 # Method: Morris OAT screening on a [0,1] hypercube over the ACTIVE factors
 # (comparable elementary effects), mapped to physical ranges, all outputs from
@@ -107,7 +114,7 @@ unified_centrifuge_model <- function(run) {
   template_density <- rho_liq - (rho_liq - rho_plast_theta) * plast_norm
 
   # ---------------------------------------------------------
-  # C. MASS BALANCE, COMPRESSION, & DEGASSING
+  # C. MASS BALANCE, SURFACE CHEMISTRY, FOAM DRAINAGE & DEGASSING
   # ---------------------------------------------------------
   Q_in_m3s <- flow_rate / 60000
   feed_liq_frac <- max(0, 1.0 - (feed_solid_frac + feed_gas_frac))
@@ -115,16 +122,59 @@ unified_centrifuge_model <- function(run) {
   Q_solid <- Q_in_m3s * feed_solid_frac
   Q_liq   <- Q_in_m3s * feed_liq_frac
   Q_gas_atm <- Q_in_m3s * feed_gas_frac
-
   rho_gas <- P_atm / (R_air * T_process)
 
-  Q_gas_vented <- Q_gas_atm * pop_frac
-  Q_gas_surviving_atm <- Q_gas_atm - Q_gas_vented
+  # Zone-separated residence. Axial transport is liquid-dominated (entrained
+  # gas rises to the air core), so the pond velocity uses the liquid+solid flow.
+  A_pond <- pi * (r_bowl^2 - r_pool^2)
+  Q_ls   <- Q_solid + Q_liq
+  U_ax   <- Q_ls / A_pond
+  t_feed    <- length_feed / U_ax
+  t_clarify <- L_cyl / U_ax
+  t_pond    <- t_feed + t_clarify
+  dist <- r_bowl - r_pool
 
+  # --- Surface chemistry: surfactant monolayer coverage -----------------
+  # Coverage = supply / interfacial demand at the feed. Low-HLB surfactant
+  # prefers the (hydrophobic) polymer surface; the aqueous foam is stabilized
+  # by coverage AND a hydrophilic (high-HLB) surfactant.
+  MW_surf <- 500; a0_angstrom2 <- 50; CMC_kg_m3 <- 1.0
+  kg_per_m2 <- (MW_surf / 1000) / ((a0_angstrom2 * 1e-20) * 6.022e23)
+  affinity_poly <- 1 / (1 + exp((HLB_value - 10) / 2))       # adsorption onto polymer
+  SA_poly_feed  <- (6 / 50e-6) * Q_solid
+  SA_gas_feed   <- (6 / 50e-6) * Q_gas_atm
+  surf_demand   <- (SA_gas_feed + SA_poly_feed * affinity_poly) * kg_per_m2   # kg/s
+  surf_supply   <- Q_liq * surf_dose_kg_m3
+  theta_surf    <- min(1, surf_supply / max(surf_demand, 1e-12))   # fractional coverage
+  foam_HLB      <- 1 / (1 + exp(-(HLB_value - 10) / 2))            # hydrophilic -> foams
+  foam_stability <- theta_surf * foam_HLB                          # 0..1
+
+  # --- Foam drainage (centrifugal Plateau-border drainage) --------------
+  # Liquid drains from the films under the centrifugal body force; the
+  # surfactant monolayer immobilizes the interfaces (Marangoni) and strongly
+  # retards it. Drained foam collapses and its gas coalesces to the air core -
+  # extra degassing beyond the mechanical pop, and a gate on the sparged-gas
+  # pore-former reaching the cake.
+  g_eff    <- r_pool * omega^2                          # centrifugal acceleration [m/s2]
+  eps_foam <- 0.20                                       # initial foam liquid fraction
+  R_bub    <- 50e-6                                      # bubble radius [m]
+  r_pb     <- R_bub * sqrt(eps_foam)                     # Plateau-border radius
+  C_drain  <- 50 * (1 + 20 * theta_surf)                 # interface mobility drag (rigid if covered)
+  v_drain  <- rho_liq * g_eff * r_pb^2 / (C_drain * visc_water)   # drainage velocity [m/s]
+  t_drain  <- dist / max(v_drain, 1e-9)                   # time to drain the foam layer [s]
+  foam_drained_frac <- 1 - exp(-t_pond / t_drain)         # collapsed over the residence
+
+  # --- Degassing: mechanical pop (retarded by a stable foam) + drainage --
+  pop_frac_eff <- pop_frac * (1 - 0.6 * foam_stability)
+  Q_gas_after_pop     <- Q_gas_atm * (1 - pop_frac_eff)
+  Q_gas_surviving_atm <- Q_gas_after_pop * (1 - foam_drained_frac)
+
+  # Hydrostatic compression (Boyle)
   P_hydro <- 0.5 * rho_liq * omega^2 * (r_bowl^2 - r_pool^2)
   P_local <- P_atm + P_hydro
   Q_gas_local <- Q_gas_surviving_atm * (P_atm / P_local)
 
+  # Local suspension properties
   Q_local_m3s <- Q_solid + Q_liq + Q_gas_local
   rho_feed_local <- ((Q_solid * rho_poly) + (Q_liq * rho_liq) + (Q_gas_surviving_atm * rho_gas)) / Q_local_m3s
 
@@ -132,16 +182,11 @@ unified_centrifuge_model <- function(run) {
   safe_phi <- min(phi_dispersed, 0.64)
   mu_apparent <- visc_water * (1 - (safe_phi / 0.65))^(-2.5 * 0.65)
 
-  # Zone-separated residence
-  A_pond <- pi * (r_bowl^2 - r_pool^2)
-  U_ax   <- Q_local_m3s / A_pond
-  t_feed    <- length_feed / U_ax
-  t_clarify <- L_cyl / U_ax
-  t_pond    <- t_feed + t_clarify
-
+  # Foam cushion: thixotropic recovery over the residence, boosted by the
+  # surfactant-stabilized film network.
   foam_dampening_full <- max(1.0, mu_apparent / visc_water)
   recovery_frac <- 1 - exp(-t_pond / t_recover_sec)
-  foam_dampening_factor <- 1.0 + (foam_dampening_full - 1.0) * recovery_frac
+  foam_dampening_factor <- 1.0 + (foam_dampening_full - 1.0) * recovery_frac * (1 + 1.5 * foam_stability)
 
   k_feed_accel <- 80
   n_rev_feed   <- omega * t_feed / (2 * pi)
@@ -179,7 +224,7 @@ unified_centrifuge_model <- function(run) {
 
   phi_s_local <- Q_solid / Q_local_m3s
   hinder <- (max(0, 1 - phi_s_local))^4.65
-  dist <- r_bowl - r_pool
+  # dist (settling distance) already defined in Section C
 
   for (i in seq_len(n_size)) {
     d_um <- size_bins[i]
@@ -224,6 +269,11 @@ unified_centrifuge_model <- function(run) {
   heavy_solid_yield     <- heavy_solid_yield / weight_sum
   light_solid_yield     <- light_solid_yield / weight_sum
   agg_survival          <- agg_survival / weight_sum
+
+  # Light (foam-borne) solids only report to the light phase while the foam
+  # survives; drained / collapsed foam sheds them to the centrate (a loss).
+  foam_vehicle <- 0.3 + 0.7 * (1 - foam_drained_frac)
+  light_solid_yield <- light_solid_yield * foam_vehicle
 
   # Outlet classification: grade efficiency -> cut size + cake median
   grade_eff <- size_capture / pmax(size_feed_mass, 1e-12)
@@ -283,24 +333,15 @@ unified_centrifuge_model <- function(run) {
   Total_Plast_Retained <- (Plast_frac_solid * heavy_solid_yield) + (Plast_frac_liquid * (Q_liq_heavy / Q_liq_safe))
 
   # ---------------------------------------------------------
-  # F. SURFACTANT PARTITIONING & SECONDARY FOAMING (surface group)
+  # F. SURFACTANT PARTITIONING -> CENTRATE FOAM POTENTIAL (surface group)
   # ---------------------------------------------------------
-  # Monolayer partition: coverage = MW / (a0 N_A); surfactant splits across the
-  # polymer and bubble interfaces (HLB-weighted) with the remainder dissolved
-  # in the centrate, whose concentration vs CMC gives the foam potential.
-  # NOTE: currently a terminal output - not fed back into foam/cohesion.
-  CMC_kg_m3 <- 1.0; MW <- 500; a0_angstrom2 <- 50
-  kg_per_m2 <- (MW / 1000) / ((a0_angstrom2 * 1e-20) * 6.022e23)
-
-  SA_poly <- (6 / 50e-6) * Q_solid
-  SA_gas  <- (6 / 50e-6) * Q_gas_surviving_atm
-
-  Surf_on_Gas <- SA_gas * kg_per_m2
-  affinity_factor <- 1 / (1 + exp((HLB_value - 10) / 2))
-  Surf_on_Poly <- SA_poly * kg_per_m2 * affinity_factor
-
-  Total_Surf_In <- Q_liq * surf_dose_kg_m3
-  Surf_Dissolved <- max(0, Total_Surf_In - Surf_on_Gas - Surf_on_Poly)
+  # Reuse the Section-C monolayer coverage: surfactant not adsorbed on the
+  # polymer or bubble interfaces stays dissolved in the centrate, whose
+  # concentration vs CMC gives the residual (downstream) foam potential.
+  # The coverage also drives foam stability / drainage / degassing in Section C.
+  Surf_on_Gas  <- SA_gas_feed  * kg_per_m2
+  Surf_on_Poly <- SA_poly_feed * kg_per_m2 * affinity_poly
+  Surf_Dissolved <- max(0, surf_supply - Surf_on_Gas - Surf_on_Poly)
 
   Q_liq_centrate <- Q_liq - Q_liq_heavy - (Q_gas_surviving_atm * 0.05)
   Centrate_Conc_kg_m3 <- Surf_Dissolved / max(Q_liq_centrate, 1e-6)
@@ -323,6 +364,8 @@ unified_centrifuge_model <- function(run) {
     Paste_Viscosity_Pa_s  = paste_viscosity_pa_s,
     Plasticizer_Retained  = Total_Plast_Retained,
     Monomer_Retained      = 1 - mono_flash_frac,
+    Foam_Stability        = foam_stability,
+    Foam_Drainage_Frac    = foam_drained_frac,
     Centrate_Foam_Ratio   = Foam_Potential_Ratio
   ))
 }
