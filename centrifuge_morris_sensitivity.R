@@ -97,11 +97,12 @@ unified_centrifuge_model <- function(run) {
   I_strength       <- run[["I_strength"]]        # ionic strength (Debye)   [mol/L]
   Delta_pH         <- run[["Delta_pH"]]          # pH offset from IEP       [-]
   contact_angle_deg<- run[["contact_angle_deg"]] # particle wettability (Pickering)
-  # additives
+  # additives / material
   plasticizer_frac <- run[["plasticizer_frac"]]
   C_monomer        <- run[["C_monomer"]]
   C_binder         <- run[["C_binder"]]          # binder concentration     [wt/wt]
   chi_parameter    <- run[["chi_parameter"]]
+  rho_poly         <- run[["rho_poly"]]          # dry solids/polymer density [kg/m3]
   # equipment (muted by default)
   L_cyl            <- run[["L_cyl"]]             # cylinder length          [m]
   r_bowl           <- run[["r_bowl"]]            # bowl radius (diameter)   [m]
@@ -117,7 +118,7 @@ unified_centrifuge_model <- function(run) {
   # keep the pond physical even if equipment geometry is swept
   r_pool <- min(max(r_pool, r_discharge + 0.005), r_bowl - 0.005)
 
-  rho_poly <- 1200; rho_liq <- 1000
+  rho_liq <- 1000              # rho_poly is a swept material factor (Section A)
   R_gas <- 8.314; R_air <- 287
   P_atm <- 101325; omega <- rpm * (2 * pi / 60)
 
@@ -529,6 +530,8 @@ factors <- rbind(
   fac("C_monomer",       0.000, 0.020, 0.005, "additive"),
   fac("C_binder",        0.000, 0.050, 0.010, "additive"),
   fac("chi_parameter",   0.1,   0.9,   0.5,   "additive"),
+  fac("rho_poly",        1150,  1900,  1250,  "additive"),   # dry solids/polymer density (filled -> dense)
+
   # --- EQUIPMENT (MUTED by default: hard to change) -------------------
   fac("L_cyl",           0.30,  1.00,  0.60,  "equipment"),
   fac("beach_angle_deg", 5.0,   15.0,  10.0,  "equipment"),
