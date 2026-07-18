@@ -97,11 +97,13 @@ unified_centrifuge_model <- function(run) {
   I_strength       <- run[["I_strength"]]        # ionic strength (Debye)   [mol/L]
   Delta_pH         <- run[["Delta_pH"]]          # pH offset from IEP       [-]
   contact_angle_deg<- run[["contact_angle_deg"]] # particle wettability (Pickering)
-  # additives
+  # additives / material
   plasticizer_frac <- run[["plasticizer_frac"]]
   C_monomer        <- run[["C_monomer"]]
   C_binder         <- run[["C_binder"]]          # binder concentration     [wt/wt]
   chi_parameter    <- run[["chi_parameter"]]
+  S_base           <- run[["S_base"]]            # compacted-sludge solids floor (vol frac)
+  S_ceiling        <- run[["S_ceiling"]]         # max dewatered solids (vol frac)
   # equipment (muted by default)
   L_cyl            <- run[["L_cyl"]]             # cylinder length          [m]
   r_bowl           <- run[["r_bowl"]]            # bowl radius (diameter)   [m]
@@ -378,7 +380,8 @@ unified_centrifuge_model <- function(run) {
   # limit) with beach residence t_gap; tacky/plasticized/binder cakes and a
   # high serum surface tension hold moisture, while surfactant (low sigma) aids
   # dewatering. Cake solids cannot exceed the ceiling.
-  S_ceiling <- 0.50; S_base <- 0.25
+  # S_base (compaction floor) and S_ceiling (max dewatered) are material factors
+  S_ceiling <- max(S_ceiling, S_base + 0.02)          # keep the ceiling above the floor
   dewater <- 1 - exp(-t_gap / 8.0)                     # residence approach to ceiling
   aid <- 1 - 0.40 * (plasticizer_frac / 0.25) - 0.40 * (C_binder / 0.05) -
              0.20 * ((sigma_eff / sigma_clean) - 0.33) / 0.67
@@ -582,6 +585,8 @@ factors <- rbind(
   fac("C_monomer",       0.000, 0.020, 0.005, "additive"),
   fac("C_binder",        0.000, 0.050, 0.010, "additive"),
   fac("chi_parameter",   0.1,   0.9,   0.5,   "additive"),
+  fac("S_base",          0.10,  0.35,  0.25,  "additive"),   # compacted-sludge floor (vol solids)
+  fac("S_ceiling",       0.45,  0.60,  0.50,  "additive"),   # max dewatered (vol solids)
 
   # --- EQUIPMENT (MUTED by default: hard to change) -------------------
   fac("L_cyl",           0.30,  1.00,  0.60,  "equipment"),
