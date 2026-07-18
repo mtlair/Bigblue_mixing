@@ -559,6 +559,7 @@ centrifuge_to_spray <- function(run, target_solid_mass = 0.30) {
                     (sigma_clean0 - o$Serum_Surface_Tension_N_m) * (1 - 1/dil),  # -> clean on dilution
     D_b           = o$Bubble_Size_um * 1e-6,                # bubble diameter  [m]
     mu_L          = 1e-3 + (o$Serum_Viscosity_Pa_s - 1e-3) / dil,  # serum viscosity [Pa s]
+    C_surfactant  = run[["surf_dose_kg_m3"]] / rho_L / dil, # surfactant wt/wt  [-]
     C_solid_massfrac_cake = Cs_cake,                        # (pre-dilution, for reference)
     C_monomer     = run[["C_monomer"]]     * o$Monomer_Retained / dil,
     C_plasticizer = run[["plasticizer_frac"]] * o$Plasticizer_Retained / dil,

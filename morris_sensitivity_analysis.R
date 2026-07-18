@@ -500,7 +500,10 @@ spray_dry_model <- function(x) {
     D_pore_um      = D_pore * 1e6,
     solv_retained  = R_solv,
     f_burst_solv   = f_burst,
-    sigma_y_cake_MPa = sigma_y / 1e6)
+    sigma_y_cake_MPa = sigma_y / 1e6,
+    T_out_K        = T_out,
+    DeltaT_K       = T_in - T_out,
+    RH_out         = RH_out)
 }
 
 run_model <- function(X01) {
