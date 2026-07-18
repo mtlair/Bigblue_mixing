@@ -15,6 +15,14 @@
 # core-shell migration) -> heavy-cake rheology & plasticizer retention ->
 # surfactant partitioning & secondary foaming.
 #
+# Aggregate integrity: the primary solids aggregate in the first formulation
+# step (aggregate size grows with plasticizer_frac); Aggregate_Destruction
+# reports the distribution-weighted fraction of those aggregates ruptured by
+# centrifugal shear. The core/template density is coupled to plasticizer_frac
+# as a theta-solvent phase (lighter than bulk liquid), which sets the density
+# contrast abs(rho_poly - template_density) driving that shear - so it is
+# derived here, not swept as an independent factor.
+#
 # Requires the `sensitivity` package (install.packages("sensitivity")).
 #
 # Run:  Rscript centrifuge_morris_sensitivity.R
@@ -44,7 +52,8 @@ unified_centrifuge_model <- function(run) {
   chi_parameter     <- run[["chi_parameter"]]     # Flory-Huggins compatibility
   HLB_value         <- run[["HLB_value"]]         # Surfactant affinity
   t_recover_sec     <- run[["t_recover_sec"]]     # Thixotropic foam recovery time
-  template_density  <- run[["template_density"]]  # Core density (1.2 to 1500)
+  # template_density is NOT swept independently - it is derived from
+  # plasticizer_frac below (theta-solvent coupling).
 
   # ---------------------------------------------------------
   # B. FIXED EQUIPMENT GEOMETRY & CONSTANTS
@@ -56,6 +65,17 @@ unified_centrifuge_model <- function(run) {
   rho_poly <- 1200; rho_liq <- 1000; rho_gas <- 1.2
   visc_water <- 0.001; tau_max <- 25.0
   P_atm <- 101325; omega <- rpm * (2 * pi / 60)
+
+  # Core/template density COUPLED to plasticizer content (theta-solvent core).
+  # More plasticizer -> a more solvent-rich, lighter core that sits below the
+  # 1000 kg/m3 bulk liquid. Linear from bulk-liquid density at the low-
+  # plasticizer limit down to a theta-solvent density at the high-plasticizer
+  # limit. A lighter core widens abs(rho_poly - template_density), the
+  # centrifugal contrast that stresses (and can rupture) the aggregates.
+  rho_plast_theta <- 820           # theta-solvent core density (max plasticizer) [kg/m3]
+  plast_lo <- 0.05; plast_hi <- 0.25
+  plast_norm <- max(0, min(1, (plasticizer_frac - plast_lo) / (plast_hi - plast_lo)))
+  template_density <- rho_liq - (rho_liq - rho_plast_theta) * plast_norm
 
   # ---------------------------------------------------------
   # C. MASS BALANCE, COMPRESSION, & DEGASSING
@@ -110,6 +130,7 @@ unified_centrifuge_model <- function(run) {
   heavy_solid_yield <- 0
   light_solid_yield <- 0
   intact_template_yield <- 0
+  agg_survival <- 0   # distribution-weighted fraction surviving shear intact
 
   for (d_um in size_bins) {
     for (core_frac in core_bins) {
@@ -127,6 +148,9 @@ unified_centrifuge_model <- function(run) {
       shear_stress <- (abs(rho_poly - template_density) * r_pool * omega^2 * d_intact_m) / foam_dampening_factor
 
       survival_prob <- 1 / (1 + exp(-(cohesive_strength - shear_stress) / 500))
+
+      # How much of the first-step aggregate survives the centrifuge shear
+      agg_survival <- agg_survival + (survival_prob * weight)
 
       # Determine migration physics based on survival
       # Path A: It Survives (Migrates as intact core-shell)
@@ -155,6 +179,7 @@ unified_centrifuge_model <- function(run) {
   intact_template_yield <- intact_template_yield / weight_sum
   heavy_solid_yield     <- heavy_solid_yield / weight_sum
   light_solid_yield     <- light_solid_yield / weight_sum
+  agg_survival          <- agg_survival / weight_sum
 
   # ---------------------------------------------------------
   # E. HEAVY CAKE RHEOLOGY & PLASTICIZER RETENTION
@@ -220,6 +245,8 @@ unified_centrifuge_model <- function(run) {
   # ---------------------------------------------------------
   return(list(
     Intact_Template_Yield = intact_template_yield,
+    Aggregate_Survival    = agg_survival,
+    Aggregate_Destruction = 1 - agg_survival,
     Heavy_Solid_Yield     = heavy_solid_yield,
     Yield_Loss_Centrate   = 1 - (heavy_solid_yield + light_solid_yield),
     Wet_Cake_Moisture     = cake_moisture_frac,
@@ -246,21 +273,25 @@ run_morris_wrapper <- function(X, target_variable = "Intact_Template_Yield") {
 # =========================================================================
 # 3. SETUP & EXECUTE MORRIS SENSITIVITY
 # =========================================================================
+# template_density is not listed here: it is derived inside the model from
+# plasticizer_frac (theta-solvent coupling), so it is not an independent knob.
 params <- c("rpm", "delta_rpm", "flow_rate_lpm", "feed_solid_frac",
             "feed_gas_frac", "pop_frac", "plasticizer_frac",
-            "chi_parameter", "HLB_value", "t_recover_sec", "template_density")
+            "chi_parameter", "HLB_value", "t_recover_sec")
 
 # Define Boundaries for your Process
-lower <- c(1500,  1.0,  20, 0.05, 0.10, 0.20, 0.05, 0.1,  4.0, 0.5,    1.2)
-upper <- c(4500, 20.0, 150, 0.25, 0.50, 0.90, 0.25, 0.9, 18.0, 5.0, 1500.0)
+lower <- c(1500,  1.0,  20, 0.05, 0.10, 0.20, 0.05, 0.1,  4.0, 0.5)
+upper <- c(4500, 20.0, 150, 0.25, 0.50, 0.90, 0.25, 0.9, 18.0, 5.0)
 
 set.seed(42)
 
 # ---> CHANGE THE TARGET VARIABLE HERE <---
-# Options: Intact_Template_Yield, Heavy_Solid_Yield, Yield_Loss_Centrate,
-# Wet_Cake_Moisture, Paste_Viscosity_Pa_s, Plasticizer_Retained, Centrate_Foam_Ratio
+# Options: Intact_Template_Yield, Aggregate_Survival, Aggregate_Destruction,
+# Heavy_Solid_Yield, Yield_Loss_Centrate, Wet_Cake_Moisture,
+# Paste_Viscosity_Pa_s, Plasticizer_Retained, Centrate_Foam_Ratio
 
-target <- "Paste_Viscosity_Pa_s"
+# Default screens what destroys the first-step aggregates in the centrifuge.
+target <- "Aggregate_Destruction"
 
 morris_out <- morris(model = function(X) run_morris_wrapper(X, target),
                      factors = params, r = 25,
