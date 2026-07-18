@@ -117,6 +117,7 @@ factors <- rbind(
   fac("Delta_pH",      0.2,    4.0,    FALSE, "pH",    "delta pH vs isoelectric point"),
   fac("I_strength",    1.0e-3, 5.0e-1, TRUE,  "M",     "ionic strength (Debye screening driver)"),
   fac("Tg_polymer",    280,    380,    FALSE, "K",     "dry-polymer glass transition"),
+  fac("T_sticky_K",    350,    500,    FALSE, "K",     "melt/softening sticky (clumping) point"),
   fac("n_flow",        0.40,   1.00,   FALSE, "-",     "power-law shear-thinning flow index"),
   fac("k_perm_mono",   5.0,    60.0,   FALSE, "-",     "monomer free-volume permeation coeff."),
   fac("k_perm_plast",  5.0,    60.0,   FALSE, "-",     "plasticizer free-volume permeation coeff."),
@@ -189,6 +190,7 @@ spray_dry_model <- function(x) {
   C_bind <- x[["C_binder"]];   C_surf <- x[["C_surfactant"]]
   dpH    <- x[["Delta_pH"]];   I_str  <- x[["I_strength"]]
   Tg_pol <- x[["Tg_polymer"]]; n_fl   <- x[["n_flow"]]
+  T_sticky <- x[["T_sticky_K"]]
   k_pm   <- x[["k_perm_mono"]]
   k_pp   <- x[["k_perm_plast"]]
   k_pb   <- x[["k_perm_bind"]]
@@ -406,8 +408,12 @@ spray_dry_model <- function(x) {
   Tg_dry <- 1 / ((1 - w_res) / Tg_pol + w_res / Tg_solv)
   Tg_eff <- 1 / ((1 - w_wat) / Tg_dry + w_wat / Tg_water)
 
-  # stickiness: particle temperature vs Tg_eff + 20 K sticky-point offset
-  S_stick <- 1 / (1 + exp(-(T_particle - (Tg_eff + 20)) / 10))
+  # stickiness / caking: for a LOW-Tg (rubbery) polymer the powder is above Tg
+  # everywhere yet does not clump; clumping is governed by the melt/softening
+  # sticky point T_sticky, NOT Tg. T_sticky is a material property - set near the
+  # melt for a semi-crystalline / heat-resistant product (clumps ~220 C), or near
+  # Tg+20 for a classic amorphous one.
+  S_stick <- 1 / (1 + exp(-(T_particle - T_sticky) / 10))
 
   ## --- Module 7b: Cake (consolidated shell) mechanics -----------------------
   # Rumpf-type yield strength of the particulate cake vs meniscus capillary

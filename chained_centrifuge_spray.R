@@ -31,8 +31,12 @@ spray_factors            <- spray_env$factors
 from_centrifuge <- c("rho_L", "C_solid_mass", "alpha_g_0", "sigma", "D_b", "mu_L",
                      "C_surfactant", "C_monomer", "C_plasticizer", "C_binder",
                      "I_strength", "Delta_pH")
-# dryer operating / formulation settings: midpoints of the spray model's ranges
+# dryer operating / formulation settings: midpoints of the spray model's ranges,
+# then overridden with the real plant dryer setpoints.
 sp_mid <- setNames((spray_factors$min + spray_factors$max) / 2, spray_factors$name)
+sp_mid["T_system"]   <- 423    # dryer inlet ~150 C (plant: 130-160 C)
+sp_mid["T_feed"]     <- 300    # feed / atomizing air ~ ambient
+sp_mid["T_sticky_K"] <- 493    # melt/clumping point ~220 C (heat-resistant product)
 
 clamp_to_spray <- function(x) {
   for (nm in names(x)) {
