@@ -417,7 +417,12 @@ spray_dry_model <- function(x) {
   # ~ MW^3.4, so a high-MW powder barely flows / sinters even above the nominal
   # sticky point, raising the EFFECTIVE clump temperature (~15 K per decade of
   # MW relative to 1e5 g/mol).
-  T_sticky_eff <- T_sticky + 15 * log10(MW_pol / 1e5)
+  # ADDITIVES depress the sticky point: residual plasticizer + monomer (and
+  # moisture) plasticize the matrix, and binder tackifies it - all lower the
+  # temperature at which the powder clumps. MW raises it. (w_res = residual
+  # plasticizer/monomer fraction of the solid; w_wat = residual moisture.)
+  plast_soften <- w_res + w_wat + 0.5 * C_bind
+  T_sticky_eff <- T_sticky + 15 * log10(MW_pol / 1e5) - 250 * plast_soften
   S_stick <- 1 / (1 + exp(-(T_particle - T_sticky_eff) / 10))
 
   ## --- Module 7b: Cake (consolidated shell) mechanics -----------------------
