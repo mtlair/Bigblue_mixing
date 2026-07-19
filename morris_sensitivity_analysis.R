@@ -375,6 +375,17 @@ spray_dry_model <- function(x) {
   S_crit <- 500 * (1 + 0.05 * Softness)
   theta_skin <- S_skin / (S_skin + S_crit)
 
+  # Surface additive enrichment -> sealed film skin (case hardening). At high
+  # Peclet the receding surface out-runs back-diffusion, and surface-active
+  # surfactant migrates to the interface, so the LOCAL surface plasticizer /
+  # surfactant exceeds bulk. That soft, enriched surface film-forms into a
+  # continuous SEALED skin - distinct from the rigid particulate skin above,
+  # and it ADDS to it (the case-hardening route: seals in moisture).
+  E_surf    <- 1 + 3 * (Pe / (Pe + 1)) + 4 * theta_surf   # surface enrichment factor
+  phi_surf  <- min(0.9, E_surf * phi_solvent)             # local surface plasticizer frac
+  skin_film <- phi_surf / (phi_surf + 0.05)               # sealed-film fraction [-]
+  theta_skin <- theta_skin + (1 - theta_skin) * skin_film
+
   # Fractal openness (v47 Sect. 9): unstable colloid -> DLCA, open flocs
   # (low D_f, high structural porosity); stable -> compact RLCA packing
   D_f <- 1.8 + 0.7 * min((stability - 1) / 5, 1)
