@@ -128,7 +128,7 @@ unified_centrifuge_model <- function(run) {
 
   # Core/template density coupled to plasticizer (theta-solvent core)
   rho_plast_theta <- 820
-  plast_lo <- 0.05; plast_hi <- 0.25
+  plast_lo <- 0.00; plast_hi <- 0.05
   plast_norm <- max(0, min(1, (plasticizer_frac - plast_lo) / (plast_hi - plast_lo)))
   template_density <- rho_liq - (rho_liq - rho_plast_theta) * plast_norm
 
@@ -403,7 +403,7 @@ unified_centrifuge_model <- function(run) {
   # solids, which can fall below S_base. S_base/S_ceiling are material factors.
   S_ceiling <- max(S_ceiling, S_base + 0.02)
   dewater <- 1 - exp(-t_gap / 8.0)
-  aid <- 1 - 0.40 * (plasticizer_frac / 0.25) - 0.40 * (C_binder / 0.05) -
+  aid <- 1 - 0.40 * (plasticizer_frac / 0.05) - 0.40 * (C_binder / 0.05) -
              0.20 * ((sigma_eff / sigma_clean) - 0.33) / 0.67
   aid  <- max(0.2, min(1, aid))
   airy <- 1 - 0.6 * cake_gas_frac                     # mousse holds water -> wetter
@@ -598,7 +598,7 @@ factors <- rbind(
   fac("Delta_pH",        0.2,   4.0,   2.0,   "surface"),   # pH offset from IEP (DLVO)
   fac("contact_angle_deg",30,   150,   90,    "surface"),   # particle wettability (Pickering)
   # --- ADDITIVES ------------------------------------------------------
-  fac("plasticizer_frac",0.05,  0.25,  0.12,  "additive"),
+  fac("plasticizer_frac",0.00,  0.05,  0.02,  "additive"),
   fac("C_monomer",       0.000, 0.020, 0.005, "additive"),
   fac("C_binder",        0.000, 0.050, 0.010, "additive"),
   fac("chi_parameter",   0.1,   0.9,   0.5,   "additive"),

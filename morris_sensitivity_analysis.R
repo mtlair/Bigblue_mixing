@@ -95,7 +95,7 @@ fac <- function(name, min, max, log, unit, desc)
 
 factors <- rbind(
   #   name             min     max     log    unit     description
-  fac("ALR",           1.0,    10.0,   FALSE, "-",     "air-liquid mass ratio m_G/m_L"),
+  fac("ALR",           0.05,   1.5,    FALSE, "-",     "airblast air-liquid mass ratio m_G/m_L (external bi-fluid)"),
   fac("P_system",      2.0e5,  7.0e5,  FALSE, "Pa",    "atomizing air supply pressure"),
   fac("P_feed",        1.5e5,  1.0e6,  FALSE, "Pa",    "liquid feed line (hold) pressure"),
   fac("mdot_L",        0.002,  0.020,  FALSE, "kg/s",  "liquid feed mass flow"),
@@ -118,6 +118,7 @@ factors <- rbind(
   fac("I_strength",    1.0e-3, 5.0e-1, TRUE,  "M",     "ionic strength (Debye screening driver)"),
   fac("Tg_polymer",    280,    380,    FALSE, "K",     "dry-polymer glass transition"),
   fac("T_sticky_K",    290,    500,    FALSE, "K",     "sticky (clumping) point: Tg+~20 amorphous, melt if semicrystalline"),
+  fac("MW_polymer",    1.0e4,  1.0e6,  TRUE,  "g/mol", "polymer molecular weight (raises effective sticky point)"),
   fac("n_flow",        0.40,   1.00,   FALSE, "-",     "power-law shear-thinning flow index"),
   fac("k_perm_mono",   5.0,    60.0,   FALSE, "-",     "monomer free-volume permeation coeff."),
   fac("k_perm_plast",  5.0,    60.0,   FALSE, "-",     "plasticizer free-volume permeation coeff."),
@@ -190,7 +191,7 @@ spray_dry_model <- function(x) {
   C_bind <- x[["C_binder"]];   C_surf <- x[["C_surfactant"]]
   dpH    <- x[["Delta_pH"]];   I_str  <- x[["I_strength"]]
   Tg_pol <- x[["Tg_polymer"]]; n_fl   <- x[["n_flow"]]
-  T_sticky <- x[["T_sticky_K"]]
+  T_sticky <- x[["T_sticky_K"]]; MW_pol <- x[["MW_polymer"]]
   k_pm   <- x[["k_perm_mono"]]
   k_pp   <- x[["k_perm_plast"]]
   k_pb   <- x[["k_perm_bind"]]
@@ -412,8 +413,12 @@ spray_dry_model <- function(x) {
   # everywhere yet does not clump; clumping is governed by the melt/softening
   # sticky point T_sticky, NOT Tg. T_sticky is a material property - set near the
   # melt for a semi-crystalline / heat-resistant product (clumps ~220 C), or near
-  # Tg+20 for a classic amorphous one.
-  S_stick <- 1 / (1 + exp(-(T_particle - T_sticky) / 10))
+  # Tg+20 for a classic amorphous one. Polymer MW moderates it: melt viscosity
+  # ~ MW^3.4, so a high-MW powder barely flows / sinters even above the nominal
+  # sticky point, raising the EFFECTIVE clump temperature (~15 K per decade of
+  # MW relative to 1e5 g/mol).
+  T_sticky_eff <- T_sticky + 15 * log10(MW_pol / 1e5)
+  S_stick <- 1 / (1 + exp(-(T_particle - T_sticky_eff) / 10))
 
   ## --- Module 7b: Cake (consolidated shell) mechanics -----------------------
   # Rumpf-type yield strength of the particulate cake vs meniscus capillary
