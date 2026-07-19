@@ -3,37 +3,32 @@ library(deSolve)
 # =====================================================================
 # SCRIPT 1: PREFORMED-FOAM WASH COLUMN (PSD retention + impurity wash)
 # =====================================================================
-# The foam is PREFORMED and PARTICLE-LOADED in an upstream step; this column
-# has NO gas sparger of its own. Loaded foam enters at the base, rises as a
-# plug, drains (dries) as it goes, and wash liquid added at the top sweeps
-# entrained impurity out. The column therefore only RETAINS-vs-LOSES what
-# arrives -- there is no in-column attachment and no foam-formation interface.
+# The foam is PREFORMED and PARTICLE-LOADED upstream; this column has NO gas
+# sparger. Loaded foam enters at the base, rises as a plug, drains (dries)
+# slowly as it goes, and wash liquid added at the top sweeps entrained
+# impurity out. The column RETAINS-vs-LOSES what arrives -- no in-column
+# attachment, no foam-formation interface.
 #
-# State marched up height z:
-#   Js_fine, Js_mid, Js_crs   attached solid flux per size class [m/s]
-#   C_imp                     entrained impurity [%]
-#   eps_l                     liquid holdup of the foam [-]
+# Two effects added in this version (both observed in practice):
+#  (A) DRAINAGE IS TIME-LIMITED. Films drain on a timescale tau_drain that is
+#      long compared with the foam residence time, so drainage is INCOMPLETE:
+#      the foam stays wet and top-of-column solids content is low (~3-7%),
+#      even though the foam is a coherent plug over most of the height. This
+#      is the key point: PLUG-FLOW ONSET (bubble jamming at eps_g ~ 0.74) is
+#      NOT the same as DRYING (eps_g -> 0.95+). Preformed foam enters already
+#      jammed (eps_g_in ~ 0.80), so it is a plug from the base; it just never
+#      finishes draining within the column.
+#  (B) SNOW-GLOBE vs PLUG is a MATERIAL property. Well-stabilized, lightly/
+#      buoyantly-loaded foam jams into a continuous rising plug. Weak films or
+#      heavy/dense particle loads thin and rupture films, so the foam cannot
+#      hold a continuous network and stays as discrete particle-armored wet
+#      flakes ("snow-globe"). Set by film_stability vs. solid loading.
 #
-# Boundary conditions at z = 0 are the PREFORMED loaded foam (Js_*_in, etc.).
+# State marched up height z: Js_fine, Js_mid, Js_crs [m/s]; C_imp [%];
+#                            eps_l (liquid holdup) [-].
+# Solid holdup eps_s and solids content are derived diagnostics.
 #
-# Physics choices (PLACEHOLDER closures, tune later):
-#   * Preforming pressure sets the INLET bubble size: d_b ~ (P_ref/P)^(1/3).
-#     Smaller bubbles -> tighter Plateau borders (less channeling) but wetter
-#     foam (higher drained holdup). Bubble size is treated as constant up the
-#     column here (coalescence up the column is a future refinement).
-#   * Drainage: eps_l relaxes from the inlet foam wetness toward a drained
-#     equilibrium eps_l_eq over a length L_drain (foam dries as it rises).
-#   * COLLAPSE / FLOOD: if the foam wetness reaches the packing limit
-#     (eps_g <= eps_g_pack) the froth collapses to bubbly liquid. This can be
-#     driven by too-wet inlet foam or by a drained equilibrium eps_l_eq that
-#     sits above the packing holdup (high preforming pressure ~ 7.8 bar).
-#   * COARSE LOSS = two mechanisms: (1) buoyancy-failure / intrinsic
-#     detachment k_det (density too high to stay attached) and (2)
-#     bubble-collapse loss k_col, gated by foam dryness (coalescence grows as
-#     eps_g rises above packing). Fines are buoyant -> both small.
-#   * Wash liquid is set by the foam feed's entrained liquid
-#     (Jl_wash = wash_ratio * J_foam * eps_l_in) so it scales with feed;
-#     channeling from Plateau-border flow maldistribution (Q ~ r^4 => ~4x CV).
+# PLACEHOLDER closures throughout -- tune against data.
 # =====================================================================
 
 params <- c(
@@ -42,48 +37,49 @@ params <- c(
   # --- PREFORMED FOAM FEED (no sparger; foam made upstream) ---
   J_foam   = 0.06,       # superficial foam velocity entering the base [m/s]
   eps_l_in = 0.20,       # liquid holdup of the incoming foam [-] (eps_g = 0.80)
-  # inlet solid loading of the preformed foam [m/s] (upstream PSD selectivity)
-  Js_fine_in = 0.017, Js_mid_in = 0.040, Js_crs_in = 0.020,
+  eps_s_in = 0.020,      # solid volume fraction of incoming foam [-] (for solids%)
+  Js_fine_in = 0.017, Js_mid_in = 0.040, Js_crs_in = 0.020,  # inlet loading [m/s]
   C_imp_in   = 100,      # inlet entrained impurity [%]
 
   # --- PREFORMING PRESSURE -> INLET BUBBLE SIZE ---
   P = 150000, P_ref = 150000, d_b_ref = 2.0e-3,
 
-  # --- DRAINAGE (foam dries as it rises) ---
-  eps_l_dry_ref = 0.15,  # drained residual holdup at P_ref [-] (eps_g = 0.85)
-  L_drain       = 1.0,   # drainage relaxation length [m]
-  eps_g_pack    = 0.74,  # packing / collapse (flood) threshold gas fraction
+  # --- DRAINAGE (time-limited: foam does NOT fully drain in the column) ---
+  eps_l_dry_ref = 0.15,  # fully-drained residual holdup at P_ref [-]
+  tau_drain     = 90,    # film drainage time constant [s] (>> residence -> incomplete)
+  eps_g_pack    = 0.74,  # packing / collapse threshold gas fraction
 
   # --- WASH LIQUID (added at top, correlated to the foam feed) ---
   wash_ratio = 0.5,      # wash-water : entrained-feed-liquid ratio
 
   # --- PSD LOSS: buoyancy-failure detachment + bubble-collapse ---
-  # (1) intrinsic detachment (can't float; density too high) -> coarse worst
   k_det_fine = 0.01, k_det_mid = 0.05, k_det_crs = 1.0,
-  # (2) bubble-collapse loss (dumped when films rupture) -> coarse worst
   k_col_fine = 0.05, k_col_mid = 0.30, k_col_crs = 2.0,
 
   # --- CHANNELING / WASH DISTRIBUTION ---
   k_drainage = 1.5,      # base impurity sweep rate [1/m]
-  channel_cv = 0.35      # CV of Plateau-border widths (0 = ideal plug wash)
+  channel_cv = 0.35,     # CV of Plateau-border widths (0 = ideal plug wash)
+
+  # --- REGIME (snow-globe vs plug) : material stability vs loading ---
+  film_stability = 0.76, # foam/film stability (material; higher -> plug)
+  load_sens      = 1.0,  # sensitivity of the plug criterion to solid loading
+  plug_crit      = 1.0   # plug_index threshold above which foam is a plug
 )
 
 column_model_psd <- function(z, state, parameters) {
   with(as.list(c(state, parameters)), {
 
-    # inlet bubble size from preforming pressure -> foam wetness & channeling
     d_b      <- d_b_ref * (P_ref / P)^(1 / 3)
     eps_l_eq <- eps_l_dry_ref * (d_b_ref / d_b)   # wetter drained foam at high P
 
-    eps_g <- 1 - eps_l
+    eps_g  <- 1 - eps_l
+    U_int  <- J_foam / max(eps_g, 1e-3)           # interstitial foam velocity [m/s]
 
-    # foam dries as it rises (drainage relaxation toward equilibrium)
-    deps_l <- -(eps_l - eps_l_eq) / L_drain
+    # (A) time-limited drainage: dz = U_int*dt, so length scale = U_int*tau_drain
+    deps_l <- -(eps_l - eps_l_eq) / (U_int * tau_drain)
 
     # bubble-collapse rate grows as the foam dries past packing
     coalescence <- max(0, eps_g - eps_g_pack)
-
-    # size loss: buoyancy-failure detachment + collapse dumping
     dJs_fine <- -Js_fine * (k_det_fine + k_col_fine * coalescence)
     dJs_mid  <- -Js_mid  * (k_det_mid  + k_col_mid  * coalescence)
     dJs_crs  <- -Js_crs  * (k_det_crs  + k_col_crs  * coalescence)
@@ -91,7 +87,7 @@ column_model_psd <- function(z, state, parameters) {
     # washing: swept by wash liquid, penalized by Plateau-border channeling
     flow_cv         <- 4 * channel_cv * (d_b / d_b_ref)
     Wash_Efficiency <- 1 / (1 + flow_cv^2)
-    wash_strength   <- wash_ratio / (wash_ratio + 1)   # = Jl_wash/(Jl_wash+Jl_in)
+    wash_strength   <- wash_ratio / (wash_ratio + 1)
     dCimp <- -k_drainage * Wash_Efficiency * wash_strength * C_imp
 
     list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l))
@@ -101,10 +97,18 @@ column_model_psd <- function(z, state, parameters) {
 # --- helpers ---------------------------------------------------------------
 d_b_of_P    <- function(p) p[["d_b_ref"]] * (p[["P_ref"]] / p[["P"]])^(1/3)
 epsleq_of_P <- function(p) p[["eps_l_dry_ref"]] * (p[["d_b_ref"]] / d_b_of_P(p))
-# foam collapses if the inlet OR the drained-equilibrium holdup can't pack
-is_flooded  <- function(p) {
-  thr <- 1 - p[["eps_g_pack"]]
-  (p[["eps_l_in"]] >= thr) || (epsleq_of_P(p) >= thr)
+
+# (B) regime map. Jamming (eps_g >= packing) is the GATE for foam at all;
+# above it, coherence is a competition between film stability and solid
+# loading: plug_index = film_stability / (load_sens * relative loading).
+# Stable, lightly-loaded films lock into a continuous PLUG; weak films or
+# heavy loading stay as discrete wet SNOW-GLOBE flakes. Loading is highest at
+# the base (before coarse sheds), so a marginal material is snow-globe low
+# down and consolidates into a plug as it rises, drains and lightens.
+regime_of <- function(eps_g, load_rel, p) {
+  if (eps_g < p[["eps_g_pack"]]) return("dispersed")
+  plug_index <- p[["film_stability"]] / (p[["load_sens"]] * load_rel)
+  if (plug_index >= p[["plug_crit"]]) "plug" else "snowglobe"
 }
 
 solve_column <- function(p) {
@@ -112,25 +116,36 @@ solve_column <- function(p) {
                   Js_crs = p[["Js_crs_in"]], C_imp = p[["C_imp_in"]],
                   eps_l = p[["eps_l_in"]])
   z_seq <- seq(0, p[["H_total"]], by = 0.02)
-  as.data.frame(ode(y = state_init, times = z_seq,
-                    func = column_model_psd, parms = p))
+  out <- as.data.frame(ode(y = state_init, times = z_seq,
+                           func = column_model_psd, parms = p))
+  names(out)[1] <- "z"
+  out$eps_g <- 1 - out$eps_l
+  # derived: solid holdup scales with retained loading; solids content of the
+  # condensed (liquid+solid) phase = what a collapsed sample would assay.
+  Js_tot_in <- p[["Js_fine_in"]] + p[["Js_mid_in"]] + p[["Js_crs_in"]]
+  load_rel  <- (out$Js_fine + out$Js_mid + out$Js_crs) / Js_tot_in
+  out$eps_s <- p[["eps_s_in"]] * load_rel
+  out$solids_pct <- 100 * out$eps_s / (out$eps_s + out$eps_l)
+  out$regime <- vapply(seq_len(nrow(out)),
+                       function(i) regime_of(out$eps_g[i], load_rel[i], p), character(1))
+  out
 }
 
 # --- solve + report --------------------------------------------------------
 out_psd <- solve_column(params)
-names(out_psd)[1] <- "z"
-out_psd$eps_g <- 1 - out_psd$eps_l
-
-U_int <- params[["J_foam"]] / (1 - params[["eps_l_in"]])   # interstitial rise [m/s]
-cat(sprintf("Inlet bubble size d_b   = %.0f um\n", d_b_of_P(params) * 1e6))
-cat(sprintf("Foam rise (interstitial)= %.3f m/s  -> residence %.1f s over %.1f m\n",
-            U_int, params[["H_total"]] / U_int, params[["H_total"]]))
-cat(sprintf("Drained holdup eps_l_eq = %.3f  (collapse if >= %.2f)\n",
-            epsleq_of_P(params), 1 - params[["eps_g_pack"]]))
-cat(sprintf("Foam collapses/floods?  = %s\n", ifelse(is_flooded(params), "YES", "no")))
+U_int <- params[["J_foam"]] / (1 - params[["eps_l_in"]])
+t_res <- params[["H_total"]] / U_int
+drain_complete <- 1 - exp(-t_res / params[["tau_drain"]])
+plug_frac <- mean(out_psd$regime == "plug")
 top <- out_psd[nrow(out_psd), ]; ini <- out_psd[1, ]
-cat("Recovery (retained fraction of what entered):\n")
-cat(sprintf("  fine=%.1f%%  mid=%.1f%%  coarse=%.1f%%  | impurity %.0f%% -> %.1f%%\n",
+
+cat(sprintf("Residence time         = %.0f s ; drainage time tau = %.0f s\n",
+            t_res, params[["tau_drain"]]))
+cat(sprintf("Drainage completeness  = %.0f%%  (1=fully drained)\n", 100*drain_complete))
+cat(sprintf("Solids content: inlet %.1f%% -> top %.1f%%\n", ini$solids_pct, top$solids_pct))
+cat(sprintf("Plug-flow height frac  = %.0f%%  (rest: %s)\n", 100*plug_frac,
+            paste(unique(out_psd$regime[out_psd$regime != "plug"]), collapse=", ")))
+cat(sprintf("Retention: fine=%.0f%% mid=%.0f%% coarse=%.0f%% | impurity %.0f->%.1f%%\n",
             100*top$Js_fine/ini$Js_fine, 100*top$Js_mid/ini$Js_mid,
             100*top$Js_crs/ini$Js_crs, ini$C_imp, top$C_imp))
 
@@ -139,21 +154,27 @@ cat(sprintf("  fine=%.1f%%  mid=%.1f%%  coarse=%.1f%%  | impurity %.0f%% -> %.1f
 # =====================================================================
 par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
 
-# 1. PSD retention up the column
+# 1. PSD retention
 plot(out_psd$z, out_psd$Js_mid, type = "l", col = "green", lwd = 3, ylim = c(0, 0.05),
-     ylab = "Solid flux (m/s)", xlab = "Height (m)", main = "PSD retention (foam wash)")
+     ylab = "Solid flux (m/s)", xlab = "Height (m)", main = "PSD retention")
 lines(out_psd$z, out_psd$Js_fine, col = "blue", lwd = 2, lty = 2)
 lines(out_psd$z, out_psd$Js_crs,  col = "red",  lwd = 2, lty = 3)
 legend("right", legend = c("Mid", "Fine", "Coarse"),
        col = c("green", "blue", "red"), lty = c(1, 2, 3), lwd = 2)
 
-# 2. Wash impurity removal
-plot(out_psd$z, out_psd$C_imp, type = "l", col = "purple", lwd = 3, ylim = c(0, 100),
-     ylab = "Impurity (%)", xlab = "Height (m)", main = "Wash impurity removal")
+# 2. Solids content (drainage) + impurity
+plot(out_psd$z, out_psd$solids_pct, type = "l", col = "darkorange", lwd = 3,
+     ylim = c(0, 50), ylab = "%", xlab = "Height (m)",
+     main = "Solids content & impurity")
+lines(out_psd$z, out_psd$C_imp / 2, col = "purple", lwd = 2, lty = 2)  # scaled /2
+legend("topright", legend = c("Solids content %", "Impurity %/2"),
+       col = c("darkorange", "purple"), lty = c(1, 2), lwd = 2)
 
-# 3. Foam holdup / stability
+# 3. Foam holdup + regime (plug where eps_g jammed & coherent)
 plot(out_psd$z, out_psd$eps_g, type = "l", col = "black", lwd = 3, ylim = c(0, 1),
-     ylab = "Gas fraction eps_g", xlab = "Height (m)", main = "Foam holdup / stability")
+     ylab = "Gas fraction eps_g", xlab = "Height (m)", main = "Holdup & regime")
 abline(h = params[["eps_g_pack"]], col = "orange", lty = 2)
-legend("bottomright", legend = c("eps_g", "collapse (0.74)"),
-       col = c("black", "orange"), lty = c(1, 2), lwd = 2)
+plug_z <- out_psd$z[out_psd$regime == "plug"]
+if (length(plug_z)) rug(plug_z, col = "forestgreen", lwd = 2)
+legend("bottomright", legend = c("eps_g", "packing (0.74)", "plug region"),
+       col = c("black", "orange", "forestgreen"), lty = c(1, 2, 1), lwd = 2)
