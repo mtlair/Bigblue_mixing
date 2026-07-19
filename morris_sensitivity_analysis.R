@@ -95,7 +95,7 @@ fac <- function(name, min, max, log, unit, desc)
 
 factors <- rbind(
   #   name             min     max     log    unit     description
-  fac("ALR",           0.05,   1.5,    FALSE, "-",     "airblast air-liquid mass ratio m_G/m_L (external bi-fluid)"),
+  fac("ALR",           0.05,   1.5,    FALSE, "-",     "internal-mix bi-fluid nozzle air-liquid mass ratio m_G/m_L"),
   fac("P_system",      2.0e5,  7.0e5,  FALSE, "Pa",    "atomizing air supply pressure"),
   fac("P_feed",        1.5e5,  1.0e6,  FALSE, "Pa",    "liquid feed line (hold) pressure"),
   fac("mdot_L",        0.002,  0.020,  FALSE, "kg/s",  "liquid feed mass flow"),
