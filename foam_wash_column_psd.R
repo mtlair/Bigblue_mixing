@@ -10,18 +10,26 @@ library(deSolve)
 #                        the impurity is swept out by the added wash liquid.
 #
 # Notes on the physics choices (from design discussion):
+#   * Pressure sets bubble size: d_b ~ (P_ref/P)^(1/3) (gas compression at
+#     formation). Smaller bubbles -> (a) more interfacial area, so higher
+#     attachment rate and carrying capacity, and (b) smaller, more uniform
+#     Plateau borders, so less wash channeling.
 #   * channel_cv (was "D_axial") is a placeholder for POORLY DISTRIBUTED
 #     WASH FLOW. Plateau-border size follows the packing fraction of the
-#     squished bubbles (liquid holdup); drainage sets the *relative* channel
-#     width. Because drainage through a Plateau border is ~Poiseuille
-#     (Q ~ r^4), a spread channel_cv in border width amplifies ~4x into
-#     wash-flow variability -> the widest borders take most of the water and
-#     the rest of the foam is under-washed. This is a flow-maldistribution
-#     efficiency, NOT an axial-dispersion (2nd-order) term.
+#     squished bubbles (liquid holdup) and scales with bubble size; drainage
+#     sets the *relative* channel width. Because drainage through a Plateau
+#     border is ~Poiseuille (Q ~ r^4), a spread channel_cv in border width
+#     amplifies ~4x into wash-flow variability -> the widest (largest)
+#     borders take most of the water and the rest of the foam is
+#     under-washed. This is a flow-maldistribution efficiency, NOT an
+#     axial-dispersion (2nd-order) term.
 #   * The wash liquid is set by the feed rate (Jl_wash = wash_ratio * Jl_feed)
 #     so it can be swept in proportion to what is fed.
-#   * Entrainment carries fines DOWN in the draining liquid, so it is coupled
-#     to the wash flux: more wash cleans more impurity but entrains more fines.
+#   * Size-dependent loss: heavy COARSE particles settle / drain out with the
+#     down-flowing wash liquid and are the dominant product loss; FINE
+#     particles are buoyant enough to stay dispersed on the foam, so their
+#     loss is small. Loss is coupled to the wash flux (over-washing costs
+#     coarse recovery).
 # =====================================================================
 
 params <- c(
@@ -29,21 +37,28 @@ params <- c(
   Jg = 0.05,             # superficial gas velocity [m/s]
   eps_g = 0.85,          # gas holdup in foam (packing fraction of squished bubbles)
 
+  # --- PRESSURE -> BUBBLE SIZE ---
+  P       = 150000,      # operating pressure [Pa]
+  P_ref   = 150000,      # reference pressure for the bubble-size closure [Pa]
+  d_b_ref = 2.0e-3,      # bubble diameter at P_ref [m]
+
   # --- WASH LIQUID (correlated to feed so impurity can be swept) ---
   Jl_feed    = 0.004,    # feed superficial liquid velocity [m/s]
   wash_ratio = 0.5,      # wash-water : feed ratio -> sets the wash flux
 
   # --- 1. PARTICLE SIZE DISTRIBUTION (PSD) KINETICS ---
-  # FINE (< 20 um): Hard to attach (low collision), hard to detach (embedded),
-  #                 but highly entrained in the draining liquid.
-  k_att_fine = 1.0,  k_det_fine = 0.01, entrain_fine = 0.5,
+  # sink_* = susceptibility to settling/draining OUT of the foam with the
+  # down-flowing wash liquid. Heavy coarse are lost most; buoyant fines least.
+  # FINE (< 20 um): Hard to attach (low collision), hard to detach (embedded);
+  #                 buoyant, so it rides the foam and is barely lost.
+  k_att_fine = 1.0,  k_det_fine = 0.01, sink_fine = 0.02,
   # MID (50-150 um): The sweet spot. High attachment, moderate detachment.
-  k_att_mid  = 8.0,  k_det_mid  = 0.1,  entrain_mid  = 0.05,
-  # COARSE (> 300 um): High collision, but massive detachment (gravity/shear);
-  #                    too heavy to be entrained in the films.
-  k_att_crs  = 5.0,  k_det_crs  = 5.0,  entrain_crs  = 0.0,
+  k_att_mid  = 8.0,  k_det_mid  = 0.1,  sink_mid  = 0.15,
+  # COARSE (> 300 um): High collision, but massive detachment (gravity/shear)
+  #                    and settles/drains out -> the dominant product loss.
+  k_att_crs  = 5.0,  k_det_crs  = 5.0,  sink_crs  = 0.80,
 
-  # Max carrying capacity per size class [m/s]
+  # Max carrying capacity per size class [m/s] (at P_ref; scales with area)
   Js_max_fine = 0.02, Js_max_mid = 0.04, Js_max_crs = 0.02,
 
   # --- 2. CHANNELING / WASH DISTRIBUTION ---
@@ -54,15 +69,22 @@ params <- c(
 column_model_psd <- function(z, state, parameters) {
   with(as.list(c(state, parameters)), {
 
+    # Pressure sets bubble size (gas compression at formation): d_b shrinks
+    # as P rises. Smaller bubbles -> more interfacial area (area_factor > 1).
+    d_b         <- d_b_ref * (P_ref / P)^(1 / 3)
+    area_factor <- d_b_ref / d_b            # interfacial-area ratio vs reference
+
     # Wash liquid flux is set by the feed rate (swept downward through foam).
     Jl_wash <- wash_ratio * Jl_feed        # magnitude of downward wash flux [m/s]
 
     if (z < H_int) {
       # --- ZONE 1: LIQUID POOL ---
       # Fines struggle to attach; coarse and mid attach rapidly toward capacity.
-      dJs_fine <- k_att_fine * (Js_max_fine - Js_fine)
-      dJs_mid  <- k_att_mid  * (Js_max_mid  - Js_mid)
-      dJs_crs  <- k_att_crs  * (Js_max_crs  - Js_crs)
+      # Smaller bubbles (higher P) add interfacial area: faster attachment and
+      # higher carrying capacity.
+      dJs_fine <- k_att_fine * area_factor * (Js_max_fine * area_factor - Js_fine)
+      dJs_mid  <- k_att_mid  * area_factor * (Js_max_mid  * area_factor - Js_mid)
+      dJs_crs  <- k_att_crs  * area_factor * (Js_max_crs  * area_factor - Js_crs)
 
       dCimp_dz <- 0                         # well-mixed pool, no washing yet
 
@@ -73,15 +95,16 @@ column_model_psd <- function(z, state, parameters) {
       # Drainage ratio: downward wash liquid vs upward foam rise (dimensionless).
       drainage_ratio <- Jl_wash / U_rise
 
-      # Detachment + entrainment. Fines ride the draining Plateau-border liquid
-      # back down (entrain_fine large), coarse cannot (entrain_crs = 0).
-      dJs_fine <- -Js_fine * (k_det_fine + entrain_fine * drainage_ratio)
-      dJs_mid  <- -Js_mid  * (k_det_mid  + entrain_mid  * drainage_ratio)
-      dJs_crs  <- -Js_crs  * (k_det_crs  + entrain_crs  * drainage_ratio)
+      # Detachment + settling/drainage loss. Heavy coarse settle and drain out
+      # with the wash liquid (dominant loss); buoyant fines mostly stay.
+      dJs_fine <- -Js_fine * (k_det_fine + sink_fine * drainage_ratio)
+      dJs_mid  <- -Js_mid  * (k_det_mid  + sink_mid  * drainage_ratio)
+      dJs_crs  <- -Js_crs  * (k_det_crs  + sink_crs  * drainage_ratio)
 
-      # Channeling penalty from Plateau-border flow maldistribution.
-      # Q ~ r^4, so a CV of channel_cv in border width -> ~4x CV in wash flow.
-      flow_cv         <- 4 * channel_cv
+      # Channeling penalty from Plateau-border flow maldistribution. Border
+      # width scales with bubble size, so larger bubbles (lower P) widen the
+      # borders and worsen maldistribution. Q ~ r^4 => ~4x CV amplification.
+      flow_cv         <- 4 * channel_cv * (d_b / d_b_ref)
       Wash_Efficiency <- 1 / (1 + flow_cv^2)   # effectiveness under maldistribution
 
       # Impurity swept out by the wash liquid; strength set by wash-vs-feed.
