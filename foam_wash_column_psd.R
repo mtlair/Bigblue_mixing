@@ -40,7 +40,7 @@ params <- c(
   C_imp_in   = 100,      # inlet entrained impurity [%]
 
   # --- GRAVITY DECANT (bottom zone) : heuristic  t[h] = 100*mu/(rho_A-rho_B) ---
-  H_pool = 1.5,          # decant zone depth [m] (stable interface in plug flow)
+  H_pool = 0.45,         # decant zone depth [m] ~1.5 ft (stable interface)
   mu_cont = 2.0,         # continuous-phase viscosity [cP]
   rho_A   = 1050,        # heavier separating liquid [kg/m3]
   rho_B   = 650,         # lighter separating liquid [kg/m3]
@@ -52,7 +52,7 @@ params <- c(
   eps_l_dry_ref = 0.15,  # fully-drained (wet) residual holdup at P_ref [-]
   L_drain       = 1.5,   # film-drainage length in the foam [m]
   eps_g_pack    = 0.74,  # packing gas fraction (collapse / regime threshold)
-  blend_wz      = 0.10,  # smooth pool<->foam velocity switch width [m]
+  blend_wz      = 0.03,  # smooth pool<->foam velocity switch width [m]
 
   # --- WASH LIQUID (added at top, correlated to the foam feed) ---
   wash_ratio = 0.5,      # wash-water : entrained-feed-liquid ratio
