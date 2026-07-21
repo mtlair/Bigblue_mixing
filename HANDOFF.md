@@ -67,6 +67,11 @@ holdup), `d_b` (mean bubble size), `J_g_foam` + `J_g_slug` (gas state), `t_res` 
   (downstream) unit up. Total gas `J_g_foam + J_g_slug` is conserved and carried out the top.
   **Bursting still coarsens/removes bubbles and is the single mechanism for coarse dumping**,
   but it no longer removes gas from the column.
+- **Gas → holdup (collapse wetting):** bursting collapses foam structure, so the freed film
+  liquid concentrates and the collapsing foam gets **wetter** — a source `k_wet·burst_rate·eps_g`
+  on `eps_l`, balanced by drainage, so bursting zones sit wetter. It's localized to the top at
+  baseline (mid-column `eps_l` unchanged; top 0.166→0.177, solids 6.3→5.9%) and dramatic in the
+  cliff (collapsing foam holds its liquid: top solids 2.9→1.1%).
 
 #### What affects the burst (verified by sweep)
 | Variable | Effect on burst | Why | Channel |
@@ -107,7 +112,7 @@ holdup), `d_b` (mean bubble size), `J_g_foam` + `J_g_slug` (gas state), `t_res` 
 | Quantity | Value |
 |---|---|
 | Residence | 1.74 h (0.16 pool + 1.58 foam) |
-| Top solids content | 6.3% |
+| Top solids content | 5.9% (bursting wets the top; drier equilibrium below) |
 | Bubble size | 2.0 → 3.5 mm (burst-limited; `d_b_crit` ≈ 3.0 mm) |
 | Gas out top | 100% conserved (top split ~foam 70% / retained slug 30%) |
 | Plug-flow height | 91% |
@@ -153,22 +158,42 @@ inlet loading `Js_*_in`, and the **operating point** `T_col, P_col` and **surfac
 - **✅ Film-rupture burst trigger + `h_eq(z)` fixed.** Bursting fires off a film-rupture critical
   size `d_b_crit(film_stability, σ)`, modulated by viscosity / solids content / coarse-particle
   size (see burst table). A burst `d_b`-sink caps runaway coarsening, so `d_b` stays physical and
-  `h_eq(z)` no longer spuriously rises in the cliff. Burst dependence on T/P/μ/solids swept and
-  documented. Bubble panel now plots `d_b` vs `d_b_crit`.
+  `h_eq(z)` no longer spuriously rises in the cliff. Bubble panel plots `d_b` vs `d_b_crit`.
+- **✅ Gas → holdup coupling (was item #3).** Bursting wets the collapsing foam (`k_wet`); see
+  the "Gas → holdup" mechanism above.
+- **✅ Mass-balance / consistency check.** The report closes gas (to ~1e-16), solids per class
+  (with a pool-settle vs foam-loss split — coarse is ~90% foam-lost, pool settling <1% at
+  baseline), liquid holdup (65% drained to pool), and impurity (53% removed).
+
+## When is Ostwald ripening (disproportionation) worth adding? (analysis of former item #5)
+A live diagnostic prints `tau_ripen` vs residence and coalescence time. Ripening rate is set by
+the Laplace driving force `ΔP = 4σ/d_b`, so it scales as **1/d_b** — it is fast for fine bubbles
+and slow for coarse ones. For this column's **mm-scale mean bubble** at 1.5 bar,
+`tau_ripen ≈ 3300 h ≫ residence 1.7 h` (Da_ripen ≈ 0.00) — negligible next to coalescence
+(`tau_coal ≈ 2 h`). **Add ripening only when ALL three hold:**
+1. **Time scale:** `Da_ripen = residence/tau_ripen ≳ 0.3` — i.e. a **fine-bubble tail**
+   (sub-~100 µm) exists (at `d_b≈50 µm`, `tau_ripen` drops to ~0.7 h → Da≈2.5, significant), or a
+   much more permeable film (`k_perm_film ≳ 5e-3 m/s`, unlikely for a surfactant/particle-laden film).
+2. **A size distribution exists to act on** — ripening is meaningless on a lumped mean `d_b`; it
+   needs the **bimodal population balance** (remaining open item) first.
+3. **Films are gas-permeable** — particle-armored (Pickering) films strongly suppress it, and
+   this foam is particle-laden, so ripening is likely doubly suppressed here.
+Bottom line: **not worth it for the current mm-scale, particle-laden, lumped-`d_b` model.**
+Revisit only if a fine-bubble mode is added and data shows fines vanishing faster than
+coalescence explains. Uncertain inputs: `k_perm_film` (spans 1e-7…1e-3 m/s), `He_gas`.
 
 ## OPEN ITEMS (priority order)
-1. **Calibrate the film/kinetics closures** — `K_coal, K_break, K_burst, K_bsink, d_b_burst` and
-   the surfactant/film constants (`E_stab_ref, Gamma_inf, K_ads, cmc, mu_surf, Π_charge, λ_D,
+1. **Calibrate the film/kinetics closures** — `K_coal, K_break, K_burst, K_bsink, k_wet, d_b_burst`
+   and the surfactant/film constants (`E_stab_ref, Gamma_inf, K_ads, cmc, mu_surf, Π_charge, λ_D,
    c_pb, a_fs, a_sig, n_visc, k_armor, k_bridge`, the `r_pb_ref`/`h_eq_ref` normalizers) are
    placeholder forms. **The net temperature sign of the burst is set by `a_fs/a_sig/dsigma_dT`
    and is not yet anchored** — pin it with data. Highest-value data: measured bubble-size profile
    (inlet vs overflow), surface tension vs dose (σ–c isotherm), and the actual gas split.
 2. **Pin `d_sep`** (~45 µm placeholder) — sets the decant timescale. Should be the real fine
    dispersed/emulsion droplet size from upstream.
-3. **Couple gas state → holdup:** bursting (foam → slug) should make the collapsing foam wetter
-   near the top (currently the gas split and `eps_l` evolve semi-independently).
-4. Optional fidelity: full population balance (bimodal distributions, fine-bubble tail) instead
-   of a lumped mean diameter; counter-current wash liquid adding to holdup.
+3. **Fidelity:** full bimodal population balance (fine-bubble tail) instead of a lumped mean
+   diameter — also the prerequisite for Ostwald ripening (above); counter-current wash liquid
+   adding to holdup.
 
 ## Modeling notes / assumptions
 - All closures are PLACEHOLDER forms calibrated to two plant anchors: **total residence

@@ -119,6 +119,11 @@ params <- c(
   K_bsink = 0.15,         # burst-driven mean-d_b reduction (removes coarsest bubbles) [-]
   d_b_cap = 2.0e-2,       # d_b cap used in border geometry (h_eq robustness) [m]
   h_eq_max = 2.0e-7,      # cap on reported equilibrium film thickness [m]
+  k_wet = 0.06,           # collapse-wetting efficiency: bursting foam -> wetter holdup [-]
+
+  # --- OSTWALD RIPENING (diagnostic only; not a dynamic term -- see report) ---
+  k_perm_film = 1.0e-5,   # surfactant-film gas permeability [m/s] (very uncertain)
+  He_gas = 0.03,          # dimensionless gas solubility (Ostwald coefficient) [-]
 
   # --- WASH ---
   wash_ratio = 0.5, k_drainage = 1.8e-3, channel_cv = 0.35, d_b_ref = 2.0e-3,
@@ -240,8 +245,12 @@ column_model_psd <- function(z, state, parameters) {
     # DRAINAGE: liquid drains through the Plateau-border network, whose
     # permeability scales with r_pb^2 -> wider borders (bigger bubbles / wetter
     # foam) drain FASTER. tau_local = tau_drain * (r_pb_ref/r_pb)^p_perm.
-    tau_local <- tau_drain * (r_pb_ref / r_pb)^p_perm
-    deps_l <- -(eps_l - eps_l_dry) / tau_local / U
+    # GAS -> HOLDUP: bursting collapses foam structure, so the freed film liquid
+    # concentrates and the collapsing foam gets WETTER (source ~ burst x gas
+    # present), counter-balanced by drainage -> bursting zones sit wetter.
+    tau_local  <- tau_drain * (r_pb_ref / r_pb)^p_perm
+    wet_source <- k_wet * burst_rate * eps_g                        # collapse wetting [1/s]
+    deps_l <- (-(eps_l - eps_l_dry) / tau_local + wet_source) / U
 
     # (1) POOL decant with HINDERED settling (Richardson-Zaki) + KD viscosity
     phi <- 1 - eps_g                                                 # condensed holdup
@@ -334,6 +343,55 @@ cat(sprintf("Solids: inlet %.1f%% -> top %.1f%% | plug %.0f%%\n",
 cat(sprintf("Retention: fine=%.0f%% mid=%.0f%% coarse=%.0f%% | impurity %.0f->%.1f%%\n",
             100*top$Js_fine/ini$Js_fine, 100*top$Js_mid/ini$Js_mid,
             100*top$Js_crs/ini$Js_crs, ini$C_imp, top$C_imp))
+
+# =====================================================================
+# MASS BALANCE / CONSISTENCY CHECK
+# Each solid flux Js is a superficial throughput [m/s]; in - out = losses by
+# construction, so this both closes the balance and splits WHERE solids go
+# (pool settling below H_pool vs foam detachment/burst above it).
+# =====================================================================
+cat("\n--- MASS BALANCE ---\n")
+# (a) gas: foam + slug must equal the inlet gas flux (no source/sink)
+gas_resid <- (top$J_g_foam + top$J_g_slug - Jg_in) / Jg_in
+cat(sprintf("Gas: J_foam+J_slug = %.4e vs inlet %.4e  => closure error %.2e (should be ~0)\n",
+            top$J_g_foam + top$J_g_slug, Jg_in, gas_resid))
+# (b) solids per class, split pool (z<H_pool) vs foam (z>=H_pool)
+solid_bal <- function(nm) {
+  Jin  <- ini[[nm]]; Jtop <- top[[nm]]
+  Jhp  <- approx(out_psd$z, out_psd[[nm]], dpar[["H_pool"]])$y
+  pool <- (Jin - Jhp) / Jin; foam <- (Jhp - Jtop) / Jin; ret <- Jtop / Jin
+  cat(sprintf("  %-5s retained %5.1f%% | lost: pool-settle %5.1f%% + foam(detach/burst) %5.1f%% | closure %+.1e\n",
+              sub("Js_", "", nm), 100*ret, 100*pool, 100*foam, ret + pool + foam - 1))
+  c(ret = ret, pool = pool, foam = foam)
+}
+invisible(lapply(c("Js_fine", "Js_mid", "Js_crs"), solid_bal))
+tot_in  <- ini$Js_fine + ini$Js_mid + ini$Js_crs
+tot_top <- top$Js_fine + top$Js_mid + top$Js_crs
+cat(sprintf("  TOTAL solids retained %.1f%% / lost %.1f%%\n", 100*tot_top/tot_in, 100*(1-tot_top/tot_in)))
+# (c) liquid holdup balance: inlet vs carried out the top; net = drained to pool
+liq_drained <- (ini$eps_l - top$eps_l) / ini$eps_l
+cat(sprintf("Liquid: holdup %.3f (in) -> %.3f (top); net drained to pool %.0f%% of inlet liquid\n",
+            ini$eps_l, top$eps_l, 100*liq_drained))
+# (d) impurity removed
+cat(sprintf("Impurity: %.0f%% removed (washed), %.0f%% carried over\n",
+            100*(ini$C_imp - top$C_imp)/ini$C_imp, 100*top$C_imp/ini$C_imp))
+
+# =====================================================================
+# OSTWALD RIPENING DIAGNOSTIC (is disproportionation worth modelling?)
+# Compare the ripening time-scale to residence and to the coalescence time.
+# tau_OR ~ (d_b/6) / (k_perm * He * dP/P), dP = 4*sigma/d_b (Laplace).
+# =====================================================================
+db_ripe   <- top$d_b
+dP_lap    <- 4 * dpar[["sigma_film"]] / db_ripe
+tau_OR    <- (db_ripe / 6) / (dpar[["k_perm_film"]] * dpar[["He_gas"]] * dP_lap / dpar[["P_col"]])
+coal_rate_top <- dpar[["K_coal"]] * ((1 - top$eps_l - top$eps_s) / dpar[["eps_g_pack"]]) / dpar[["film_stability"]]
+tau_coal  <- 1 / coal_rate_top
+cat(sprintf("\n--- OSTWALD RIPENING CHECK ---\n"))
+cat(sprintf("tau_ripen ~ %.2f h  vs  residence %.2f h  vs  coalescence %.2f h\n",
+            tau_OR/3600, t_tot/3600, tau_coal/3600))
+cat(sprintf("=> ripening is %s (Da_ripen = residence/tau_ripen = %.2f; add it only if >~0.3)\n",
+            ifelse(t_tot/tau_OR > 0.3, "SIGNIFICANT - consider adding (needs a size distribution)",
+                   "negligible vs coalescence/residence - skip for now"), t_tot/tau_OR))
 
 # =====================================================================
 # PLOTS
