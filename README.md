@@ -1,5 +1,5 @@
-# spray
-spray
+# dryer
+dryer
 
 ## Morris sensitivity analysis
 
@@ -15,7 +15,7 @@ stoichiometry (`theta_surf` from `C_surfactant`, `MW_surfactant`,
 `A_molecule`), DLVO electrostatics (`Delta_pH`, `I_strength`), and
 Krieger–Dougherty crowding from feed solids (`phi_s`).
 
-Spray-line extensions beyond the reactor spec: pressurized-hold bubble
+Dryer-line extensions beyond the reactor spec: pressurized-hold bubble
 coarsening (Ostwald ripening + coalescence over `t_hold` at the liquid-line
 pressure `P_feed`, surfactant-retarded), an effervescent–airblast hybrid
 exit plane (nothing atomizes in the confined feed line; the entrained gas
@@ -48,7 +48,7 @@ fifteen outputs:
 
 | Output | Nomenclature symbol |
 |---|---|
-| Spray droplet size | `Dv50` |
+| Dryer droplet size | `Dv50` |
 | Distribution tails | `d10`, `d90`, `d99`, span, bimodality index |
 | Final particle size | `Dp50`, `Dp90` (per-mode particle distribution) |
 | Particle skin formation | `theta_skin,z` |

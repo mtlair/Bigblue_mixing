@@ -15,7 +15,7 @@
 #     gating aggregation (skin onset) and fractal openness (D_f -> porosity)
 #   * Krieger-Dougherty crowding viscosity from feed solids (phi_s)
 #
-# Spray-specific extensions beyond the v47 reactor spec:
+# Dryer-specific extensions beyond the v47 reactor spec:
 #   * Pressurized-hold bubble coarsening: Ostwald ripening + coalescence of
 #     the entrained foam during the pressurized residence time t_hold before
 #     the nozzle (LSW r^3 ~ t kinetics, Henry's-law accelerated by pressure,
@@ -85,7 +85,7 @@ set.seed(42)
 # One row per factor: name, min, max, log (TRUE = sampled log-uniformly over
 # its range, used for wide-ranging positive factors), unit, and description.
 # Symbols follow the master nomenclature sheet where they exist; others use
-# the spray report's notation. t_hold, mdot_gas_dry and Y_in are spray-line
+# the dryer report's notation. t_hold, mdot_gas_dry and Y_in are dryer-line
 # additions (pressurized residence before the nozzle; dryer gas flow and
 # inlet humidity); k_perm_* are the shell permeability coefficients for
 # monomer / plasticizer / binder.
@@ -175,7 +175,7 @@ h_fg_solv <- 3.5e5    # template solvent latent heat            [J/kg]
 k_emu0   <- 2.0e-20   # emulsion LSW ripening rate (solubility-
                       # limited; immiscible in water)           [m3/s]
 
-spray_dry_model <- function(x) {
+dryer_dry_model <- function(x) {
   ALR    <- x[["ALR"]];        P_G    <- x[["P_system"]]
   P_F    <- x[["P_feed"]]
   mdot_L <- x[["mdot_L"]];     sigma  <- x[["sigma"]]
@@ -505,7 +505,7 @@ spray_dry_model <- function(x) {
 
 run_model <- function(X01) {
   Xphys <- scale_design(as.matrix(X01))
-  t(apply(Xphys, 1, spray_dry_model))
+  t(apply(Xphys, 1, dryer_dry_model))
 }
 
 # -----------------------------------------------------------------------------
@@ -593,7 +593,7 @@ stats_list <- setNames(lapply(ee_list, morris_stats), outputs)
 # -----------------------------------------------------------------------------
 dir.create("output", showWarnings = FALSE)
 
-titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
+titles <- c(d_droplet_um   = "Dryer droplet size  Dv50 [um]",
             d10_um         = "Fines tail  d10 [um]",
             d90_um         = "Coarse tail  d90 [um]",
             d99_um         = "Extreme coarse tail  d99 [um]",
