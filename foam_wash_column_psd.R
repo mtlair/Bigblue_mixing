@@ -106,9 +106,19 @@ params <- c(
   # --- BUBBLE POPULATION (coalescence - breakage) ---
   K_coal = 1.3e-4,        # coalescence coeff [1/s] (grows d_b)
   K_break = 1.2e-4,       # breakage coeff [1/s] (restores toward d_b_in)
-  # --- GAS STATE CHANGE (bursting of over-coarsened bubbles: foam gas -> slug) ---
-  d_b_burst = 3.0e-3,     # bubble size above which bursting accelerates [m]
-  K_burst = 1.0e-3,       # burst-rate coeff [1/s] (foam->slug conversion, not a vent)
+  # --- BURST TRIGGER (film rupture -> foam gas becomes slug) ---
+  d_b_burst = 3.0e-3,     # baseline critical burst size (at baseline film state) [m]
+  K_burst = 1.4e-3,       # burst-rate coeff [1/s] (foam->slug conversion, not a vent)
+  a_fs = 1.0,             # critical-size sensitivity to film stability (elasticity) [-]
+  a_sig = 1.0,            # critical-size sensitivity to surface tension [-]
+  sigma_ref_film = 0.02122, # baseline film surface tension (normalizer) [N/m]
+  n_visc = 1.0,           # burst sensitivity to viscosity (drainage speed) [-]
+  mu_drain_ref = 2.0e-3,  # fixed reference viscosity for burst normalization [Pa s]
+  k_armor = 2.0,          # solids-armoring stabilization (local content) [-]
+  k_bridge = 0.5,         # coarse-particle film-bridging destabilization (local size) [-]
+  K_bsink = 0.15,         # burst-driven mean-d_b reduction (removes coarsest bubbles) [-]
+  d_b_cap = 2.0e-2,       # d_b cap used in border geometry (h_eq robustness) [m]
+  h_eq_max = 2.0e-7,      # cap on reported equilibrium film thickness [m]
 
   # --- WASH ---
   wash_ratio = 0.5, k_drainage = 1.8e-3, channel_cv = 0.35, d_b_ref = 2.0e-3,
@@ -194,23 +204,39 @@ column_model_psd <- function(z, state, parameters) {
     phi_cond <- eps_s / (eps_s + eps_l)                              # solids fraction in border liquid
     mu_eff   <- mu_cont * (1 - min(phi_cond, 0.999*phi_smax)/phi_smax)^(-2.5*phi_smax)
 
+    # FILM THICKNESS / PLATEAU-BORDER GEOMETRY (local). d_b is bounded (d_b_cap)
+    # in the geometry so a runaway mean diameter cannot make the border curvature
+    # (and h_eq) blow up -- the burst d_b-sink below keeps d_b physical anyway.
+    d_b_eff <- min(d_b, d_b_cap)
+    r_pb   <- c_pb * d_b_eff * sqrt(max(eps_l, 1e-3))                # border radius [m]
+    P_cap  <- sigma_film / r_pb                                      # capillary suction [Pa]
+    Pi_bar <- Pi_charge * theta_cov                                  # disjoining barrier [Pa]
+    h_eq   <- min(lambda_D * log(max(Pi_bar / P_cap, 1 + 1e-9)), h_eq_max)  # eq film thickness [m]
+
     # (2) BUBBLE POPULATION: coalescence (dry/unstable -> faster) - breakage
     coal_rate <- K_coal * (eps_g / eps_g_pack) / film_stability     # [1/s]
-    dd_b <- (coal_rate * d_b - K_break * (d_b - d_b_in)) / U
 
-    # (3) GAS STATE: bursting when bubbles coarsen past d_b_burst. Gas is NOT
-    # vented -- it converts from dispersed foam gas to retained SLUG gas that
-    # only escapes in the next (downstream) unit. Total gas is conserved, so
-    # the foam-gas loss equals the slug-gas gain.
-    burst_rate <- K_burst * max(0, d_b - d_b_burst) / d_b_in         # [1/s]
+    # (3) BURST TRIGGER = FILM RUPTURE. The critical burst size is set by film
+    # physics: weak films (low Gibbs elasticity) or high surface tension thin the
+    # films and let smaller bubbles rupture, so d_b_crit shrinks -> burst sooner.
+    # Rate is modulated by drainage speed (viscosity) and particle effects:
+    #   - viscosity  : higher mu -> slower film drainage -> LESS burst
+    #   - solids content : particles armor the film -> LESS burst
+    #   - coarse-particle size : large particles bridge/rupture the film -> MORE burst
+    d_b_crit <- d_b_burst * film_stability^a_fs * (sigma_ref_film / sigma_film)^a_sig
+    M_visc   <- (mu_drain_ref / mu_cont)^n_visc                      # low mu -> faster drainage -> more burst
+    M_armor  <- 1 / (1 + k_armor * phi_cond)                        # solids content armors film
+    M_bridge <- 1 + k_bridge * (d_crs / max(d_b, d_b_in)) * (eps_s / eps_s_in)  # coarse bridging
+    burst_rate <- K_burst * max(0, d_b - d_b_crit) / d_b_in * M_visc * M_armor * M_bridge
+
+    # bursting removes the coarsest bubbles -> pulls the mean d_b back down, so
+    # coarsening self-limits (bubbles burst before growing without bound).
+    dd_b <- (coal_rate * d_b - K_break * (d_b - d_b_in) - K_bsink * burst_rate * d_b) / U
+
     burst_flux <- burst_rate * J_g_foam / U
     dJ_g_foam <- -burst_flux                                         # dispersed foam gas
     dJ_g_slug <-  burst_flux                                         # retained slug gas (out the top)
 
-    # FILM THICKNESS / PLATEAU-BORDER GEOMETRY (local, wired into drainage)
-    r_pb  <- c_pb * d_b * sqrt(max(eps_l, 1e-4))                     # border radius [m]
-    P_cap <- sigma_film / r_pb                                       # capillary suction [Pa]
-    h_eq  <- lambda_D * log(max(Pi_charge*theta_cov / P_cap, 1 + 1e-9))  # eq film thickness [m]
     # DRAINAGE: liquid drains through the Plateau-border network, whose
     # permeability scales with r_pb^2 -> wider borders (bigger bubbles / wetter
     # foam) drain FASTER. tau_local = tau_drain * (r_pb_ref/r_pb)^p_perm.
@@ -246,7 +272,8 @@ column_model_psd <- function(z, state, parameters) {
     dCimp <- ((1-foam_frac)*dCimp_pool + foam_frac*dCimp_foam) / U
 
     list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b, dJ_g_foam, dJ_g_slug, dt_res),
-         h_eq = h_eq, r_pb = r_pb, tau_local = tau_local)
+         h_eq = h_eq, r_pb = r_pb, tau_local = tau_local,
+         d_b_crit = d_b_crit, burst_rate = burst_rate)
   })
 }
 
@@ -290,8 +317,12 @@ cat(sprintf("Film: eq. thickness h %.0f nm (sets holdup, wet-factor %.2f) | bord
 cat(sprintf("      drainage tau %.0f->%.0f s up z (wider borders drain faster) | eq. holdup %.3f\n",
             ini$tau_local, top$tau_local, dpar[["eps_l_dry"]]))
 
-cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence)\n",
+cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence, burst-limited)\n",
             dpar[["d_b_in"]]*1e3, top$d_b*1e3))
+d_b_crit0 <- dpar[["d_b_burst"]] * dpar[["film_stability"]]^dpar[["a_fs"]] *
+             (dpar[["sigma_ref_film"]]/dpar[["sigma_film"]])^dpar[["a_sig"]]
+cat(sprintf("Burst trigger: film-rupture critical size d_b_crit %.2f mm (film_stab %.2f, sigma %.1f mN/m)\n",
+            d_b_crit0*1e3, dpar[["film_stability"]], dpar[["sigma_film"]]*1e3))
 cat(sprintf("GAS balance (conserved, no vent): in %.2e -> out %.2e m/s => carried out top %.0f%%\n",
             Jg_in, Jg_out, 100*Jg_out/Jg_in))
 cat(sprintf("  gas state at top: foam bubbles %.0f%% + retained slug %.0f%% (slug released next unit up)\n",
@@ -316,9 +347,11 @@ abline(v=dpar[["H_pool"]], col="gray", lty=2)
 legend("right", legend=c("Mid","Fine","Coarse"), col=c("green","blue","red"), lty=c(1,2,3), lwd=2)
 
 plot(out_psd$z, out_psd$d_b*1e3, type="l", col="darkorange", lwd=3,
-     ylab="Bubble d_b (mm)", xlab="Height (m)", main="Bubble growth & burst")
-abline(h=dpar[["d_b_burst"]]*1e3, col="red", lty=3)
-legend("topleft", legend=c("d_b","burst onset"), col=c("darkorange","red"), lty=c(1,3), lwd=2)
+     ylim=c(0, max(out_psd$d_b*1e3, out_psd$d_b_crit*1e3)),
+     ylab="Bubble d_b (mm)", xlab="Height (m)", main="Bubble growth & burst trigger")
+lines(out_psd$z, out_psd$d_b_crit*1e3, col="red", lwd=2, lty=3)
+legend("topleft", legend=c("d_b","d_b_crit (film rupture)"),
+       col=c("darkorange","red"), lty=c(1,3), lwd=2)
 
 plot(out_psd$z, out_psd$J_g_total/Jg_in*100, type="l", col="black", lwd=3, ylim=c(0,100),
      ylab="Gas (% of inlet)", xlab="Height (m)", main="Gas state (conserved)")
