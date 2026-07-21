@@ -74,11 +74,19 @@ Add real wash-liquid feeds and untie the fixed reslurry. Spec as given:
 - **UP2 and UP3 each get their own wash-liquid feed input.**
 - **UP2 wash:** co-current / counter-current flow in the column; the wash liquid
   **leaves with the foam into the UP3 inlet** (it becomes part of the stream to UP3).
-- **UP3 wash:** sprayed, disperses into the cake in the separator, **part exits with
-  the light phase**. Expected to wash *little* — it is sprayed on a viscous
-  foam/slurry, so **UP3 impurity clearing is dominated by centrifugal force**, not
-  by the wash. Model the UP3 wash as a minor dilution/entrainment term, not a strong
-  impurity remover.
+- **UP3 wash:** sprayed, disperses into the cake, **part exits with the light phase**.
+  The **wash itself washes little** (sprayed on a viscous foam/slurry) — model it as a
+  minor dilution/entrainment term. But **do not conflate the weak wash with the unit's
+  clearing power**: UP3 concentrates solids in the liquid feed and its **impurity
+  removal is g-force-driven (centrifugal), which can be large**. The unit as a whole is
+  a strong impurity remover even though the wash spray is not.
+  - Already in the model (`centrifuge_morris_sensitivity.R`): separation scales with
+    g-force — `omega = rpm·2π/60`, centrifugal settling `v_c ∝ omega²`, recovery
+    `1 − exp(−|v_c|·t_clarify/dist)`, `g_eff = r_pool·omega²`. Higher rpm → faster
+    settling → sharper clarification cut (`Cut_Size_d50c_um`), more solids into the
+    cake (`Product_Solids_MassFrac`), more fines/dissolved rejected to the centrate
+    (`Yield_Loss_Centrate`, `Centrate_Conc_kg_m3`). So `rpm` is the impurity-clearing
+    lever; the new wash feed rides on top as a small dilution/light-phase term.
 - **Post-separator feed to UP4 must be tied to UP3 output** (solids + liquid + some
   entrained gas in foam) — **replace the fixed 30% reslurry** target with the
   separator's actual output.
@@ -106,8 +114,11 @@ Add real wash-liquid feeds and untie the fixed reslurry. Spec as given:
 2. **How much physics for the UP3 wash and the UP3→UP4 tie.**
    Resolution from the spec: **UP2 wash = real co/counter-current transport** that
    joins the foam into UP3; **UP3 wash = minimal** (light dilution, part to light
-   phase, little impurity removal — centrifugal force dominates); and the **reslurry
-   is replaced** by a UP3-output-tied feed carrying solids + liquid + entrained gas.
+   phase) — but **UP3 as a unit is a strong impurity remover via g-force**, which the
+   model already captures (rpm → omega² → settling → clarification cut + solids
+   concentration). So the wash is a small term layered on top of the existing
+   centrifugal clearing, not the impurity mechanism. The **reslurry is replaced** by a
+   UP3-output-tied feed carrying solids + liquid + entrained gas.
 
 ---
 
