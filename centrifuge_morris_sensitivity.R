@@ -1,6 +1,6 @@
 # =============================================================================
-# Morris (Elementary Effects) sensitivity analysis of a unified decanter-
-# centrifuge model for a three-phase polymer separation.
+# Morris (Elementary Effects) sensitivity analysis of UP3 (separator)
+# model for a three-phase polymer separation.
 #
 # FACTORS ARE ORGANISED INTO SWEEP GROUPS (see the `factors` table below):
 #   * equipment  - hard-to-change machine geometry (bowl diameter, cylinder

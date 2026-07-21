@@ -7,7 +7,7 @@ source module you are wrapping. You should not need the rest of the chain's
 history.
 
 ```
-UP1 (mixer) ──► UP2 (foam-wash) ──► UP3 (centrifuge) ──► reslurry ──► UP4 (spray dryer)
+UP1 (mixer) ──► UP2 (foam-wash) ──► UP3 (separator) ──► reslurry ──► UP4 (dryer)
 ```
 
 - Chain wiring:            `unified_model.R` → `run_unified()`

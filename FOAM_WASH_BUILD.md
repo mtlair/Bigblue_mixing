@@ -65,7 +65,7 @@ foam_wash_column(stream, pars = list()) -> stream
 ```
 
 ✓ UP2 (foam-wash) outputs (alpha_g, D_b, P) match handoff baseline exactly  
-✓ UP3 (centrifuge)/reslurry outputs unchanged (same input solids loading)  
+✓ UP3 (separator)/reslurry outputs unchanged (same input solids loading)  
 ✓ Nominal run completes without errors; no external CRAN dependencies  
 ✓ Mass balance closes: gas + solids + liquid conserved through train
 
@@ -102,9 +102,9 @@ Algebraic model **currently** disables particle loss by default (`particle_loss 
 - `C_solid` — solids loading (optionally reduced by retention; off by default)
 
 ### Downstream Contracts
-- **UP3 (centrifuge) input** (`stream_to_centrifuge`): uses `alpha_g`, `D_b_m`, `P_Pa`, `C_solid` directly
+- **UP3 (separator) input** (`stream_to_centrifuge`): uses `alpha_g`, `D_b_m`, `P_Pa`, `C_solid` directly
 - **UP4 (dryer) inputs** (via UP3 handoff): inherit UP3 exit density, gas holdup
-- **Floc coupling** (UP1 mixer Bond → UP3 centrifuge yield): unchanged
+- **Floc coupling** (UP1 mixer Bond → UP3 separator yield): unchanged
 
 ---
 

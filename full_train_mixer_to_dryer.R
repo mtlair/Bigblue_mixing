@@ -1,20 +1,20 @@
 #!/usr/bin/env Rscript
 # =============================================================================
 # FULL PROCESS TRAIN: gassed/templated mixer -> pressurized foam-wash column
-#                     -> decanter centrifuge -> reslurry -> spray dryer
+#                     -> liquid-solid separator -> reslurry -> nozzle dryer
 # =============================================================================
 #
 #   UP1 mixer            unified/up1_mixer_module.R      (pulled, deSolve ODE)
 #     -> UP2 (foam-wash)   foam_wash_column()
-#       -> UP3 (centrifuge) centrifuge_morris_sensitivity.R (unified_centrifuge_model)
+#       -> UP3 (separator) centrifuge_morris_sensitivity.R (unified_centrifuge_model)
 #         -> reslurry      centrifuge_to_spray()  (dilution to sprayable solids)
-#           -> UP4 (spray dryer) morris_sensitivity_analysis.R (spray_dry_model)
+#           -> UP4 (dryer) morris_sensitivity_analysis.R (spray_dry_model)
 #
-# The mixer (UP1) is "the 2nd step prior to the centrifuge"; the foam-wash column (UP2) is
-# "the 1st step prior to the centrifuge". Composition, gas holdup, surface
+# The mixer (UP1) is "the 2nd step prior to the separator"; the foam-wash column (UP2) is
+# "the 1st step prior to the separator". Composition, gas holdup, surface
 # chemistry, template state, temperature and (critically) the aggregate/floc
 # strength are DEFINED ONCE at the mixer and flow downstream through the shared
-# `stream` interface (unified/interface_stream.R), so the UP3 (centrifuge) and UP4 (dryer)
+# `stream` interface (unified/interface_stream.R), so UP3 (separator) and UP4 (dryer)
 # see the mixer's transformed values instead of independent knobs.
 #
 # >>> foam_wash_column() is a deliberately thin PLACEHOLDER <<<
@@ -48,7 +48,7 @@ up1_pars_from_x  <- mx_env$up1_pars_from_x
 mx_equipment     <- mx_env$equipment
 mx_factors       <- mx_env$factors
 
-# ---- my evolved centrifuge + spray DEFINITIONS, into isolated envs -----------
+# ---- my evolved UP3 (separator) + UP4 (dryer) DEFINITIONS, into isolated envs -----------
 src_defs <- function(path, stop_marker) {
   L <- readLines(path); cut <- grep(stop_marker, L)[1]
   paste(L[seq_len(cut - 1)], collapse = "\n")
@@ -80,16 +80,16 @@ sp_from_centrifuge <- c("rho_L", "C_solid_mass", "alpha_g_0", "sigma", "D_b", "m
 # It implements hindered settling, bimodal bubble dynamics, surfactant film
 # elasticity, and per-class particle loss via algebraic closure.
 # =============================================================================
-# ADAPTER: mixer-exit stream  ->  centrifuge input factor vector
+# ADAPTER: mixer-exit stream  ->  UP3 (separator) input factor vector
 # =============================================================================
-# Overwrites ONLY the centrifuge inputs the upstream physically determines;
-# the centrifuge's own operating knobs (rpm, scroll, pond, beach, pop_frac,
+# Overwrites ONLY the UP3 inputs the upstream physically determines;
+# the UP3's own operating knobs (rpm, scroll, pond, beach, pop_frac,
 # S_base/ceiling, ...) stay at cen_op (nominal, or whatever the sweep sets).
 #
-# floc_strength_Pa: the aggregates the centrifuge tears apart were BUILT by the
-# mixer, so the mixer's Bond_Strength drives the centrifuge's floc strength.
+# floc_strength_Pa: the aggregates the UP3 tears apart were BUILT by the
+# mixer, so the mixer's Bond_Strength drives the UP3's floc strength.
 # Anchored so the mixer-nominal Bond_Strength maps to 2000 Pa (the plant-
-# calibrated value), then clamped to the centrifuge factor range.
+# calibrated value), then clamped to the UP3 factor range.
 .bond_ref <- local({
   r1 <- up1_run_mixer(up1_pars_from_x(mixer_nominal_x), mx_equipment)
   unname(r1$outputs[["Bond_Strength"]])
@@ -134,16 +134,16 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   s <- stream_from_up1(r1, up1_pars_from_x(mixer_x), eq)
   if (verbose) print_stream(s, "1) mixer exit")
 
-  # 2. pressurized foam-wash column (placeholder)
+  # 2. pressurized foam-wash column
   s <- foam_wash_column(s, wash_pars)
-  if (verbose) print_stream(s, "2) foam-wash column exit -> centrifuge feed")
+  if (verbose) print_stream(s, "2) UP2 foam-wash exit -> UP3 feed")
 
-  # 3. centrifuge + 4. reslurry handoff (one call: runs the model, dilutes)
+  # 3. UP3 (separator) + 4. reslurry handoff (one call: runs the model, dilutes)
   cen_run <- stream_to_centrifuge(s, cen_op)
   cen_out <- unified_centrifuge_model(cen_run)
   hand    <- centrifuge_to_spray(cen_run, target_solid_mass = reslurry_solids)
 
-  # 5. spray dryer
+  # 5. UP4 (dryer)
   x <- spray_op
   for (nm in sp_from_centrifuge) x[nm] <- hand[[nm]]
   sp <- spray_dry_model(x)
@@ -165,12 +165,12 @@ cat(sprintf("\n[UP1]            C_solid %.3f  alpha_g %.3f  D_agg %.0f um  Bond 
             m[["Bond_Strength"]], m[["Residual_Template_Fraction"]]))
 cat(sprintf("[UP2 foam-wash]  alpha_g %.3f -> %.3f (washed)  D_b %.1f um  P %.2f atm\n",
             m[["Blended_Porosity"]], s$alpha_g, s$D_b_m*1e6, s$P_Pa/1.013e5))
-cat(sprintf("[UP3 centrifuge] cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
+cat(sprintf("[UP3 separator]  cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
             co$Product_Solids_MassFrac*100, co$Exit_Density_kg_m3/1000,
             co$Entrained_Gas_Holdup, res$cen_run[["floc_strength_Pa"]]))
 cat(sprintf("[reslurry 30%%]   rho_L %.0f  C_solid %.2f  alpha_g0 %.3f  mu_L %.4f  dil x%.2f\n",
             h[["rho_L"]], h[["C_solid_mass"]], h[["alpha_g_0"]], h[["mu_L"]], h[["dilution_x"]]))
-cat(sprintf("[UP4 spray dryer] D_particle %.1f um  porosity %.3f  skin %.3f  rho_tap %.0f  X_moist %.3f\n",
+cat(sprintf("[UP4 dryer]      D_particle %.1f um  porosity %.3f  skin %.3f  rho_tap %.0f  X_moist %.3f\n",
             sp[["D_particle_um"]], sp[["phi_porosity_z"]], sp[["theta_skin_z"]],
             sp[["rho_tapped"]], sp[["X_moisture"]]))
 
@@ -183,5 +183,5 @@ for (eg in c(0.0, 0.50, 0.75, 0.95)) {
               r$cen_out$Entrained_Gas_Holdup, r$handoff[["alpha_g_0"]],
               r$spray[["D_particle_um"]], r$spray[["phi_porosity_z"]]))
 }
-cat("\nMore foam washed out -> less gas into the centrifuge/dryer -> denser,\n",
+cat("\nMore foam washed out -> less gas into the UP3/UP4 stages -> denser,\n",
     "less porous powder (and, per your plant note, easier to dry).\n", sep = "")
