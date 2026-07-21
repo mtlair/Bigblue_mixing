@@ -54,11 +54,13 @@ dir.create(out_dir, showWarnings = FALSE)
 up3_free <- c("rpm", "delta_rpm", "r_pool", "flow_rate_lpm", "pop_frac",
               "gas_sat_frac", "t_recover_sec", "contact_angle_deg",
               "chi_parameter", "S_base", "S_ceiling")
-# UP4 operating factors kept free (drop the 12 the reslurry handoff overwrites).
+# UP4 operating factors kept free. Dropped: the 12 the reslurry handoff
+# overwrites, PLUS T_feed / phi_emulsion / D_template, now bound from the mixer
+# stream (feed T = mixer-exit T; template emulsion fraction & droplet size come
+# from UP1) — so UP1 output bounds them, they are not independent dryer knobs.
 up4_free <- c("ALR", "P_system", "P_feed", "mdot_L", "T_system", "mdot_gas_dry",
-              "Y_in", "T_feed", "t_hold", "Tg_polymer", "n_flow",
-              "k_perm_mono", "k_perm_plast", "k_perm_bind", "phi_emulsion",
-              "D_template", "T_bp_solv")
+              "Y_in", "t_hold", "Tg_polymer", "n_flow",
+              "k_perm_mono", "k_perm_plast", "k_perm_bind", "T_bp_solv")
 
 # UP2 coalescence factors (equipment/geometry fixed). Ranges bracket the
 # calibrated column defaults; broken into decades where they span them (log).
@@ -92,13 +94,21 @@ narrow <- list(
   "up1.v_tip"         = c(2,    22),   "up1.P_mix"         = c(0.5,  3.5),
   "up1.C_surfactant"  = c(2e-4, 8e-3), "up1.MW_surfactant" = c(400,  6000),
   "up3.pop_frac"      = c(0.25, 0.85), "up4.ALR"           = c(1.5,  8),
-  "up4.mdot_gas_dry"  = c(0.15, 0.8),  "up4.T_system"      = c(350,  460),
-  "up4.phi_emulsion"  = c(0,    0.25))
+  "up4.mdot_gas_dry"  = c(0.15, 0.8),  "up4.T_system"      = c(350,  460))
 for (nm in names(narrow)) {
   i <- match(nm, factors$name)
   if (!is.na(i)) { factors$min[i] <- narrow[[nm]][1]; factors$max[i] <- narrow[[nm]][2] }
 }
 k <- nrow(factors)
+
+# Emit the screening-range table (factor, stage/UP, min, max, log) as a CSV.
+UP <- c(up1 = "UP1 mixer", up2 = "UP2 foam-wash", up3 = "UP3 separator",
+        up4 = "UP4 dryer")
+range_tbl <- data.frame(factor = factors$base, UP = UP[factors$stage],
+                        min = factors$min, max = factors$max, log = factors$log,
+                        row.names = NULL)
+write.csv(range_tbl, file.path(out_dir, "full_train_factor_ranges.csv"),
+          row.names = FALSE)
 cat(sprintf("Merged dictionary: %d factors (UP1 %d + UP2 %d + UP3 %d + UP4 %d)\n",
             k, nrow(d_up1), nrow(d_up2), nrow(d_up3), nrow(d_up4)))
 
