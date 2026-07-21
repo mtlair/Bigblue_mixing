@@ -103,6 +103,11 @@ params <- c(
   h_eq_ref = 4.195e-8,    # reference equilibrium film thickness (holdup normalizer; baseline) [m]
   q_film = 0.5,           # equilibrium-holdup sensitivity to film thickness [-]
 
+  # --- MIXER (up1) BUBBLE BIRTH: turbulent (Hinze) breakup sets d_b_in ---
+  V_tip = 14.5,           # mixer tip speed [m/s] (baseline = highest / finest foam)
+  V_tip_ref = 14.5,       # reference tip speed (d_b_in normalizer) [m/s]
+  n_hinze = 1.2,          # Hinze tip-speed exponent (d_born ~ V_tip^-1.2) [-]
+
   # --- BUBBLE POPULATION (coalescence - breakage) ---
   K_coal = 1.3e-4,        # coalescence coeff [1/s] (grows d_b)
   K_break = 1.2e-4,       # breakage coeff [1/s] (restores toward d_b_in)
@@ -163,6 +168,19 @@ derive_state_props <- function(p) {
 
   # step 2: elasticity -> film_stability (normalized ~1 at baseline)
   film_stab <- E_gibbs / p[["E_stab_ref"]]
+
+  # MIXER (up1) BIRTH LAW: turbulent (Hinze) breakup sets the inlet bubble size.
+  # d_born ~ (sigma/rho)^0.6 * eps^-0.4, dissipation eps ~ V_tip^3  =>
+  # d_born ~ sigma^0.6 * V_tip^-1.2. Higher tip speed OR lower sigma (more
+  # surfactant) -> finer born bubbles. Normalized so baseline (V_tip_ref,
+  # baseline sigma) reproduces the calibrated d_b_in. NOTE: this couples up1 to
+  # the column -- at high V_tip bubbles are born fine (<< d_b_crit) and the
+  # film-rupture cliff never triggers, so surfactant has little leverage; at low
+  # V_tip they are born near d_b_crit and surfactant becomes make-or-break
+  # (reproduces the up1 Morris finding: surfactant tunable only at low speed).
+  d_b_in_eff <- p[["d_b_in"]] * (p[["V_tip_ref"]] / p[["V_tip"]])^p[["n_hinze"]] *
+                (sigma / p[["sigma_ref_film"]])^0.6
+  p[["d_b_in"]] <- d_b_in_eff
 
   # step 3: drainage. Surface mobility (rigid/high surface viscosity -> slower).
   mobility      <- 0.5 * (1 + p[["mu_surf"]] / p[["mu_surf_ref"]])
@@ -326,6 +344,8 @@ cat(sprintf("Film: eq. thickness h %.0f nm (sets holdup, wet-factor %.2f) | bord
 cat(sprintf("      drainage tau %.0f->%.0f s up z (wider borders drain faster) | eq. holdup %.3f\n",
             ini$tau_local, top$tau_local, dpar[["eps_l_dry"]]))
 
+cat(sprintf("Mixer (up1): tip speed %.1f m/s -> born d_b_in %.2f mm (Hinze; sigma %.1f mN/m)\n",
+            dpar[["V_tip"]], dpar[["d_b_in"]]*1e3, dpar[["sigma_film"]]*1e3))
 cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence, burst-limited)\n",
             dpar[["d_b_in"]]*1e3, top$d_b*1e3))
 d_b_crit0 <- dpar[["d_b_burst"]] * dpar[["film_stability"]]^dpar[["a_fs"]] *
