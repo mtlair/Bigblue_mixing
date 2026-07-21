@@ -304,15 +304,25 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   #
   # v_tip_crit is the tip speed where shear energy ~ DLVO repulsion. It rises
   # with colloid stability (E_stab: Delta_pH, ionic_strength, Theta_surf) and
-  # falls with crowding (phi_s), so a better-stabilised or more dilute slurry
-  # tolerates a higher tip speed before aggregating. The 0.33 constant anchors
-  # it so nominal chemistry (E_stab ~ 10.7, phi_s ~ 0.22) gives v_tip_crit
-  # ~ 16 m/s, i.e. right at the nominal tip speed (midpoint of the 0.5-32 range):
-  # sweeping v_tip up from there enters aggregation, then milling past 1.8x.
+  # falls with crowding (phi_s) and primary particle size (larger particles
+  # are easier to shear into contact: v_tip_crit ~ (a_ref/a)^3 from Pe).
+  #
+  # Calibration: 200 nm primary particles, aggregation onset observed at
+  # 6.81 m/s (nominal chemistry E_stab/phi_s = 48.55) -> C_emp = 0.1403.
+  # The Pe formula (C_phys = D_imp*kT/(6*pi*mu*a^3)) gives C ~169 at 100 nm
+  # radius — a factor ~1200 larger, absorbed by the turbulent energy cascade
+  # (shear at particle scale << v_tip/D_impeller).
+  # C_AGG_CAL encodes BOTH the turbulent-cascade correction and the primary
+  # particle size (200 nm, the majority population in this colloid). It is
+  # NOT varied with D_particle because D_particle in UP1 sets the flocculation
+  # ODE kinetics and may differ from the colloidal-stability primary size.
+  # To recalibrate for a different primary: C_new = v_tip_crit_obs * phi_s / E_stab.
+  # Calibration: 200 nm primary, v_tip_crit = 6.81 m/s, E_stab/phi_s = 48.55.
+  C_AGG_CAL   <- 0.1403
   dpH_ppc     <- s_pos(p$Delta_pH)
   W_bar_ppc   <- exp(1.0 * dpH_ppc - 5.0 * sqrt(p$ionic_strength))
   E_stab_exit <- s_max(0.01, s_min(100.0, W_bar_ppc)) * s_pos(1.0 + 10.0 * Theta_surf)
-  v_tip_crit  <- 0.33 * E_stab_exit / s_max(0.05, phi_s)
+  v_tip_crit  <- C_AGG_CAL * E_stab_exit / s_max(0.05, phi_s)
 
   # Milling needs appreciably more energy than aggregation onset: the shear
   # must exceed the aggregate cohesive strength, taken here as MILL_MARGIN x
