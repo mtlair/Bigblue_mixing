@@ -1,0 +1,97 @@
+# Foam Wash Column Model — Handoff
+
+## Where this lives
+- **Repo:** `mtlair/bigblue_mixing`
+- **Branch:** `claude/foam-wash-column-review-pgfauf`
+- **Model file:** `foam_wash_column_psd.R` (repo root)
+- **Rendered output:** `output/foam_wash_column_psd.pdf` (3-panel plot)
+- **Related (separate) model:** `morris_sensitivity_analysis.R` — upstream atomization/drying sensitivity study; not part of this column.
+
+## Run it
+```r
+# R 4.3.3 with deSolve (1.40). Debian/Ubuntu: apt-get install r-base-core r-cran-desolve
+Rscript foam_wash_column_psd.R          # prints diagnostics + writes plots to a device
+```
+
+## What it models
+A **steady-state, 1-D (height z) preformed-foam wash column**. Particle-loaded foam is made
+UPSTREAM (no gas sparger in this unit) and enters the base as a wet dispersion. The column
+retains-vs-loses what arrives and washes entrained impurity out. Marched bottom→top as an
+ODE system in `z` with `deSolve::ode`.
+
+### Two zones (split at fixed decant depth `H_pool`)
+- **Bottom — gravity-decant pool (`z < H_pool`):** liquid separates by density-differential
+  **Stokes settling with hindered-settling (Richardson–Zaki) correction**. Pool velocity is
+  computed, not fitted. `H_pool ≈ 0.45 m` (1–2 ft, stable interface).
+- **Top — plug-flow foam (`z ≥ H_pool`):** throughput plug flow at the (very low) feed
+  velocity `U_up`; washed by liquid added at the top.
+
+### State variables
+`Js_fine, Js_mid, Js_crs` (solid flux per size class), `C_imp` (impurity %), `eps_l` (liquid
+holdup), `d_b` (mean bubble size), `J_g` (gas flux), `t_res` (cumulative residence).
+
+### Mechanisms implemented
+- **Residence:** throughput-based, ~1.5–2 h total (pool ~0.15 h + foam ~1.6 h). Interface is a
+  fixed depth (observed stable in plug flow); feed rate sets plug residence.
+- **Decant (impurity):** Stokes `U_settle = (ρ_liquid−ρ_foam)·g·d_sep²/(18μ) · (1−φ)^4.65`.
+  Completes only if settling keeps up with upflow: `completion = min(1, U_settle/U_up)` — slow
+  feed → clean separation. **This reproduces the plant decanter heuristic `t[h]=100μ/(ρA−ρB)`
+  to within ~15%**, which de-magics that constant.
+- **Bubble population:** `d_b(z)` grows by coalescence (faster in dry/unstable foam, ∝
+  1/film_stability) minus breakage (restores toward inlet size). Feeds channeling + settling cut.
+- **Gas balance:** `J_g` sink-only (no sparger). Bubbles coarsening past `d_b_burst` burst.
+  **Bursting is the single mechanism for both gas loss and coarse dumping.** ⚠️ See open item #1.
+- **PSD loss:** buoyancy-failure detachment (`k_det`, coarse worst) + burst-driven collapse.
+  Fines buoyant → retained; coarse stripped.
+- **Regime map:** pool / snow-globe / plug. Above jamming, `plug_index = film_stability /
+  (load_sens·loading)` — stable/lightly-loaded → plug; weak films/heavy load → snow-globe flakes.
+- **Solids content:** `eps_s/(eps_s+eps_l)` — low top solids (~3–7%) is the **wet drainage
+  equilibrium**, not incomplete drainage.
+- **Pressure:** sets the inlet bubble size upstream (passed in as `d_b_in`).
+
+## Calibrated baseline (current params)
+| Quantity | Value |
+|---|---|
+| Residence | 1.74 h (0.16 pool + 1.58 foam) |
+| Top solids content | 6.3% |
+| Bubble size | 2.0 → 3.7 mm |
+| Gas recovery | 70% (30% "lost" — see #1) |
+| Plug-flow height | 91% |
+| Retention | fine 92% / mid 64% / coarse 9% |
+| Impurity | 100% → 48% |
+
+### Operational cliff (the key finding)
+Film stability controls coalescence, which is make-or-break. As `film_stability` drops
+1.5 → 0.5: `d_b` runs away 3 → 7 mm, gas recovery collapses 100% → 2%, product and the plug
+regime disintegrate. Foam stability is the variable the column lives or dies by.
+
+## Inputs that should come from the UPSTREAM unit (not fitted)
+`mu_cont` (viscosity), `rho_foam`, `rho_liquid`, `rho_p`, particle sizes `d_fine/d_mid/d_crs`,
+inlet bubble size `d_b_in`, decant-controlling droplet size `d_sep`, inlet holdups
+`eps_l_in/eps_g_in/eps_s_in`, inlet loading `Js_*_in`.
+
+## OPEN ITEMS (priority order)
+1. **⚠️ Gas is not vented in this column.** Gas stays in the foam and is only released in the
+   DOWNSTREAM open-atmosphere solids-concentration stage. `J_g` should be RETAINED gas carried
+   out the top to the next unit, not a local vent sink. Bursting should still coarsen bubbles,
+   dump coarse, and make the collapsing foam wetter — but the gas leaves with the overflow.
+   (Flagged inline in the script header, section (3).)
+2. **Calibrate the bubble/gas kinetics** — `K_coal, K_break, K_burst, d_b_burst` are the
+   least-anchored constants and now drive the dominant behavior. Highest-value data:
+   measured bubble-size profile (inlet vs overflow) and actual gas split to the next stage.
+3. **Pin `d_sep`** (~45 µm placeholder) — sets the decant timescale. Should be the real fine
+   dispersed/emulsion droplet size from upstream.
+4. **Couple gas → holdup:** gas leaving should make the collapsing foam wetter near the top
+   (currently `J_g` and `eps_l` evolve semi-independently).
+5. **Bubble growth → drainage feedback:** bigger bubbles → wider Plateau borders → faster
+   drainage (not yet coupled).
+6. Optional fidelity: full population balance (bimodal distributions, fine-bubble tail) instead
+   of a lumped mean diameter; counter-current wash liquid adding to holdup.
+
+## Modeling notes / assumptions
+- All closures are PLACEHOLDER forms calibrated to two plant anchors: **total residence
+  1.5–2.5 h** and **top solids 3–7%**. Directional trends are trustworthy; absolute numbers
+  need the data above.
+- Verified end-to-end in R 4.3.3 / deSolve 1.40; single clean solve (zone switch is a smooth
+  blend, no discontinuity).
+- History of the derivation (why each mechanism was added) is in the git log on this branch.

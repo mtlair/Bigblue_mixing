@@ -15,11 +15,15 @@ library(deSolve)
 #  (2) BUBBLE POPULATION: mean bubble size d_b(z) evolves by COALESCENCE
 #      (grows, faster in dry/unstable foam) minus BREAKAGE (shear, restores
 #      toward the inlet size). This is the key operational lever.
-#  (3) GAS BALANCE / GAS-LOSS REGIME: no gas is generated in the column, so the
-#      gas flux J_g only DECREASES -- bubbles that coarsen past d_b_burst
-#      rupture and vent gas. Track J_g in vs out (gas recovery) and the gas
-#      lost. Bursting is also what dumps coarse particles (collapse loss is now
-#      tied to the burst rate, not an empirical dryness proxy).
+#  (3) GAS BALANCE: no gas is generated in the column (no sparger), so the gas
+#      flux J_g only DECREASES with coalescence-driven bursting. Bursting is
+#      also what dumps coarse particles (collapse loss tied to the burst rate).
+#      *** KNOWN ISSUE (to fix next): gas is NOT actually vented to atmosphere
+#      inside THIS column -- it stays in the foam and is only released in the
+#      DOWNSTREAM open-atmosphere solids-concentration stage. So J_g here
+#      should be a RETAINED gas carried out the top to the next unit, not a
+#      local vent sink. Bursting should still coarsen bubbles / dump coarse and
+#      make the foam collapse wetter, but the gas leaves with the overflow. ***
 #
 # States up z: Js_fine, Js_mid, Js_crs [m/s]; C_imp [%]; eps_l [-];
 #              d_b [m]; J_g [m/s]; t_res [s].
