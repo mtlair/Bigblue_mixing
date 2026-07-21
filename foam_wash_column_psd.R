@@ -93,10 +93,15 @@ params <- c(
   hold_exp = 0.6,         # sensitivity of equilibrium holdup to film stability [-]
   eps_g_pack = 0.74, blend_wz = 0.03,
 
-  # --- FILM THICKNESS / DISJOINING (reporting; DLVO-style) ---
+  # --- FILM THICKNESS / PLATEAU-BORDER GEOMETRY (wired into drainage/holdup) ---
   A_ham = 1.0e-20,        # Hamaker constant [J]
   lambda_D = 1.0e-8,      # Debye length [m]
   Pi_charge = 1.0e4,      # electrostatic disjoining-pressure scale (x coverage) [Pa]
+  c_pb = 0.20,            # Plateau-border radius coeff: r_pb = c_pb*d_b*sqrt(eps_l) [-]
+  p_perm = 2.0,           # border-drainage permeability exponent (drainage ~ r_pb^2) [-]
+  r_pb_ref = 2.69e-4,     # reference border radius (tau normalizer; baseline foam-zone mean) [m]
+  h_eq_ref = 4.195e-8,    # reference equilibrium film thickness (holdup normalizer; baseline) [m]
+  q_film = 0.5,           # equilibrium-holdup sensitivity to film thickness [-]
 
   # --- BUBBLE POPULATION (coalescence - breakage) ---
   K_coal = 1.3e-4,        # coalescence coeff [1/s] (grows d_b)
@@ -147,7 +152,20 @@ derive_state_props <- function(p) {
   # step 3: drainage. Surface mobility (rigid/high surface viscosity -> slower).
   mobility      <- 0.5 * (1 + p[["mu_surf"]] / p[["mu_surf_ref"]])
   tau_drain_eff <- p[["tau_drain"]] * (mu_T / p[["mu_ref"]]) * mobility        # thicker/rigid -> slower
-  eps_l_dry_eff <- min(p[["eps_l_in"]], p[["eps_l_dry"]] * film_stab^p[["hold_exp"]])  # stabler -> wetter
+
+  # FILM THICKNESS -> EQUILIBRIUM HOLDUP: the foam stops draining where the
+  # disjoining pressure the films can support balances the Plateau-border
+  # capillary suction. Evaluate that balance at reference border geometry to
+  # get the equilibrium film thickness h_eq_dry, and let a thicker equilibrium
+  # film (stronger disjoining / lower sigma) hold a wetter foam. Normalized to
+  # 1.0 at the baseline state, so the baseline equilibrium holdup is unchanged.
+  r_pb_dry  <- p[["c_pb"]] * p[["d_b_in"]] * sqrt(p[["eps_l_dry"]])            # ref border radius
+  P_c_dry   <- sigma / r_pb_dry                                               # capillary suction [Pa]
+  Pi_e      <- p[["Pi_charge"]] * theta                                       # electrostatic scale [Pa]
+  h_eq_dry  <- p[["lambda_D"]] * log(max(Pi_e / P_c_dry, 1 + 1e-9))           # eq film thickness [m]
+  film_wet  <- h_eq_dry / p[["h_eq_ref"]]                                     # ~1 at baseline
+  eps_l_dry_eff <- min(p[["eps_l_in"]],
+                       p[["eps_l_dry"]] * film_stab^p[["hold_exp"]] * film_wet^p[["q_film"]])
 
   # overrides consumed by the ODE
   p[["mu_cont"]]        <- mu_T
@@ -158,7 +176,7 @@ derive_state_props <- function(p) {
 
   # derived reporting quantities
   c(p, sigma_film = sigma, E_gibbs = E_gibbs, Gamma_surf = Gamma, theta_cov = theta,
-       mu_cont_T = mu_T, mobility = mobility)
+       mu_cont_T = mu_T, mobility = mobility, h_eq_dry = h_eq_dry, film_wet = film_wet)
 }
 
 column_model_psd <- function(z, state, parameters) {
@@ -189,8 +207,15 @@ column_model_psd <- function(z, state, parameters) {
     dJ_g_foam <- -burst_flux                                         # dispersed foam gas
     dJ_g_slug <-  burst_flux                                         # retained slug gas (out the top)
 
-    # film drainage toward the (surfactant-set) equilibrium holdup
-    deps_l <- -(eps_l - eps_l_dry) / tau_drain / U
+    # FILM THICKNESS / PLATEAU-BORDER GEOMETRY (local, wired into drainage)
+    r_pb  <- c_pb * d_b * sqrt(max(eps_l, 1e-4))                     # border radius [m]
+    P_cap <- sigma_film / r_pb                                       # capillary suction [Pa]
+    h_eq  <- lambda_D * log(max(Pi_charge*theta_cov / P_cap, 1 + 1e-9))  # eq film thickness [m]
+    # DRAINAGE: liquid drains through the Plateau-border network, whose
+    # permeability scales with r_pb^2 -> wider borders (bigger bubbles / wetter
+    # foam) drain FASTER. tau_local = tau_drain * (r_pb_ref/r_pb)^p_perm.
+    tau_local <- tau_drain * (r_pb_ref / r_pb)^p_perm
+    deps_l <- -(eps_l - eps_l_dry) / tau_local / U
 
     # (1) POOL decant with HINDERED settling (Richardson-Zaki) + KD viscosity
     phi <- 1 - eps_g                                                 # condensed holdup
@@ -220,7 +245,8 @@ column_model_psd <- function(z, state, parameters) {
     dCimp_foam <- -k_drainage * Wash_Efficiency * (wash_ratio/(wash_ratio+1)) * C_imp
     dCimp <- ((1-foam_frac)*dCimp_pool + foam_frac*dCimp_foam) / U
 
-    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b, dJ_g_foam, dJ_g_slug, dt_res))
+    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b, dJ_g_foam, dJ_g_slug, dt_res),
+         h_eq = h_eq, r_pb = r_pb, tau_local = tau_local)
   })
 }
 
@@ -258,13 +284,11 @@ cat(sprintf("Thermo: T %.1f K, P %.2f bar | mu(T) %.2f mPa.s, rho_gas %.2f kg/m3
 cat(sprintf("Surfactant: c %.1f mol/m3 (CMC %.1f) -> coverage %.2f, Gibbs E %.0f mN/m -> film_stability %.2f\n",
             dpar[["c_surf"]], dpar[["cmc"]], dpar[["theta_cov"]], dpar[["E_gibbs"]]*1e3, dpar[["film_stability"]]))
 
-# Plateau-border radius & disjoining-set equilibrium film thickness (illustrative)
-r_pb  <- 0.2 * top$d_b * sqrt(max(top$eps_l, 1e-4))              # border radius proxy [m]
-P_cap <- dpar[["sigma_film"]] / r_pb                            # capillary suction [Pa]
-Pi_rep <- dpar[["Pi_charge"]] * dpar[["theta_cov"]]             # electrostatic disjoining scale [Pa]
-h_eq  <- if (Pi_rep > P_cap) dpar[["lambda_D"]] * log(Pi_rep / P_cap) else NA_real_
-cat(sprintf("Film: Plateau-border r_pb ~%.0f um, cap. suction %.0f Pa, eq. film h ~%.0f nm\n",
-            r_pb*1e6, P_cap, ifelse(is.na(h_eq), 0, h_eq*1e9)))
+# Film thickness / Plateau-border geometry (wired into drainage + holdup)
+cat(sprintf("Film: eq. thickness h %.0f nm (sets holdup, wet-factor %.2f) | border r_pb %.0f->%.0f um up z\n",
+            dpar[["h_eq_dry"]]*1e9, dpar[["film_wet"]], ini$r_pb*1e6, top$r_pb*1e6))
+cat(sprintf("      drainage tau %.0f->%.0f s up z (wider borders drain faster) | eq. holdup %.3f\n",
+            ini$tau_local, top$tau_local, dpar[["eps_l_dry"]]))
 
 cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence)\n",
             dpar[["d_b_in"]]*1e3, top$d_b*1e3))
@@ -283,7 +307,7 @@ cat(sprintf("Retention: fine=%.0f%% mid=%.0f%% coarse=%.0f%% | impurity %.0f->%.
 # =====================================================================
 # PLOTS
 # =====================================================================
-par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
 plot(out_psd$z, out_psd$Js_mid, type="l", col="green", lwd=3, ylim=c(0,0.05),
      ylab="Solid flux (m/s)", xlab="Height (m)", main="PSD retention")
 lines(out_psd$z, out_psd$Js_fine, col="blue", lwd=2, lty=2)
@@ -303,3 +327,14 @@ lines(out_psd$z, out_psd$J_g_slug/Jg_in*100, col="firebrick", lwd=2, lty=3)
 abline(v=dpar[["H_pool"]], col="gray", lty=2)
 legend("right", legend=c("Total (out top)","Foam bubbles","Slug (retained)"),
        col=c("black","purple","firebrick"), lty=c(1,2,3), lwd=2)
+
+# Film thickness (wired into drainage/holdup) + liquid holdup
+plot(out_psd$z, out_psd$h_eq*1e9, type="l", col="steelblue", lwd=3,
+     ylab="Film h_eq (nm)", xlab="Height (m)", main="Film thickness & holdup")
+par(new=TRUE)
+plot(out_psd$z, out_psd$eps_l, type="l", col="darkgreen", lwd=2, lty=2,
+     axes=FALSE, xlab="", ylab="", ylim=c(0, max(out_psd$eps_l)))
+axis(4); mtext("Liquid holdup eps_l (-)", side=4, line=-1.3, cex=0.7)
+abline(v=dpar[["H_pool"]], col="gray", lty=2)
+legend("right", legend=c("Film h_eq (L)","Holdup eps_l (R)"),
+       col=c("steelblue","darkgreen"), lty=c(1,2), lwd=2)

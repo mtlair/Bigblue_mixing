@@ -69,9 +69,16 @@ holdup), `d_b` (mean bubble size), `J_g_foam` + `J_g_slug` (gas state), `t_res` 
   scaled by dimensionless factors that are 1.0 at the baseline state.
 - **Solids content:** `eps_s/(eps_s+eps_l)` — low top solids (~3–7%) is the **wet drainage
   equilibrium**, not incomplete drainage.
-- **Film thickness (reporting):** Plateau-border radius proxy `r_pb ~ d_b·√eps_l`, capillary
-  suction `σ/r_pb`, and a DLVO equilibrium film thickness `h_eq = λ_D·ln(Π_charge·θ / P_cap)`
-  (~49 nm baseline). Illustrative — not fed back into the ODE (see open item #4).
+- **Film thickness (wired into drainage + holdup):** Plateau-border radius `r_pb = c_pb·d_b·√eps_l`,
+  capillary suction `P_c = σ/r_pb`, DLVO equilibrium film thickness `h_eq = λ_D·ln(Π_charge·θ / P_c)`
+  (~48 nm baseline). Two live couplings:
+  - **Drainage rate** ← border permeability: `tau_local = tau_drain·(r_pb_ref/r_pb)^p_perm`
+    (p_perm=2). Bigger bubbles → fatter borders → **faster drainage** (resolves old item #4).
+  - **Equilibrium holdup** ← disjoining/capillary balance: a thicker equilibrium film (stronger
+    disjoining Π_charge·θ, lower σ, longer λ_D) holds a **wetter** foam,
+    `eps_l_dry ← eps_l_dry·film_stability^hold_exp·film_wet^q_film`, `film_wet = h_eq/h_eq_ref`.
+  Both normalized to 1.0 at baseline. Verified: starving surfactant or shrinking λ_D thins the
+  equilibrium film → drier foam; doubling coalescence fattens borders → `tau` halves → drier.
 
 ## Calibrated baseline (current params)
 | Quantity | Value |
@@ -85,7 +92,7 @@ holdup), `d_b` (mean bubble size), `J_g_foam` + `J_g_slug` (gas state), `t_res` 
 | Impurity | 100% → 48% |
 | Thermo state | T 298 K, P 1.5 bar → μ 2.0 mPa·s, ρ_gas 1.75 kg/m³, σ 21 mN/m |
 | Surfactant | c 5 mol/m³ (CMC 6) → coverage 0.91, Gibbs E 99 mN/m → film_stability 1.00 |
-| Film thickness | eq. `h_eq` ~49 nm (r_pb ~300 µm) |
+| Film thickness | eq. `h_eq` ~42 nm (border r_pb ~283→298 µm; drainage τ ~1800→1630 s up z) |
 
 ### Operational cliff (the key finding)
 Film stability controls coalescence, which is make-or-break — and it is now **set by the
@@ -116,19 +123,27 @@ inlet loading `Js_*_in`, and the **operating point** `T_col, P_col` and **surfac
   runs on a physical `tau_drain(μ,T,mobility)` toward a stability-set equilibrium holdup.
   Temperature and pressure added (`mu(T)`, `σ(T)`, ideal-gas `ρ_gas(P,T)`). Krieger–Dougherty
   border crowding added to settling. All in `derive_state_props()`; baseline unchanged.
+- **✅ Film thickness wired into drainage + holdup (was item #4).** Plateau-border radius
+  `r_pb(z)` sets the drainage timescale (permeability ∝ r_pb²: bigger bubbles drain faster);
+  the disjoining/capillary equilibrium film thickness `h_eq` sets the equilibrium holdup
+  (thicker films → wetter foam). `h_eq(z)`/`r_pb(z)`/`tau_local(z)` emitted as profiles; new
+  film-thickness+holdup plot panel. Normalized to baseline; baseline unchanged.
 
 ## OPEN ITEMS (priority order)
 1. **Calibrate the film/kinetics closures** — `K_coal, K_break, K_burst, d_b_burst` and the new
-   surfactant constants (`E_stab_ref, Gamma_inf, K_ads, cmc, mu_surf`, disjoining `Π_charge`)
-   are placeholder forms; the isotherm and `E_stab_ref` normalization should be pinned to the
-   actual surfactant. Highest-value data: measured bubble-size profile (inlet vs overflow),
-   surface tension vs dose (σ–c isotherm), and the actual gas split to the next stage.
+   surfactant/film constants (`E_stab_ref, Gamma_inf, K_ads, cmc, mu_surf, Π_charge, λ_D, c_pb`,
+   the `r_pb_ref`/`h_eq_ref` normalizers) are placeholder forms; the isotherm and normalizations
+   should be pinned to the actual surfactant. Highest-value data: measured bubble-size profile
+   (inlet vs overflow), surface tension vs dose (σ–c isotherm), and the actual gas split.
 2. **Pin `d_sep`** (~45 µm placeholder) — sets the decant timescale. Should be the real fine
    dispersed/emulsion droplet size from upstream.
 3. **Couple gas state → holdup:** bursting (foam → slug) should make the collapsing foam wetter
    near the top (currently the gas split and `eps_l` evolve semi-independently).
-4. **Bubble growth → drainage feedback:** bigger bubbles → wider Plateau borders → faster
-   drainage (not yet coupled).
+4. **Film-rupture-driven bursting:** bursting is still triggered by the `d_b_burst` geometric
+   threshold; the natural next step is to fire it off the film thinning to a critical rupture
+   thickness (`h_eq → h_crit`), unifying the film chain with the gas-state conversion. (Note: the
+   mean-field `r_pb ∝ d_b` makes the *reported* `h_eq(z)` rise once bubbles run away in the cliff
+   state — cosmetic, since `h_eq` is not yet fed into burst.)
 5. Optional fidelity: full population balance (bimodal distributions, fine-bubble tail) instead
    of a lumped mean diameter; counter-current wash liquid adding to holdup.
 
