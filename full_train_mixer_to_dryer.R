@@ -57,6 +57,11 @@ cen_env <- new.env(); spray_env <- new.env()
 eval(parse(text = src_defs("centrifuge_morris_sensitivity.R", "^# 3\\. SMOKE TEST")), envir = cen_env)
 eval(parse(text = src_defs("morris_sensitivity_analysis.R",   "^# 3\\. Morris design")), envir = spray_env)
 
+# ---- UP2 foam-wash column: the 491-line ODE (functions only; skip its driver
+#      + plots by cutting at the "solve + report" marker) --------------------
+fc_env <- new.env()
+eval(parse(text = src_defs("foam_wash_column_psd.R", "^# --- solve \\+ report")), envir = fc_env)
+
 unified_centrifuge_model <- cen_env$unified_centrifuge_model
 centrifuge_to_spray      <- cen_env$centrifuge_to_spray
 cen_nominal              <- cen_env$nominal_vec
@@ -120,22 +125,118 @@ stream_to_centrifuge <- function(stream, cen_op = cen_nominal, couple_floc = TRU
 }
 
 # =============================================================================
+# UP2 (foam-wash) as the 491-line COLUMN ODE  —  stream-contract wrapper
+# =============================================================================
+# The ODE (foam_wash_column_psd.R) is a standalone script, not an f(stream)->
+# stream stage. This wrapper maps the mixer-exit stream onto the column feed,
+# solves the column, and writes back the SAME fields the algebraic placeholder
+# touched (alpha_g, D_b_m, P_Pa) — now driven by the ODE instead of a fixed
+# eta_gas. Couplings that are unambiguous are taken from the stream; the
+# calibrated film-chemistry / geometry knobs keep their column defaults.
+#
+# Stream -> column feed:
+#   rho_liquid <- rho_slurry;  rho_p <- rho_polymer
+#   T_col      <- T_K   (T_ref set equal so mu(T_col) == mu_ref, no Andrade offset)
+#   P_col      <- P_Pa  (if finite)
+#   eps_g_in   <- alpha_g (mixer trapped-gas holdup)         } renormalised
+#   eps_s_in   <- phi_s = C_solid*rho_L/rho_polymer          } to sum to 1
+#   eps_l_in   <- 1 - eps_g_in - eps_s_in                    }
+#   c_surf,cmc <- C_surfactant, CMC  (wt/wt -> mol/m3 via rho_L / MW_surfactant)
+#   V_tip      <- mixer tip speed (Hinze born-bubble size), if passed in pars
+# Column -> stream (writeback):
+#   alpha_g <- alpha_g * (1 - f_slug)  (the coalesced-slug gas — coarse bubbles
+#              that grow past the film-rupture size and burst — disengages
+#              overhead and is removed; the still-dispersed foam stays entrained.
+#              Weaker/less-elastic films burst sooner -> more slug -> stronger
+#              wash. f_slug = J_g_slug / J_g_in at the top.  NOTE: the raw ODE
+#              *conserves* gas out the top; this slug split is the interpretation
+#              used to give the train a gas-removal number, and is the responsive
+#              (film-chemistry-coupled) part of the gas balance — the fine mode
+#              never bursts, so it carries a fixed share and cannot drive a wash.)
+#   D_b_m   <- top FINE-mode bubble diameter (the dispersed population that stays
+#              entrained downstream; coarse/slug disengage). This is a foam-column
+#              bubble, coarser than the dryer's native D_b factor range — see the
+#              caveat in the report.
+#   P_Pa    <- column operating pressure
+# Diagnostics (per-class retention, impurity, film_stability, derived eta_gas,
+# gas-balance closure) are attached as attr(stream,"up2_ode").
+foam_wash_column_ode <- function(stream, pars = list()) {
+  P <- fc_env$params
+  rho_L <- stream$rho_slurry
+  P[["rho_liquid"]] <- rho_L
+  P[["rho_p"]]      <- stream$rho_polymer
+  P[["T_col"]]      <- stream$T_K
+  P[["T_ref"]]      <- stream$T_K
+  if (is.finite(stream$P_Pa) && stream$P_Pa > 0) P[["P_col"]] <- stream$P_Pa
+
+  # holdups (renormalised to close the phase balance)
+  C_sol <- stream$C_solid + stream$C_solid_rigid
+  phi_s <- max(1e-4, min(0.60, C_sol * rho_L / stream$rho_polymer))
+  eg    <- max(1e-4, min(0.90, stream$alpha_g))
+  el    <- max(0.05, 1 - eg - phi_s)
+  tot   <- eg + phi_s + el
+  P[["eps_g_in"]] <- eg / tot
+  P[["eps_s_in"]] <- phi_s / tot
+  P[["eps_l_in"]] <- el / tot
+
+  # surfactant wt/wt -> mol/m3
+  MW_kg <- max(stream$MW_surfactant / 1000, 1e-3)
+  P[["c_surf"]] <- max(0,    stream$C_surfactant * rho_L / MW_kg)
+  P[["cmc"]]    <- max(1e-6, stream$CMC          * rho_L / MW_kg)
+
+  if (!is.null(pars$v_tip)) P[["V_tip"]] <- pars$v_tip
+  # explicit overrides (e.g. a sensitivity sweep over a real column knob)
+  for (nm in names(pars)) if (nm %in% names(P)) P[[nm]] <- pars[[nm]]
+
+  dpar <- fc_env$derive_state_props(P)
+  out  <- fc_env$solve_column(dpar)
+  top  <- out[nrow(out), ]
+  Jg_in <- dpar[["eps_g_in"]] * dpar[["U_up"]]
+
+  f_slug <- min(max(as.numeric(top$J_g_slug) / Jg_in, 0), 1)
+
+  stream$alpha_g <- max(0, stream$alpha_g * (1 - f_slug))
+  stream$D_b_m   <- as.numeric(top$d_b_fine)
+  stream$P_Pa    <- unname(dpar[["P_col"]])
+
+  attr(stream, "up2_ode") <- list(
+    eta_gas        = f_slug,
+    d_b_fine_um    = as.numeric(top$d_b_fine)   * 1e6,
+    d_b_coarse_um  = as.numeric(top$d_b_coarse) * 1e6,
+    film_stability = unname(dpar[["film_stability"]]),
+    sigma_mNm      = unname(dpar[["sigma_film"]]) * 1e3,
+    ret_fine = as.numeric(top$Js_fine / out$Js_fine[1]),
+    ret_mid  = as.numeric(top$Js_mid  / out$Js_mid[1]),
+    ret_crs  = as.numeric(top$Js_crs  / out$Js_crs[1]),
+    impurity_out = as.numeric(top$C_imp),
+    gas_closure  = as.numeric((top$J_g_foam_fine + top$J_g_foam_coarse +
+                               top$J_g_slug - Jg_in) / Jg_in))
+  stream
+}
+
+# =============================================================================
 # THE FULL TRAIN
 # =============================================================================
 run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
                            wash_pars = list(), cen_op = cen_nominal,
                            reslurry_solids = 0.30, spray_op = sp_mid,
-                           verbose = FALSE) {
+                           up2 = c("ode", "algebraic"), verbose = FALSE) {
+  up2 <- match.arg(up2)
   eq <- mx_equipment; eq$template_type <- template_type
+  p1 <- up1_pars_from_x(mixer_x)
 
   # 1. mixer
-  r1 <- up1_run_mixer(up1_pars_from_x(mixer_x), eq)
+  r1 <- up1_run_mixer(p1, eq)
   if (any(is.na(r1$outputs))) return(NULL)
-  s <- stream_from_up1(r1, up1_pars_from_x(mixer_x), eq)
+  s <- stream_from_up1(r1, p1, eq)
   if (verbose) print_stream(s, "1) mixer exit")
 
-  # 2. pressurized foam-wash column
-  s <- foam_wash_column(s, wash_pars)
+  # 2. pressurized foam-wash column (UP2)
+  if (up2 == "ode") {
+    s <- foam_wash_column_ode(s, modifyList(list(v_tip = unname(p1$v_tip)), wash_pars))
+  } else {
+    s <- foam_wash_column(s, wash_pars)   # algebraic placeholder (foam_wash_module.R)
+  }
   if (verbose) print_stream(s, "2) UP2 foam-wash exit -> UP3 feed")
 
   # 3. UP3 (separator) + 4. reslurry handoff (one call: runs the model, dilutes)
@@ -165,6 +266,10 @@ cat(sprintf("\n[UP1]            C_solid %.3f  alpha_g %.3f  D_agg %.0f um  Bond 
             m[["Bond_Strength"]], m[["Residual_Template_Fraction"]]))
 cat(sprintf("[UP2 foam-wash]  alpha_g %.3f -> %.3f (washed)  D_b %.1f um  P %.2f atm\n",
             m[["Blended_Porosity"]], s$alpha_g, s$D_b_m*1e6, s$P_Pa/1.013e5))
+d2 <- attr(s, "up2_ode")
+cat(sprintf("  (491-ODE)      eta_gas %.2f  film_stab %.2f  sigma %.1f mN/m  retention f/m/c %.0f/%.0f/%.0f%%  imp->%.0f%%  gas-closure %.1e\n",
+            d2$eta_gas, d2$film_stability, d2$sigma_mNm,
+            100*d2$ret_fine, 100*d2$ret_mid, 100*d2$ret_crs, d2$impurity_out, d2$gas_closure))
 cat(sprintf("[UP3 separator]  cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
             co$Product_Solids_MassFrac*100, co$Exit_Density_kg_m3/1000,
             co$Entrained_Gas_Holdup, res$cen_run[["floc_strength_Pa"]]))
@@ -174,14 +279,16 @@ cat(sprintf("[UP4 dryer]      D_particle %.1f um  porosity %.3f  skin %.3f  rho_
             sp[["D_particle_um"]], sp[["phi_porosity_z"]], sp[["theta_skin_z"]],
             sp[["rho_tapped"]], sp[["X_moisture"]]))
 
-cat("\n=== UP2 (foam-wash) sensitivity: how much gas removal changes the train ===\n")
-cat(sprintf("  %-10s %-12s %-12s %-12s %-12s\n",
-            "eta_gas", "cen_gas_hld", "reslurry_ag0", "D_particle", "porosity"))
-for (eg in c(0.0, 0.50, 0.75, 0.95)) {
-  r <- run_full_train(wash_pars = list(eta_gas = eg))
-  cat(sprintf("  %-10.2f %-12.3f %-12.3f %-12.1f %-12.3f\n", eg,
-              r$cen_out$Entrained_Gas_Holdup, r$handoff[["alpha_g_0"]],
+cat("\n=== UP2 (491-ODE) sensitivity: surfactant dose -> film stability -> train ===\n")
+cat(sprintf("  %-12s %-10s %-12s %-12s %-12s %-12s\n",
+            "c_surf", "eta_gas", "cen_gas_hld", "reslurry_ag0", "D_particle", "porosity"))
+for (cs in c(1.0, 3.0, 5.0, 8.0)) {
+  r  <- run_full_train(wash_pars = list(c_surf = cs))
+  d2 <- attr(r$stream, "up2_ode")
+  cat(sprintf("  %-12.1f %-10.2f %-12.3f %-12.3f %-12.1f %-12.3f\n", cs,
+              d2$eta_gas, r$cen_out$Entrained_Gas_Holdup, r$handoff[["alpha_g_0"]],
               r$spray[["D_particle_um"]], r$spray[["phi_porosity_z"]]))
 }
-cat("\nMore foam washed out -> less gas into the UP3/UP4 stages -> denser,\n",
-    "less porous powder (and, per your plant note, easier to dry).\n", sep = "")
+cat("\nMore surfactant -> more-stable films -> less bubble coalescence -> more gas\n",
+    "stays finely dispersed (weaker wash, lower eta_gas) -> gassier feed into\n",
+    "UP3/UP4 -> more porous powder. Less surfactant washes harder (denser powder).\n", sep = "")

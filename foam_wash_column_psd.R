@@ -451,8 +451,10 @@ cat(sprintf("=> ripening is %s (Da_ripen = residence/tau_ripen = %.2f; add it on
                    "negligible vs coalescence/residence - skip for now"), t_tot/tau_OR))
 
 # =====================================================================
-# PLOTS
+# PLOTS  (muted on non-interactive runs so Rscript emits no Rplots.pdf;
+#         run interactively to render, or wrap in png(...)/dev.off())
 # =====================================================================
+if (interactive()) {
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
 plot(out_psd$z, out_psd$Js_mid, type="l", col="green", lwd=3, ylim=c(0,0.05),
      ylab="Solid flux (m/s)", xlab="Height (m)", main="PSD retention")
@@ -489,3 +491,4 @@ axis(4); mtext("Liquid holdup eps_l (-)", side=4, line=-1.3, cex=0.7)
 abline(v=dpar[["H_pool"]], col="gray", lty=2)
 legend("right", legend=c("Film h_eq (L)","Holdup eps_l (R)"),
        col=c("steelblue","darkgreen"), lty=c(1,2), lwd=2)
+}  # end if (interactive())

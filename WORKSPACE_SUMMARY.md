@@ -146,8 +146,9 @@ capillary-collapse threshold are hard-coded in UP2 constants.
 | `unified/up2_spray_dryer_module.R` | UP2 spray dryer + particle formation |
 | `unified/interface_stream.R` | Stream object + placeholder intermediate stages |
 | `unified/STAGE_CONTRACT.md` | Stream/stage contract reference |
-| `full_train_mixer_to_dryer.R` | 4-stage train (adds foam-wash + separator) |
-| `foam_wash_module.R` | Foam-wash column (placeholder) + build notes |
+| `full_train_mixer_to_dryer.R` | 4-stage train; UP2 selectable `up2="ode"` (default) or `"algebraic"` |
+| `foam_wash_module.R` | Foam-wash column — algebraic closure (`up2="algebraic"`) |
+| `foam_wash_column_psd.R` | Foam-wash column — 491-line deSolve ODE, wrapped as UP2 (`up2="ode"`) |
 | `centrifuge_morris_sensitivity.R` | UP3 separator/centrifuge model |
 | `morris_sensitivity_analysis.R` | Standalone UP4 dryer screen (`spray_dry_model`) |
 | `up1_module_rev38_dryer_risk.r` | Original standalone UP1 mixer (source of truth) |
