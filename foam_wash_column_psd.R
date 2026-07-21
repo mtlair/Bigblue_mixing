@@ -1,79 +1,67 @@
 library(deSolve)
 
 # =====================================================================
-# SCRIPT 1: PREFORMED-FOAM WASH COLUMN (decant pool + plug-flow foam)
+# SCRIPT 1: PREFORMED-FOAM WASH COLUMN
+#   decant pool (hindered settling) + plug foam + bubble population + gas loss
 # =====================================================================
-# Preformed, particle-loaded foam (no sparger) enters the base as a wet
-# dispersion. Two zones, split at the fixed decant depth H_pool:
+# Preformed, particle-loaded foam (no sparger) enters the base. Two zones split
+# at the fixed decant depth H_pool. Properties (mu, rho_foam, d_p, d_b_in,
+# d_sep) are passed down from the upstream unit.
 #
-#   BOTTOM  z < H_pool : GRAVITY-DECANT POOL. The pool VELOCITY is a proper
-#           density-differential SETTLING law (Stokes), computed from the
-#           passed-down dispersed size d_sep, the phase density difference
-#           (rho_liquid - rho_foam), and the continuous-phase viscosity mu:
-#               U_settle = (rho_liquid - rho_foam) * g * d_sep^2 / (18 mu)
-#           This is slow when the density differential is low -> the ~30 min
-#           decant timescale. No more free tau_sep / pool_mobility.
-#   TOP     z >= H_pool: THROUGHPUT plug-flow foam at the (very low) feed
-#           velocity U_up, washed by liquid added at the top.
+# NEW in this version:
+#  (1) HINDERED SETTLING (Richardson-Zaki): the pool Stokes settling velocity
+#      is slowed by crowding, U = U_stokes * (1 - phi)^n_RZ, phi = condensed
+#      holdup (1 - eps_g). Dense pools settle much slower -> longer decant.
+#  (2) BUBBLE POPULATION: mean bubble size d_b(z) evolves by COALESCENCE
+#      (grows, faster in dry/unstable foam) minus BREAKAGE (shear, restores
+#      toward the inlet size). This is the key operational lever.
+#  (3) GAS BALANCE / GAS-LOSS REGIME: no gas is generated in the column, so the
+#      gas flux J_g only DECREASES -- bubbles that coarsen past d_b_burst
+#      rupture and vent gas. Track J_g in vs out (gas recovery) and the gas
+#      lost. Bursting is also what dumps coarse particles (collapse loss is now
+#      tied to the burst rate, not an empirical dryness proxy).
 #
-# THROUGHPUT + GATE: residence is throughput-based (H / U_up per zone). The
-# decant COMPLETES only if the clarifying settling keeps up with the upflow,
-# i.e. completion = min(1, U_settle / U_up). Very low upward velocity -> good
-# separation; too-fast feed -> impurity carryover. This replaces "pool
-# residence forced = decant time" with the physical competition of the two.
-#
-# Particle loss: coarse aggregates (particle + attached bubble) settle out of
-# the pool only if their net density beats the liquid (Stokes on the aggregate
-# with bubble size d_b); with normal bubbles all classes are buoyant, so
-# coarse loss is the foam-zone detachment/collapse below. The pool settling
-# term is included and self-activates if the bubbles are small enough.
-#
-# Passed down from the UPSTREAM unit (inputs, not fitted): mu_cont, rho_foam,
-# d_fine/d_mid/d_crs, d_b, d_sep.
-#
-# States up z: Js_fine, Js_mid, Js_crs [m/s]; C_imp [%]; eps_l [-]; t_res [s].
-# PLACEHOLDER foam loss/wash constants calibrated to: residence 1.5-2.5 h and
-# top solids 3-7%.
+# States up z: Js_fine, Js_mid, Js_crs [m/s]; C_imp [%]; eps_l [-];
+#              d_b [m]; J_g [m/s]; t_res [s].
+# PLACEHOLDER kinetics calibrated to: residence ~1.5-2 h, top solids 3-7%.
 # =====================================================================
 
 GRAV <- 9.81
 
 params <- c(
-  H_total = 5.0, H_pool = 0.45,          # column & decant depth [m] (~1.5 ft)
-  U_up = 8.0e-4,                         # throughput superficial upward velocity [m/s]
+  H_total = 5.0, H_pool = 0.45, U_up = 8.0e-4,
 
-  # --- UPSTREAM-PASSED PHYSICAL PROPERTIES (inputs, not fitted) ---
-  mu_cont   = 2.0e-3,                    # continuous-phase viscosity [Pa s] (=2 cP)
-  rho_liquid = 1050, rho_foam = 575, rho_p = 2500, rho_gas = 1.8,  # [kg/m3]
-  d_fine = 1.5e-5, d_mid = 8.0e-5, d_crs = 3.0e-4,  # particle diameters [m]
-  d_b    = 2.0e-3,                       # bubble diameter (set upstream by P) [m]
-  d_sep  = 4.5e-5,                       # decant-controlling dispersed size [m]
+  # --- UPSTREAM-PASSED PROPERTIES ---
+  mu_cont = 2.0e-3, rho_liquid = 1050, rho_foam = 575, rho_p = 2500, rho_gas = 1.8,
+  d_fine = 1.5e-5, d_mid = 8.0e-5, d_crs = 3.0e-4,
+  d_b_in = 2.0e-3, d_sep = 4.5e-5, n_RZ = 4.65,
 
-  # --- FEED LOADING ---
-  eps_l_in = 0.50, eps_s_in = 0.020,
+  # --- FEED ---
+  eps_l_in = 0.50, eps_s_in = 0.020, eps_g_in = 0.48,
   Js_fine_in = 0.017, Js_mid_in = 0.040, Js_crs_in = 0.020, C_imp_in = 100,
 
-  # --- FILM DRAINAGE (foam dries toward a wet equilibrium) ---
-  eps_l_dry = 0.15, L_drain = 1.5, eps_g_pack = 0.74, blend_wz = 0.03,
-  d_b_ref = 2.0e-3,                      # bubble-size reference for channeling ratio
+  # --- FILM DRAINAGE (time-based) ---
+  eps_l_dry = 0.15, tau_drain = 2000, eps_g_pack = 0.74, blend_wz = 0.03,
 
-  # --- WASH LIQUID ---
-  wash_ratio = 0.5,
+  # --- BUBBLE POPULATION (coalescence - breakage) ---
+  K_coal = 1.3e-4,        # coalescence coeff [1/s] (grows d_b)
+  K_break = 1.2e-4,       # breakage coeff [1/s] (restores toward d_b_in)
+  # --- GAS LOSS (bursting of over-coarsened bubbles) ---
+  d_b_burst = 3.0e-3,     # bubble size above which bursting accelerates [m]
+  K_burst = 1.0e-3,       # burst-rate coeff [1/s]
 
-  # --- FOAM-ZONE PARTICLE LOSS (per time): detachment + collapse ---
-  k_det_fine = 1.2e-5, k_det_mid = 6.0e-5, k_det_crs = 3.0e-4,   # [1/s]
-  k_col_fine = 5.0e-5, k_col_mid = 2.5e-4, k_col_crs = 1.5e-3,   # [1/s]
+  # --- WASH ---
+  wash_ratio = 0.5, k_drainage = 1.8e-3, channel_cv = 0.35, d_b_ref = 2.0e-3,
 
-  # --- CHANNELING / WASH DISTRIBUTION ---
-  k_drainage = 1.8e-3, channel_cv = 0.35,
+  # --- PARTICLE LOSS ---
+  k_det_fine = 1.2e-5, k_det_mid = 6.0e-5, k_det_crs = 3.0e-4,   # detachment [1/s]
+  k_burstloss_fine = 0.05, k_burstloss_mid = 0.30, k_burstloss_crs = 2.0, # burst dumps [-]
 
-  # --- REGIME (snow-globe vs plug): material stability vs loading ---
+  # --- REGIME ---
   film_stability = 1.0, load_sens = 1.0, plug_crit = 1.0
 )
 
-# Stokes settling velocity [m/s]; positive = settles, negative = rises
-stokes <- function(dRho, d, mu) dRho * GRAV * d^2 / (18 * mu)
-# net density of a particle+bubble aggregate (volume-weighted spheres)
+stokes  <- function(dRho, d, mu) dRho * GRAV * d^2 / (18 * mu)
 rho_agg <- function(dp, db, rp, rg) (rp*dp^3 + rg*db^3) / (dp^3 + db^3)
 
 column_model_psd <- function(z, state, parameters) {
@@ -81,49 +69,51 @@ column_model_psd <- function(z, state, parameters) {
 
     load_rel <- (Js_fine + Js_mid + Js_crs) / (Js_fine_in + Js_mid_in + Js_crs_in)
     eps_s    <- eps_s_in * load_rel
-    eps_g    <- 1 - eps_l
-
-    U <- U_up                                   # throughput velocity (very low)
+    eps_g    <- 1 - eps_l - eps_s
+    U <- U_up
     dt_res <- 1 / U
+    foam_frac <- 1 / (1 + exp(-(z - H_pool) / blend_wz))
 
-    foam_frac <- 1 / (1 + exp(-(z - H_pool) / blend_wz))   # 0 pool -> 1 foam
-    deps_l <- -(eps_l - eps_l_dry) / L_drain               # film drainage
+    # (2) BUBBLE POPULATION: coalescence (dry/unstable -> faster) - breakage
+    coal_rate <- K_coal * (eps_g / eps_g_pack) / film_stability     # [1/s]
+    dd_b <- (coal_rate * d_b - K_break * (d_b - d_b_in)) / U
 
-    # ---- POOL: gravity decant of impurity (density-differential settling) ----
-    U_settle_sep <- stokes(rho_liquid - rho_foam, d_sep, mu_cont)
-    # removal rate per height = (settling velocity / depth) / U ; over the pool
-    # residence H_pool/U this integrates to exp(-U_settle_sep/U) -> the
-    # completion = min(1, U_settle/U_up) competition.
+    # (3) GAS LOSS: bursting when bubbles coarsen past d_b_burst (gas-only sink)
+    burst_rate <- K_burst * max(0, d_b - d_b_burst) / d_b_in         # [1/s]
+    dJ_g <- -burst_rate * J_g / U
+
+    # film drainage (foam dries -> eps_l falls toward eps_l_dry)
+    deps_l <- -(eps_l - eps_l_dry) / tau_drain / U
+
+    # (1) POOL decant with HINDERED settling (Richardson-Zaki)
+    phi <- 1 - eps_g                                                 # condensed holdup
+    U_settle_sep <- stokes(rho_liquid - rho_foam, d_sep, mu_cont) * (1 - phi)^n_RZ
     dCimp_pool <- -(U_settle_sep / H_pool) * C_imp
 
-    # ---- POOL: particle settling (aggregate; coarse only if it beats liquid)
+    # POOL particle settling (aggregate; uses current d_b)
     settle_loss <- function(dp) {
       d_agg <- (dp^3 + d_b^3)^(1/3)
-      Uset  <- stokes(rho_agg(dp, d_b, rho_p, rho_gas) - rho_liquid, d_agg, mu_cont)
-      max(0, Uset) / H_pool                      # [1/s]; >0 only if aggregate sinks
+      Uset  <- stokes(rho_agg(dp, d_b, rho_p, rho_gas) - rho_liquid, d_agg, mu_cont) * (1 - phi)^n_RZ
+      max(0, Uset) / H_pool
     }
     sl_fine <- settle_loss(d_fine); sl_mid <- settle_loss(d_mid); sl_crs <- settle_loss(d_crs)
 
-    # ---- FOAM: detachment + collapse (attached-particle losses) ----
-    coalescence <- max(0, eps_g - eps_g_pack)
-    lf_fine <- k_det_fine + k_col_fine * coalescence
-    lf_mid  <- k_det_mid  + k_col_mid  * coalescence
-    lf_crs  <- k_det_crs  + k_col_crs  * coalescence
+    # FOAM particle loss: detachment + BURST-driven collapse (dumps coarse)
+    lf_fine <- k_det_fine + k_burstloss_fine * burst_rate
+    lf_mid  <- k_det_mid  + k_burstloss_mid  * burst_rate
+    lf_crs  <- k_det_crs  + k_burstloss_crs  * burst_rate
 
-    # blend pool settling and foam detachment; convert per-time -> per-height
     dJs_fine <- -Js_fine * ((1-foam_frac)*sl_fine + foam_frac*lf_fine) / U
     dJs_mid  <- -Js_mid  * ((1-foam_frac)*sl_mid  + foam_frac*lf_mid ) / U
     dJs_crs  <- -Js_crs  * ((1-foam_frac)*sl_crs  + foam_frac*lf_crs ) / U
 
-    # ---- FOAM: washing, penalized by Plateau-border channeling ----
+    # FOAM washing (channeling scales with current bubble size)
     flow_cv         <- 4 * channel_cv * (d_b / d_b_ref)
     Wash_Efficiency <- 1 / (1 + flow_cv^2)
-    wash_strength   <- wash_ratio / (wash_ratio + 1)
-    dCimp_foam <- -k_drainage * Wash_Efficiency * wash_strength * C_imp
-
+    dCimp_foam <- -k_drainage * Wash_Efficiency * (wash_ratio/(wash_ratio+1)) * C_imp
     dCimp <- ((1-foam_frac)*dCimp_pool + foam_frac*dCimp_foam) / U
 
-    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dt_res))
+    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b, dJ_g, dt_res))
   })
 }
 
@@ -135,12 +125,13 @@ regime_of <- function(z, load_rel, p) {
 }
 solve_column <- function(p) {
   s0 <- c(Js_fine=p[["Js_fine_in"]], Js_mid=p[["Js_mid_in"]], Js_crs=p[["Js_crs_in"]],
-          C_imp=p[["C_imp_in"]], eps_l=p[["eps_l_in"]], t_res=0)
+          C_imp=p[["C_imp_in"]], eps_l=p[["eps_l_in"]], d_b=p[["d_b_in"]],
+          J_g=p[["eps_g_in"]]*p[["U_up"]], t_res=0)
   z <- seq(0, p[["H_total"]], by = 0.02)
   out <- as.data.frame(ode(s0, z, column_model_psd, p)); names(out)[1] <- "z"
-  out$eps_g <- 1 - out$eps_l
   lr <- (out$Js_fine+out$Js_mid+out$Js_crs)/(p[["Js_fine_in"]]+p[["Js_mid_in"]]+p[["Js_crs_in"]])
   out$eps_s <- p[["eps_s_in"]]*lr
+  out$eps_g <- 1 - out$eps_l - out$eps_s
   out$solids_pct <- 100*out$eps_s/(out$eps_s+out$eps_l)
   out$regime <- vapply(seq_len(nrow(out)), function(i) regime_of(out$z[i], lr[i], p), character(1))
   out
@@ -148,21 +139,18 @@ solve_column <- function(p) {
 
 # --- solve + report --------------------------------------------------------
 out_psd <- solve_column(params)
-U_set  <- stokes(params[["rho_liquid"]]-params[["rho_foam"]], params[["d_sep"]], params[["mu_cont"]])
-completion <- min(1, U_set / params[["U_up"]])
 t_pool <- approx(out_psd$z, out_psd$t_res, params[["H_pool"]])$y
 t_tot  <- out_psd$t_res[nrow(out_psd)]
+Jg_in  <- params[["eps_g_in"]]*params[["U_up"]]; Jg_out <- out_psd$J_g[nrow(out_psd)]
 top <- out_psd[nrow(out_psd),]; ini <- out_psd[1,]
 
-cat(sprintf("Upward velocity U_up   = %.2e m/s  |  settling U_settle = %.2e m/s\n",
-            params[["U_up"]], U_set))
-cat(sprintf("Decant completion      = %.0f%%  (min(1, U_settle/U_up))\n", 100*completion))
-cat(sprintf("Decant time  H/U_settle= %.2f h  [Stokes]   vs heuristic 100mu/dRho= %.2f h\n",
-            params[["H_pool"]]/U_set/3600,
-            100*(params[["mu_cont"]]*1000)/(params[["rho_liquid"]]-params[["rho_foam"]])))
-cat(sprintf("Residence: pool %.2f h + foam %.2f h = %.2f h (throughput)\n",
+cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence)\n",
+            params[["d_b_in"]]*1e3, top$d_b*1e3))
+cat(sprintf("GAS balance: in %.2e -> out %.2e m/s  => recovery %.0f%%, lost %.0f%%\n",
+            Jg_in, Jg_out, 100*Jg_out/Jg_in, 100*(1-Jg_out/Jg_in)))
+cat(sprintf("Residence: pool %.2f h + foam %.2f h = %.2f h\n",
             t_pool/3600, (t_tot-t_pool)/3600, t_tot/3600))
-cat(sprintf("Solids content: inlet %.1f%% -> top %.1f%% | plug %.0f%%\n",
+cat(sprintf("Solids: inlet %.1f%% -> top %.1f%% | plug %.0f%%\n",
             ini$solids_pct, top$solids_pct, 100*mean(out_psd$regime=="plug")))
 cat(sprintf("Retention: fine=%.0f%% mid=%.0f%% coarse=%.0f%% | impurity %.0f->%.1f%%\n",
             100*top$Js_fine/ini$Js_fine, 100*top$Js_mid/ini$Js_mid,
@@ -179,14 +167,11 @@ lines(out_psd$z, out_psd$Js_crs,  col="red",  lwd=2, lty=3)
 abline(v=params[["H_pool"]], col="gray", lty=2)
 legend("right", legend=c("Mid","Fine","Coarse"), col=c("green","blue","red"), lty=c(1,2,3), lwd=2)
 
-plot(out_psd$z, out_psd$solids_pct, type="l", col="darkorange", lwd=3, ylim=c(0,50),
-     ylab="%", xlab="Height (m)", main="Solids content & impurity")
-lines(out_psd$z, out_psd$C_imp/2, col="purple", lwd=2, lty=2)
-abline(v=params[["H_pool"]], col="gray", lty=2)
-legend("topright", legend=c("Solids %","Impurity %/2"), col=c("darkorange","purple"), lty=c(1,2), lwd=2)
+plot(out_psd$z, out_psd$d_b*1e3, type="l", col="darkorange", lwd=3,
+     ylab="Bubble d_b (mm)", xlab="Height (m)", main="Bubble growth & burst")
+abline(h=params[["d_b_burst"]]*1e3, col="red", lty=3)
+legend("topleft", legend=c("d_b","burst onset"), col=c("darkorange","red"), lty=c(1,3), lwd=2)
 
-plot(out_psd$z, out_psd$t_res/3600, type="l", col="black", lwd=3,
-     ylab="Cumulative residence (h)", xlab="Height (m)", main="Residence (throughput)")
+plot(out_psd$z, out_psd$J_g/Jg_in*100, type="l", col="purple", lwd=3, ylim=c(0,100),
+     ylab="Gas remaining (% of inlet)", xlab="Height (m)", main="Gas-loss regime")
 abline(v=params[["H_pool"]], col="gray", lty=2)
-plug_z <- out_psd$z[out_psd$regime=="plug"]; if (length(plug_z)) rug(plug_z, col="forestgreen", lwd=2)
-legend("topleft", legend=c("t_res","interface","plug"), col=c("black","gray","forestgreen"), lty=c(1,2,1), lwd=2)
