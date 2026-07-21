@@ -2,7 +2,7 @@ library(deSolve)
 
 # =====================================================================
 # SCRIPT 1: PREFORMED-FOAM WASH COLUMN
-#   decant pool (hindered settling) + plug foam + bubble population + gas loss
+#   decant pool (hindered settling) + plug foam + bubble population + gas state
 # =====================================================================
 # Preformed, particle-loaded foam (no sparger) enters the base. Two zones split
 # at the fixed decant depth H_pool. Properties (mu, rho_foam, d_p, d_b_in,
@@ -15,18 +15,20 @@ library(deSolve)
 #  (2) BUBBLE POPULATION: mean bubble size d_b(z) evolves by COALESCENCE
 #      (grows, faster in dry/unstable foam) minus BREAKAGE (shear, restores
 #      toward the inlet size). This is the key operational lever.
-#  (3) GAS BALANCE: no gas is generated in the column (no sparger), so the gas
-#      flux J_g only DECREASES with coalescence-driven bursting. Bursting is
-#      also what dumps coarse particles (collapse loss tied to the burst rate).
-#      *** KNOWN ISSUE (to fix next): gas is NOT actually vented to atmosphere
-#      inside THIS column -- it stays in the foam and is only released in the
-#      DOWNSTREAM open-atmosphere solids-concentration stage. So J_g here
-#      should be a RETAINED gas carried out the top to the next unit, not a
-#      local vent sink. Bursting should still coarsen bubbles / dump coarse and
-#      make the foam collapse wetter, but the gas leaves with the overflow. ***
+#  (3) GAS STATE (no gas generated -- no sparger, no vent). Coalescence and
+#      bubble bursting DO happen in the column, but the gas is NOT released
+#      here: it stays in the column and is only let out in the DOWNSTREAM
+#      open-atmosphere solids-concentration stage ("next up"). So the total
+#      gas is CONSERVED and carried out the top -- what changes with height is
+#      its STATE, not its amount. Bursting/coalescence convert dispersed foam
+#      gas (J_g_foam) into large retained SLUG gas (J_g_slug); the slug gas
+#      cannot escape until the next unit. Bursting still coarsens bubbles and
+#      still dumps coarse particles (collapse loss tied to the burst rate);
+#      only the gas-leaves-atmosphere sink is removed. Total gas out the top
+#      J_g_foam + J_g_slug == gas in the bottom (recovery = 100% by construction).
 #
 # States up z: Js_fine, Js_mid, Js_crs [m/s]; C_imp [%]; eps_l [-];
-#              d_b [m]; J_g [m/s]; t_res [s].
+#              d_b [m]; J_g_foam, J_g_slug [m/s]; t_res [s].
 # PLACEHOLDER kinetics calibrated to: residence ~1.5-2 h, top solids 3-7%.
 # =====================================================================
 
@@ -50,9 +52,9 @@ params <- c(
   # --- BUBBLE POPULATION (coalescence - breakage) ---
   K_coal = 1.3e-4,        # coalescence coeff [1/s] (grows d_b)
   K_break = 1.2e-4,       # breakage coeff [1/s] (restores toward d_b_in)
-  # --- GAS LOSS (bursting of over-coarsened bubbles) ---
+  # --- GAS STATE CHANGE (bursting of over-coarsened bubbles: foam gas -> slug) ---
   d_b_burst = 3.0e-3,     # bubble size above which bursting accelerates [m]
-  K_burst = 1.0e-3,       # burst-rate coeff [1/s]
+  K_burst = 1.0e-3,       # burst-rate coeff [1/s] (foam->slug conversion, not a vent)
 
   # --- WASH ---
   wash_ratio = 0.5, k_drainage = 1.8e-3, channel_cv = 0.35, d_b_ref = 2.0e-3,
@@ -82,9 +84,14 @@ column_model_psd <- function(z, state, parameters) {
     coal_rate <- K_coal * (eps_g / eps_g_pack) / film_stability     # [1/s]
     dd_b <- (coal_rate * d_b - K_break * (d_b - d_b_in)) / U
 
-    # (3) GAS LOSS: bursting when bubbles coarsen past d_b_burst (gas-only sink)
+    # (3) GAS STATE: bursting when bubbles coarsen past d_b_burst. Gas is NOT
+    # vented -- it converts from dispersed foam gas to retained SLUG gas that
+    # only escapes in the next (downstream) unit. Total gas is conserved, so
+    # the foam-gas loss equals the slug-gas gain.
     burst_rate <- K_burst * max(0, d_b - d_b_burst) / d_b_in         # [1/s]
-    dJ_g <- -burst_rate * J_g / U
+    burst_flux <- burst_rate * J_g_foam / U
+    dJ_g_foam <- -burst_flux                                         # dispersed foam gas
+    dJ_g_slug <-  burst_flux                                         # retained slug gas (out the top)
 
     # film drainage (foam dries -> eps_l falls toward eps_l_dry)
     deps_l <- -(eps_l - eps_l_dry) / tau_drain / U
@@ -117,7 +124,7 @@ column_model_psd <- function(z, state, parameters) {
     dCimp_foam <- -k_drainage * Wash_Efficiency * (wash_ratio/(wash_ratio+1)) * C_imp
     dCimp <- ((1-foam_frac)*dCimp_pool + foam_frac*dCimp_foam) / U
 
-    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b, dJ_g, dt_res))
+    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b, dJ_g_foam, dJ_g_slug, dt_res))
   })
 }
 
@@ -130,10 +137,11 @@ regime_of <- function(z, load_rel, p) {
 solve_column <- function(p) {
   s0 <- c(Js_fine=p[["Js_fine_in"]], Js_mid=p[["Js_mid_in"]], Js_crs=p[["Js_crs_in"]],
           C_imp=p[["C_imp_in"]], eps_l=p[["eps_l_in"]], d_b=p[["d_b_in"]],
-          J_g=p[["eps_g_in"]]*p[["U_up"]], t_res=0)
+          J_g_foam=p[["eps_g_in"]]*p[["U_up"]], J_g_slug=0, t_res=0)
   z <- seq(0, p[["H_total"]], by = 0.02)
   out <- as.data.frame(ode(s0, z, column_model_psd, p)); names(out)[1] <- "z"
   lr <- (out$Js_fine+out$Js_mid+out$Js_crs)/(p[["Js_fine_in"]]+p[["Js_mid_in"]]+p[["Js_crs_in"]])
+  out$J_g_total <- out$J_g_foam + out$J_g_slug     # conserved: carried out the top
   out$eps_s <- p[["eps_s_in"]]*lr
   out$eps_g <- 1 - out$eps_l - out$eps_s
   out$solids_pct <- 100*out$eps_s/(out$eps_s+out$eps_l)
@@ -145,13 +153,15 @@ solve_column <- function(p) {
 out_psd <- solve_column(params)
 t_pool <- approx(out_psd$z, out_psd$t_res, params[["H_pool"]])$y
 t_tot  <- out_psd$t_res[nrow(out_psd)]
-Jg_in  <- params[["eps_g_in"]]*params[["U_up"]]; Jg_out <- out_psd$J_g[nrow(out_psd)]
+Jg_in  <- params[["eps_g_in"]]*params[["U_up"]]; Jg_out <- out_psd$J_g_total[nrow(out_psd)]
 top <- out_psd[nrow(out_psd),]; ini <- out_psd[1,]
 
 cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence)\n",
             params[["d_b_in"]]*1e3, top$d_b*1e3))
-cat(sprintf("GAS balance: in %.2e -> out %.2e m/s  => recovery %.0f%%, lost %.0f%%\n",
-            Jg_in, Jg_out, 100*Jg_out/Jg_in, 100*(1-Jg_out/Jg_in)))
+cat(sprintf("GAS balance (conserved, no vent): in %.2e -> out %.2e m/s => carried out top %.0f%%\n",
+            Jg_in, Jg_out, 100*Jg_out/Jg_in))
+cat(sprintf("  gas state at top: foam bubbles %.0f%% + retained slug %.0f%% (slug released next unit up)\n",
+            100*top$J_g_foam/Jg_in, 100*top$J_g_slug/Jg_in))
 cat(sprintf("Residence: pool %.2f h + foam %.2f h = %.2f h\n",
             t_pool/3600, (t_tot-t_pool)/3600, t_tot/3600))
 cat(sprintf("Solids: inlet %.1f%% -> top %.1f%% | plug %.0f%%\n",
@@ -176,6 +186,10 @@ plot(out_psd$z, out_psd$d_b*1e3, type="l", col="darkorange", lwd=3,
 abline(h=params[["d_b_burst"]]*1e3, col="red", lty=3)
 legend("topleft", legend=c("d_b","burst onset"), col=c("darkorange","red"), lty=c(1,3), lwd=2)
 
-plot(out_psd$z, out_psd$J_g/Jg_in*100, type="l", col="purple", lwd=3, ylim=c(0,100),
-     ylab="Gas remaining (% of inlet)", xlab="Height (m)", main="Gas-loss regime")
+plot(out_psd$z, out_psd$J_g_total/Jg_in*100, type="l", col="black", lwd=3, ylim=c(0,100),
+     ylab="Gas (% of inlet)", xlab="Height (m)", main="Gas state (conserved)")
+lines(out_psd$z, out_psd$J_g_foam/Jg_in*100, col="purple",    lwd=2, lty=2)
+lines(out_psd$z, out_psd$J_g_slug/Jg_in*100, col="firebrick", lwd=2, lty=3)
 abline(v=params[["H_pool"]], col="gray", lty=2)
+legend("right", legend=c("Total (out top)","Foam bubbles","Slug (retained)"),
+       col=c("black","purple","firebrick"), lty=c(1,2,3), lwd=2)
