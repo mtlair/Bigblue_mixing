@@ -142,6 +142,7 @@ capillary-collapse threshold are hard-coded in UP2 constants.
 | File | Role |
 |---|---|
 | `unified_model.R` | Unified chain driver: nominal runs + Morris screen + plots |
+| `full_train_morris.R` | Full 4-stage Morris screen (57 factors, NA-guarded) over the 5 particle features |
 | `unified/up1_mixer_module.R` | UP1 mixer physics (deSolve ODE) |
 | `unified/up2_spray_dryer_module.R` | UP2 spray dryer + particle formation |
 | `unified/interface_stream.R` | Stream object + placeholder intermediate stages |
