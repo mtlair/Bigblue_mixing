@@ -23,8 +23,15 @@
 #   rho_slurry [kg/m3], rho_polymer [kg/m3], T_K [K], P_Pa [Pa],
 #   mu_exit_PaS (mixer exit apparent viscosity, diagnostic)
 # Particulate state:
-#   D_particle_um  primary colloid particle diameter
-#   D_agg_um       aggregate (blended) size at mixer exit
+#   D_particle_um  primary colloid particle diameter (mixer INPUT / reference)
+#   D_primary_exit_um  primary size AFTER the UP1 three-regime v_tip closure:
+#                  == D_particle_um below the critical tip speed, milled smaller
+#                  past it. This (not D_particle_um) is the primary size
+#                  downstream stages should use.
+#   v_tip_crit     critical tip speed [m/s] (aggregation onset; diagnostic)
+#   v_tip_ratio    v_tip / v_tip_crit (>1 aggregation, >>1 milling; diagnostic)
+#   D_agg_um       aggregate (blended) size at mixer exit (enlarged in the
+#                  aggregation regime, broken back down under milling)
 #   sphericity     Omega at mixer exit (diagnostic)
 #   WetSkin        wet-skin fraction at mixer exit (partially survives
 #                  atomization; seeds the dryer skin state)

@@ -288,27 +288,54 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   Foam_Stability <- 1.0 + (5.0 * Theta_surf * (p$HLB / 10.0))
 
   # --- Three-regime v_tip closure (all colloid effects resolve here in UP1) --
-  # Regime 1 - low v_tip:      colloid unchanged (DLVO barrier intact)
-  # Regime 2 - critical v_tip: onset of orthokinetic aggregation
-  # Regime 3 - past critical:  milling / attrition -> smaller primary size
+  # A single critical tip speed sets where the colloid leaves the stable
+  # regime; the two mechanical effects then switch on in sequence, not together:
   #
-  # v_tip_crit is the tip speed where shear energy ~ DLVO repulsion:
-  # anchored so nominal E_stab (~27 at base chemistry) + phi_s=0.3 gives
-  # v_tip_crit ~ 13.5 m/s, placing the nominal run just below aggregation onset.
+  #   Regime 1 - v_tip < v_tip_crit:        colloid unchanged (DLVO barrier
+  #                                         holds) - no aggregation, no milling
+  #   Regime 2 - v_tip_crit .. mill_onset:  orthokinetic aggregation - shear
+  #                                         collisions overcome the barrier and
+  #                                         primaries flocculate (D_agg grows,
+  #                                         primary size unchanged)
+  #   Regime 3 - v_tip > mill_onset:        milling / attrition - shear energy
+  #                                         now fractures the aggregates back
+  #                                         down AND grinds the primaries
+  #                                         (D_agg falls, primary size shrinks)
+  #
+  # v_tip_crit is the tip speed where shear energy ~ DLVO repulsion. It rises
+  # with colloid stability (E_stab: Delta_pH, ionic_strength, Theta_surf) and
+  # falls with crowding (phi_s), so a better-stabilised or more dilute slurry
+  # tolerates a higher tip speed before aggregating. The 0.33 constant anchors
+  # it so nominal chemistry (E_stab ~ 10.7, phi_s ~ 0.22) gives v_tip_crit
+  # ~ 16 m/s, i.e. right at the nominal tip speed (midpoint of the 0.5-32 range):
+  # sweeping v_tip up from there enters aggregation, then milling past 1.8x.
   dpH_ppc     <- s_pos(p$Delta_pH)
   W_bar_ppc   <- exp(1.0 * dpH_ppc - 5.0 * sqrt(p$ionic_strength))
   E_stab_exit <- s_max(0.01, s_min(100.0, W_bar_ppc)) * s_pos(1.0 + 10.0 * Theta_surf)
-  v_tip_crit  <- 0.15 * E_stab_exit / s_max(0.05, phi_s)
+  v_tip_crit  <- 0.33 * E_stab_exit / s_max(0.05, phi_s)
 
-  # Ratio of operating tip speed to the critical value
-  v_tip_ratio <- p$v_tip / s_max(0.1, v_tip_crit)
+  # Milling needs appreciably more energy than aggregation onset: the shear
+  # must exceed the aggregate cohesive strength, taken here as MILL_MARGIN x
+  # the aggregation threshold.
+  MILL_MARGIN <- 1.8
+  v_tip_mill  <- MILL_MARGIN * v_tip_crit
 
-  # Milling activates smoothly past the critical point.
-  # Below critical: D_primary unchanged. Past critical: attrition shrinks it.
-  # Maximum reduction ~70% at extreme shear (ratio >> 1).
-  mill_act <- tanh(2.0 * s_pos(v_tip_ratio - 1.0))  # onset above critical
-  mill_str <- tanh(s_pos(v_tip_ratio - 1.0))         # saturation at high ratio
-  D_primary_exit_um <- s_max(0.01, p$D_particle * (1.0 - 0.70 * mill_act * mill_str))
+  v_tip_ratio <- p$v_tip / s_max(0.1, v_tip_crit)          # >1 past aggregation
+  mill_ratio  <- p$v_tip / s_max(0.1, v_tip_mill)          # >1 past milling
+
+  # Smooth onsets (0 below threshold, saturating to 1 well above it)
+  agg_on  <- tanh(2.0 * s_pos(v_tip_ratio - 1.0))
+  mill_on <- tanh(2.0 * s_pos(mill_ratio  - 1.0))
+
+  # Aggregation dominates in the band between the two thresholds, then is
+  # consumed as milling breaks the flocs back apart.
+  AGG_MAX  <- 1.5   # max aggregate enlargement (+150%) at full flocculation
+  MILL_MAX <- 0.70  # max primary-size reduction (-70%) at extreme attrition
+  agg_size_factor  <- 1.0 + AGG_MAX  * agg_on * (1.0 - mill_on)
+  mill_size_factor <- 1.0 - MILL_MAX * mill_on
+
+  # Milled primary size handed downstream (unchanged until milling regime)
+  D_primary_exit_um <- s_max(0.01, p$D_particle * mill_size_factor)
 
   phi_solvent <- p$C_monomer + p$C_plasticizer
   Swelling_Softness <- exp(25.0 * phi_solvent)
@@ -355,6 +382,10 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   Size_B_um <- cbrt((6.0 * V_env_B) / (pi * final_state$N_B)) * 1e6
 
   Blended_Size_um <- (Size_A_um * Fraction_A) + (Size_B_um * Fraction_B)
+
+  # Regime-2 orthokinetic aggregation enlarges the exit aggregate; regime-3
+  # milling (folded into agg_size_factor via (1 - mill_on)) breaks it back down.
+  Blended_Size_um <- Blended_Size_um * agg_size_factor
 
   phi_effective_exit <- phi_s + 0.1 * Blended_WetSkin + V_template_A + (p$chi_npgas * final_state$a_free_A)
   phi_m <- 0.64
