@@ -88,13 +88,15 @@ Ranges are in `full_train_output/full_train_factor_ranges.csv`.
   output now bounds UP4. Screen still 54 factors, 2.7% NA.
 
 **DONE (mechanism E — colloid milling/destabilization):**
-- **v_tip effect on primary particle size** — implemented colloid milling coupling:
-  - Higher v_tip (mixer shear) reduces primary particle size `a_prim` (linear scaling)
-  - Higher v_tip increases destabilization factor for `d_ratio` 
-  - Final particle size reduced via improved packing (smaller primaries → smaller voids)
-  - Morris ranking: v_tip now #4 driver for particle size (mu* = 57.4, was ~1 before)
-  - Reaches top-3 for porosity, top-7 for sphericity, top-5 for skin
-  - ALR still dominant but gap narrowed from 356x to 5.5x
+- **v_tip effect on primary particle size** — colloid milling coupling (physics-correct):
+  - Higher v_tip (mixer shear) **reduces** primary particle size `a_prim` via inverse
+    shear scaling `(v_tip_ref/v_tip)^0.8`; smaller primaries from milling attrition
+  - Packing efficiency coupling: smaller a_prim improves cake density, reduces final
+    particle size via factor `(a_prim_mod/a_prim_ref)^0.75`
+  - Diagnostic: v_tip 2→22 m/s produces particle size 21.89→5.28 µm (~4x reduction)
+  - Morris ranking: v_tip now #4 driver for particle size (mu* = 51.1, was ~1 before)
+  - Also top-4 for porosity, top-5 for skin, #2 for tapped density
+  - ALR still dominant at mu* = 450.2, but gap narrowed from 356x to 9x
 
 **STILL PENDING:**
 - **Mechanism A (airblast microbubble)** — couple v_tip-set microbubble size to
