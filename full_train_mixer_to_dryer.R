@@ -155,7 +155,7 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
 # =============================================================================
 # NOMINAL END-TO-END RUN (prints the stream at every interface)
 # =============================================================================
-cat("=== FULL TRAIN: UP1 -> UP2 (foam-wash) -> UP3 (centrifuge) -> reslurry -> UP4 (spray dryer) ===\n")
+cat("=== FULL TRAIN: UP1 -> UP2 (foam-wash) -> UP3 (separator) -> reslurry -> UP4 (dryer) ===\n")
 cat("    (nominal inputs, capillary_bridge template)\n\n")
 res <- run_full_train(verbose = TRUE)
 
