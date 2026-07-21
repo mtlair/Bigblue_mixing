@@ -96,6 +96,7 @@ stream_from_up1 <- function(up1_res, pars, equipment) {
     D_agg_um       = unname(out[["Blended_Size_um"]]),
     sphericity     = unname(out[["Blended_Sphericity"]]),
     WetSkin        = unname(out[["Blended_WetSkin"]]),
+    v_tip_ms       = p$v_tip,  # mixer tip speed (for downstream colloid coupling)
     # gas phase
     alpha_g        = min(max(unname(out[["Blended_Porosity"]]), 0), 0.75),
     D_b_m          = NA_real_,

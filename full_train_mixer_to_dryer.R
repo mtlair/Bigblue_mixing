@@ -280,12 +280,13 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   # 5. UP4 (dryer)
   x <- spray_op
   for (nm in sp_from_centrifuge) x[nm] <- hand[[nm]]
-  # UP1-bounded template + feed temperature carried through the stream (no
+  # UP1-bounded template + feed temperature + v_tip carried through the stream (no
   # pre-heater stage yet, so the dryer feed T is the mixer-exit T; the template
   # emulsion fraction and droplet size are the mixer's, not free dryer knobs).
   x["phi_emulsion"] <- s$phi_templ_free
   x["D_template"]   <- s$D_template_um * 1e-6
   x["T_feed"]       <- s$T_K
+  x["v_tip_ms"]     <- s$v_tip_ms  # mixer tip speed for colloid milling coupling
   sp <- spray_dry_model(x)
 
   list(mixer = r1$outputs, stream = s, cen_run = cen_run,
