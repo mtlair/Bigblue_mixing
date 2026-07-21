@@ -538,16 +538,17 @@ unified_centrifuge_model <- function(run) {
 # gas-free slurry density is the exact two-density mixture at the target solids;
 # bubble size is unchanged; serum surface tension and viscosity move toward the
 # clean-water limits as the surfactant/polymer are diluted (first-order).
-centrifuge_to_spray <- function(run, target_solid_mass = 0.30) {
+centrifuge_to_spray <- function(run, reslurry_add = 0) {
   o <- unified_centrifuge_model(run)
   rho_poly <- 1800; rho_liq <- 1000; sigma_clean0 <- 0.072
 
   Cs_cake <- o$Product_Solids_MassFrac
-  target  <- min(target_solid_mass, Cs_cake)               # only dilute, never concentrate
-  # liquid dilution factor: added-water ratio to drop solids from cake -> target
-  L_over_S_cake   <- (1 - Cs_cake) / max(Cs_cake, 1e-9)
-  L_over_S_target <- (1 - target)  / max(target, 1e-9)
-  dil <- max(1, L_over_S_target / max(L_over_S_cake, 1e-9))  # >=1 = water added
+  # The feed to UP4 is TIED to the UP3 cake output (solids, liquid, entrained
+  # gas) rather than a fixed reslurry target. reslurry_add = added dilution
+  # liquid per unit cake liquid (0 = spray the separator cake as-is); the feed
+  # solids then tracks the separator's actual cake concentration.
+  dil    <- 1 + max(0, reslurry_add)                        # >=1 = water added
+  target <- Cs_cake / dil                                   # UP3-tied feed solids
 
   rho_L <- 1 / (target / rho_poly + (1 - target) / rho_liq)  # gas-free slurry density
 
@@ -787,8 +788,8 @@ spray_ranges <- list(rho_L=c(1000,1300), C_solid_mass=c(0.05,0.40),
                      D_b=c(2e-5,2e-4), mu_L=c(0.0012,0.056),
                      C_monomer=c(0,0.02), C_plasticizer=c(0,0.05),
                      C_binder=c(0,0.05), I_strength=c(1e-3,0.5), Delta_pH=c(0.2,4.0))
-sf <- centrifuge_to_spray(nominal_vec, target_solid_mass = 0.30)
-cat("\n== Centrifuge -> spray-dryer feed (nominal, diluted to 30% solids) ==\n")
+sf <- centrifuge_to_spray(nominal_vec, reslurry_add = 0.5)
+cat("\n== Centrifuge -> spray-dryer feed (nominal, cake-tied + light reslurry) ==\n")
 for (nm in names(spray_ranges)) {
   rng <- spray_ranges[[nm]]
   flag <- if (sf[[nm]] < rng[1] || sf[[nm]] > rng[2]) "  <-- outside spray range" else ""

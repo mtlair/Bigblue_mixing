@@ -166,8 +166,15 @@ foam_wash_column_ode <- function(stream, pars = list()) {
   P[["rho_liquid"]] <- rho_L
   P[["rho_p"]]      <- stream$rho_polymer
   P[["T_col"]]      <- stream$T_K
-  P[["T_ref"]]      <- stream$T_K
+  P[["T_ref"]]      <- 298.15                     # let Andrade scale mu to T_col
   if (is.finite(stream$P_Pa) && stream$P_Pa > 0) P[["P_col"]] <- stream$P_Pa
+
+  # Tie the continuous-phase (serum) viscosity to LOCAL composition + temperature:
+  # water * binder thickening (matches the dryer's mu_serum = mu_L*(1+10 C_bind)),
+  # then the column's Andrade mu(T) scales it to the column temperature. This
+  # feeds settling, film drainage and bubble burst; the surfactant conversion
+  # below sets film elasticity (sigma / Gibbs E) and the Hinze born-bubble size.
+  P[["mu_ref"]] <- 1.0e-3 * (1 + 10 * max(stream$C_binder, 0))
 
   # holdups (renormalised to close the phase balance)
   C_sol <- stream$C_solid + stream$C_solid_rigid
@@ -184,6 +191,12 @@ foam_wash_column_ode <- function(stream, pars = list()) {
   P[["c_surf"]] <- max(0,    stream$C_surfactant * rho_L / MW_kg)
   P[["cmc"]]    <- max(1e-6, stream$CMC          * rho_L / MW_kg)
 
+  # UP2 wash-liquid feed. wash_ratio (wash liquid / foam, a native column knob)
+  # drives the column's internal impurity wash; wash_carry is the fraction of
+  # that wash liquid that leaves OVERHEAD WITH THE FOAM into UP3 (co- vs
+  # counter-current), diluting the stream handed downstream.
+  wash_carry <- if (!is.null(pars$wash_carry)) max(0, min(1, pars$wash_carry)) else 0.30
+
   if (!is.null(pars$v_tip)) P[["V_tip"]] <- pars$v_tip
   # explicit overrides (e.g. a sensitivity sweep over a real column knob)
   for (nm in names(pars)) if (nm %in% names(P)) P[[nm]] <- pars[[nm]]
@@ -195,6 +208,13 @@ foam_wash_column_ode <- function(stream, pars = list()) {
 
   f_slug <- min(max(as.numeric(top$J_g_slug) / Jg_in, 0), 1)
 
+  # wash liquid joining the foam overhead dilutes the slurry going to UP3
+  dil_w <- 1 + wash_carry * P[["wash_ratio"]]
+  for (f in c("C_solid", "C_binder", "C_monomer", "C_plasticizer",
+              "C_surfactant", "ionic_strength"))
+    stream[[f]] <- stream[[f]] / dil_w
+  stream$rho_slurry <- 1000 + (rho_L - 1000) / dil_w   # blend toward wash water
+
   stream$alpha_g <- max(0, stream$alpha_g * (1 - f_slug))
   stream$D_b_m   <- as.numeric(top$d_b_fine)
   stream$P_Pa    <- unname(dpar[["P_col"]])
@@ -205,6 +225,9 @@ foam_wash_column_ode <- function(stream, pars = list()) {
     d_b_coarse_um  = as.numeric(top$d_b_coarse) * 1e6,
     film_stability = unname(dpar[["film_stability"]]),
     sigma_mNm      = unname(dpar[["sigma_film"]]) * 1e3,
+    mu_serum_mPas  = unname(P[["mu_ref"]]) * 1e3,
+    wash_ratio     = unname(P[["wash_ratio"]]),
+    dil_wash       = dil_w,
     ret_fine = as.numeric(top$Js_fine / out$Js_fine[1]),
     ret_mid  = as.numeric(top$Js_mid  / out$Js_mid[1]),
     ret_crs  = as.numeric(top$Js_crs  / out$Js_crs[1]),
@@ -219,7 +242,7 @@ foam_wash_column_ode <- function(stream, pars = list()) {
 # =============================================================================
 run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
                            wash_pars = list(), cen_op = cen_nominal,
-                           reslurry_solids = 0.30, spray_op = sp_mid,
+                           reslurry_add = 0, spray_op = sp_mid,
                            up2 = c("ode", "algebraic"), verbose = FALSE) {
   up2 <- match.arg(up2)
   eq <- mx_equipment; eq$template_type <- template_type
@@ -242,7 +265,7 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   # 3. UP3 (separator) + 4. reslurry handoff (one call: runs the model, dilutes)
   cen_run <- stream_to_centrifuge(s, cen_op)
   cen_out <- unified_centrifuge_model(cen_run)
-  hand    <- centrifuge_to_spray(cen_run, target_solid_mass = reslurry_solids)
+  hand    <- centrifuge_to_spray(cen_run, reslurry_add = reslurry_add)
 
   # 5. UP4 (dryer)
   x <- spray_op
@@ -279,7 +302,7 @@ cat(sprintf("  (491-ODE)      eta_gas %.2f  film_stab %.2f  sigma %.1f mN/m  ret
 cat(sprintf("[UP3 separator]  cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
             co$Product_Solids_MassFrac*100, co$Exit_Density_kg_m3/1000,
             co$Entrained_Gas_Holdup, res$cen_run[["floc_strength_Pa"]]))
-cat(sprintf("[reslurry 30%%]   rho_L %.0f  C_solid %.2f  alpha_g0 %.3f  mu_L %.4f  dil x%.2f\n",
+cat(sprintf("[feed->UP4]      rho_L %.0f  C_solid %.2f (UP3-tied)  alpha_g0 %.3f  mu_L %.4f  reslurry x%.2f\n",
             h[["rho_L"]], h[["C_solid_mass"]], h[["alpha_g_0"]], h[["mu_L"]], h[["dilution_x"]]))
 cat(sprintf("[UP4 dryer]      D_particle %.1f um  porosity %.3f  skin %.3f  rho_tap %.0f  X_moist %.3f\n",
             sp[["D_particle_um"]], sp[["phi_porosity_z"]], sp[["theta_skin_z"]],

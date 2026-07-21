@@ -67,9 +67,39 @@ Ranges are in `full_train_output/full_train_factor_ranges.csv`.
 
 ---
 
-## Pending design work (specified, NOT yet built)
+## Design work — status
 
-Add real wash-liquid feeds and untie the fixed reslurry. Spec as given:
+**DONE (this session):**
+- **UP2 wash-liquid feed** — `foam_wash_column_ode()` now takes `wash_ratio`
+  (wash liquid / foam, drives the column's internal impurity wash) and
+  `wash_carry` (overhead fraction leaving WITH the foam into UP3). The carried
+  wash dilutes the stream solids/additives handed to UP3 (`dil_w = 1 +
+  wash_carry·wash_ratio`).
+- **UP2 film/bubble tied to local viscosity + surfactant** — the column
+  continuous-phase (serum) viscosity is now `1e-3·(1+10·C_binder)` with Andrade
+  scaling to the column T (feeds settling, drainage, bubble burst); film
+  elasticity / born-bubble size already keyed to the stream surfactant. Nominal
+  σ shifted 36→32 mN/m and bubble size grew accordingly.
+- **UP3→UP4 untie** — `centrifuge_to_spray()` now takes `reslurry_add` (added
+  liquid per unit cake, default 0 = spray the cake as-is) instead of a fixed 0.30
+  target. The dryer feed solids track the separator cake (`C_solid = Cs_cake/(1+
+  reslurry_add)`), and the entrained gas is carried from UP3. Effect: **UP3
+  `S_base` (dewatering floor) and `delta_rpm` rose into the top drivers** — UP3
+  output now bounds UP4. Screen still 54 factors, 2.7% NA.
+
+**STILL PENDING:**
+- **Two-pump pressure structure** — pump 1 (UP1+UP2+UP3, one back-pressure) and
+  pump 2 (UP4). Currently pressures are per-stage/stream-carried; not yet
+  collapsed to two pump levels.
+- **UP3 wash as a distinct sprayed feed** — today `reslurry_add` is a lumped
+  liquid add. The spec wants a UP3 wash sprayed on the cake, part to the light
+  phase, layered on top of the g-force clearing (which already exists). 
+- **`v_tip` still buffered** — even after the untie, tip speed stays weak on the
+  5 features: its outputs (gas, wet-skin seed, bubble size) are still neutralised
+  (dryer ignores `D_b`; gas washed/separated). Making `v_tip` matter needs the
+  dryer to respond to incoming bubble/foam state.
+
+Original spec (for reference):
 
 - **UP2 and UP3 each get their own wash-liquid feed input.**
 - **UP2 wash:** co-current / counter-current flow in the column; the wash liquid
