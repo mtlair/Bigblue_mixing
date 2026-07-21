@@ -87,17 +87,29 @@ Ranges are in `full_train_output/full_train_factor_ranges.csv`.
   `S_base` (dewatering floor) and `delta_rpm` rose into the top drivers** — UP3
   output now bounds UP4. Screen still 54 factors, 2.7% NA.
 
+**DONE (mechanism E — colloid milling/destabilization):**
+- **v_tip effect on primary particle size** — implemented colloid milling coupling:
+  - Higher v_tip (mixer shear) reduces primary particle size `a_prim` (linear scaling)
+  - Higher v_tip increases destabilization factor for `d_ratio` 
+  - Final particle size reduced via improved packing (smaller primaries → smaller voids)
+  - Morris ranking: v_tip now #4 driver for particle size (mu* = 57.4, was ~1 before)
+  - Reaches top-3 for porosity, top-7 for sphericity, top-5 for skin
+  - ALR still dominant but gap narrowed from 356x to 5.5x
+
 **STILL PENDING:**
+- **Mechanism A (airblast microbubble)** — couple v_tip-set microbubble size to
+  bi-fluid nozzle SMD. Microbubbles (D_b_m from UP2) already flow to dryer via
+  centrifuge handoff; dryer already uses them in g_in term. Could strengthen coupling
+  by modulating SMD_ab directly or feed-side viscosity feedback.
 - **Two-pump pressure structure** — pump 1 (UP1+UP2+UP3, one back-pressure) and
   pump 2 (UP4). Currently pressures are per-stage/stream-carried; not yet
   collapsed to two pump levels.
 - **UP3 wash as a distinct sprayed feed** — today `reslurry_add` is a lumped
   liquid add. The spec wants a UP3 wash sprayed on the cake, part to the light
   phase, layered on top of the g-force clearing (which already exists). 
-- **`v_tip` still buffered** — even after the untie, tip speed stays weak on the
-  5 features: its outputs (gas, wet-skin seed, bubble size) are still neutralised
-  (dryer ignores `D_b`; gas washed/separated). Making `v_tip` matter needs the
-  dryer to respond to incoming bubble/foam state.
+- **Refine v_tip scaling exponents** — current exponents (1.0 for a_prim scaling,
+  1.0 for mill_size_factor) may be adjustable. Diagnostic sweeps on v_tip at fixed
+  thermal/composition could reveal optimal coupling strength.
 
 Original spec (for reference):
 

@@ -202,10 +202,10 @@ spray_dry_model <- function(x) {
   # Higher mixer tip speed (v_tip) causes shear-driven milling of primary
   # particles and destabilization of aggregates. The effect scales with
   # shear rate ∝ v_tip. Reference speed 12 m/s -> a_prim = 1e-7 m (100 nm).
-  # Scaling: milling attrition reduces primary size as ~v_tip^1.0 (strong effect).
+  # Scaling: higher shear (v_tip) reduces primary size. Attrition ~log(v_tip).
   v_tip_ref  <- 12.0                              # reference mixer speed [m/s]
-  mill_factor <- (v_tip / v_tip_ref)^1.0          # milling attrition scaling (strong)
-  a_prim_mod <- 1.0e-7 / mill_factor              # modulated primary radius [m]
+  mill_factor <- (v_tip_ref / v_tip)^0.8          # milling attrition: strong inverse shear
+  a_prim_mod <- 1.0e-7 * mill_factor              # modulated primary radius [m]
   d_ratio_mod <- 0.10 * (1 + 0.5 * (v_tip - v_tip_ref) / v_tip_ref)  # destabilization
 
   ## --- Module 0b: Formulation - Flory-Huggins free-volume swelling ---------
@@ -478,9 +478,10 @@ spray_dry_model <- function(x) {
                      (rho_s * (1 - phi_j)))^(1/3)
   # Colloid milling coupling: the primary particle size modulation (via v_tip)
   # affects packing efficiency and final particle size. Smaller primaries from
-  # milling reduce voidage -> smaller final particles. Apply directly to Dp_j.
-  # Scale more aggressively to make v_tip a strong driver.
-  mill_size_factor <- (1.0e-7 / a_prim_mod)^1.0  # strong milling effect
+  # milling (higher v_tip) reduce voidage -> smaller final particles. Apply to Dp_j.
+  # Ratio: a_prim_mod / a_prim_ref. When a_prim_mod is smaller (higher v_tip),
+  # factor is <1 and reduces final size (correct direction). Strong coupling.
+  mill_size_factor <- (a_prim_mod / 1.0e-7)^0.75  # strong packing efficiency coupling
   Dp_j <- Dp_j * mill_size_factor
 
   grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)
