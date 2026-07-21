@@ -5,8 +5,9 @@
 - **Branch:** `claude/column-coalescence-bubble-burst-inrt41` (gas-state fix + surfactant/T/P
   chain; forked from `claude/foam-wash-column-review-pgfauf`)
 - **Model file:** `foam_wash_column_psd.R` (repo root)
-- **Rendered output:** `output/foam_wash_column_psd.pdf` (3-panel plot; panel 3 is the conserved
-  gas-state split). Regenerate with `Rscript -e 'pdf("output/foam_wash_column_psd.pdf",width=12,height=4); source("foam_wash_column_psd.R"); dev.off()'`.
+- **Rendered output:** `output/foam_wash_column_psd.pdf` (4-panel plot; panel 2 shows fine/coarse/avg
+  bubble sizes; panel 3 shows bimodal foam gas split). Regenerate with `Rscript -e 'pdf("output/foam_wash_column_psd.pdf",width=14,height=10); source("foam_wash_column_psd.R"); dev.off()'`.
+- **Session summary:** `SESSION_SUMMARY_BIMODAL.md` — detailed notes from bimodal implementation session (this work).
 - **Related (separate) model:** `morris_sensitivity_analysis.R` — upstream atomization/drying sensitivity study; not part of this column.
 
 ## Run it
@@ -28,9 +29,11 @@ ODE system in `z` with `deSolve::ode`.
 - **Top — plug-flow foam (`z ≥ H_pool`):** throughput plug flow at the (very low) feed
   velocity `U_up`; washed by liquid added at the top.
 
-### State variables
+### State variables (bimodal foam)
 `Js_fine, Js_mid, Js_crs` (solid flux per size class), `C_imp` (impurity %), `eps_l` (liquid
-holdup), `d_b` (mean bubble size), `J_g_foam` + `J_g_slug` (gas state), `t_res` (residence).
+holdup), **`d_b_fine, d_b_coarse`** (two bubble sizes), **`J_g_foam_fine, J_g_foam_coarse`** (gas flux per mode), `J_g_slug` (total retained gas), `t_res` (residence).
+Weighted-average `d_b_avg = (J_g_foam_fine · d_b_fine + J_g_foam_coarse · d_b_coarse) / (J_g_foam_fine + J_g_foam_coarse)` used for
+Plateau-border geometry and drainage timescale.
 
 ### Mechanisms implemented
 - **Residence:** throughput-based, ~1.5–2 h total (pool ~0.15 h + foam ~1.6 h). Interface is a
@@ -50,10 +53,14 @@ holdup), `d_b` (mean bubble size), `J_g_foam` + `J_g_slug` (gas state), `t_res` 
   (`φ_cond = eps_s/(eps_s+eps_l)`), raising the local suspension viscosity
   `μ_eff = μ(T)·(1−φ_cond/φ_smax)^(−2.5·φ_smax)`, which further hinders settling on top of the
   Richardson–Zaki holdup term. High local border viscosity is a real retention mechanism.
-- **Bubble population:** `d_b(z)` grows by coalescence (faster in dry/unstable foam, ∝
-  1/film_stability, surfactant-set) minus breakage (restores toward inlet size) minus a
-  **burst sink** (`K_bsink`) that removes the coarsest bubbles — so coarsening self-limits and
-  `d_b` stays bounded even in the cliff (it no longer runs to physically absurd sizes).
+- **Bubble population (bimodal):** Two independent bubble modes track fine (~0.3 mm) and coarse
+  (~Hinze-predicted) bubbles separately. **Fine mode:** stable, coalescence/breakage only, does not
+  burst. **Coarse mode:** unstable, bursts when d_b_coarse exceeds d_b_crit, rate modulated by
+  film stability, viscosity, solids. Weighted-average d_b_avg = (J_foam_fine · d_b_fine +
+  J_foam_coarse · d_b_coarse) / J_foam_total used for border geometry and drainage. **This explains
+  why surfactant only tunes at low mixer speed:** high speed → coarse born fine << d_b_crit →
+  no burst → surfactant has no effect; low speed → coarse born near d_b_crit → surfactant
+  controls whether burst fires (reproduces Morris finding).
 - **Burst trigger = film rupture.** Bursting fires when the film thins to rupture, expressed as a
   **critical bubble size that is itself set by film physics**:
   `d_b_crit = d_b_burst · film_stability^a_fs · (σ_ref/σ)^a_sig` — weak films (low Gibbs
@@ -187,13 +194,17 @@ coalescence explains. Uncertain inputs: `k_perm_film` (spans 1e-7…1e-3 m/s), `
    and the surfactant/film constants (`E_stab_ref, Gamma_inf, K_ads, cmc, mu_surf, Π_charge, λ_D,
    c_pb, a_fs, a_sig, n_visc, k_armor, k_bridge`, the `r_pb_ref`/`h_eq_ref` normalizers) are
    placeholder forms. **The net temperature sign of the burst is set by `a_fs/a_sig/dsigma_dT`
-   and is not yet anchored** — pin it with data. Highest-value data: measured bubble-size profile
-   (inlet vs overflow), surface tension vs dose (σ–c isotherm), and the actual gas split.
+   and is not yet anchored** — pin it with data. Highest-value data: measured bimodal bubble-size
+   profile at up1 outlet (inlet distribution, fine/coarse fractions vs tip speed), surface tension
+   vs dose (σ–c isotherm), and the actual gas split vs operating point.
 2. **Pin `d_sep`** (~45 µm placeholder) — sets the decant timescale. Should be the real fine
    dispersed/emulsion droplet size from upstream.
-3. **Fidelity:** full bimodal population balance (fine-bubble tail) instead of a lumped mean
-   diameter — also the prerequisite for Ostwald ripening (above); counter-current wash liquid
-   adding to holdup.
+3. ✅ **RESOLVED:** Full bimodal population balance (fine ~0.3 mm + coarse Hinze-predicted) —
+   prerequisite for Ostwald ripening. Implemented in this session; validated at baseline,
+   high speed (30 m/s), and low speed (8 m/s). Next: calibrate `frac_gas_coarse_ref` to
+   actual up1 outlet measurements.
+4. **Future:** counter-current wash liquid coupling to holdup; Ostwald ripening in fine mode
+   (if fine-bubble lifetime > 10 h and data warrant it).
 
 ## Modeling notes / assumptions
 - All closures are PLACEHOLDER forms calibrated to two plant anchors: **total residence
