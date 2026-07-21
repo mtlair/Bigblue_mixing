@@ -3,18 +3,24 @@ library(deSolve)
 # =====================================================================
 # SCRIPT 1: PREFORMED-FOAM WASH COLUMN
 #   decant pool (hindered settling) + plug foam + bubble population + gas state
+#   + surfactant-driven film elasticity/drainage + T/P thermodynamic state
 # =====================================================================
 # Preformed, particle-loaded foam (no sparger) enters the base. Two zones split
 # at the fixed decant depth H_pool. Properties (mu, rho_foam, d_p, d_b_in,
 # d_sep) are passed down from the upstream unit.
 #
 # NEW in this version:
-#  (1) HINDERED SETTLING (Richardson-Zaki): the pool Stokes settling velocity
-#      is slowed by crowding, U = U_stokes * (1 - phi)^n_RZ, phi = condensed
-#      holdup (1 - eps_g). Dense pools settle much slower -> longer decant.
+#  (1) HINDERED SETTLING (Richardson-Zaki) + KRIEGER-DOUGHERTY crowding: the
+#      pool Stokes velocity is slowed by holdup, U = U_stokes * (1 - phi)^n_RZ,
+#      AND by the local suspension viscosity. As liquid drains, solids
+#      concentrate in the Plateau borders (local fraction eps_s/(eps_s+eps_l)),
+#      so the effective viscosity mu_eff = mu(T) * (1 - phi_s/phi_smax)^(-2.5 phi_smax)
+#      rises and further hinders settling. High local border viscosity is a real
+#      retention mechanism, not just holdup.
 #  (2) BUBBLE POPULATION: mean bubble size d_b(z) evolves by COALESCENCE
 #      (grows, faster in dry/unstable foam) minus BREAKAGE (shear, restores
-#      toward the inlet size). This is the key operational lever.
+#      toward the inlet size). Coalescence is now damped by the SURFACTANT-set
+#      film elasticity (see steps 1-3 below), not a hand-tuned constant.
 #  (3) GAS STATE (no gas generated -- no sparger, no vent). Coalescence and
 #      bubble bursting DO happen in the column, but the gas is NOT released
 #      here: it stays in the column and is only let out in the DOWNSTREAM
@@ -23,9 +29,21 @@ library(deSolve)
 #      its STATE, not its amount. Bursting/coalescence convert dispersed foam
 #      gas (J_g_foam) into large retained SLUG gas (J_g_slug); the slug gas
 #      cannot escape until the next unit. Bursting still coarsens bubbles and
-#      still dumps coarse particles (collapse loss tied to the burst rate);
-#      only the gas-leaves-atmosphere sink is removed. Total gas out the top
-#      J_g_foam + J_g_slug == gas in the bottom (recovery = 100% by construction).
+#      still dumps coarse particles (collapse loss tied to the burst rate).
+#      Total gas out the top J_g_foam + J_g_slug == gas in the bottom.
+#
+# SURFACTANT / FILM CHAIN (de-lumps the old scalar film_stability):
+#  step 1  Langmuir adsorption of c_surf -> surface excess Gamma; Szyszkowski
+#          surface tension sigma(Gamma,T); Gibbs-Marangoni elasticity E_gibbs,
+#          rolled off above the CMC by micelle buffering.
+#  step 2  film_stability := E_gibbs / E_stab_ref  (normalized ~1 at baseline),
+#          so surfactant type/dose -> elasticity -> coalescence & regime.
+#  step 3  DRAINAGE is driven by the physical timescale tau_drain(mu(T),
+#          surface mobility) toward an equilibrium holdup set by film stability,
+#          replacing the hand-set tau_drain / eps_l_dry (now baseline anchors
+#          scaled by dimensionless factors that are 1.0 at the baseline state).
+#  T/P thermodynamic state: mu_cont(T) (Andrade), sigma(T), rho_gas(P,T) ideal
+#          gas. Pressure sets gas density (and, upstream, d_b_in).
 #
 # States up z: Js_fine, Js_mid, Js_crs [m/s]; C_imp [%]; eps_l [-];
 #              d_b [m]; J_g_foam, J_g_slug [m/s]; t_res [s].
@@ -40,14 +58,45 @@ params <- c(
   # --- UPSTREAM-PASSED PROPERTIES ---
   mu_cont = 2.0e-3, rho_liquid = 1050, rho_foam = 575, rho_p = 2500, rho_gas = 1.8,
   d_fine = 1.5e-5, d_mid = 8.0e-5, d_crs = 3.0e-4,
-  d_b_in = 2.0e-3, d_sep = 4.5e-5, n_RZ = 4.65,
+  d_b_in = 2.0e-3, d_sep = 4.5e-5, n_RZ = 4.65, phi_smax = 0.64,
 
   # --- FEED ---
   eps_l_in = 0.50, eps_s_in = 0.020, eps_g_in = 0.48,
   Js_fine_in = 0.017, Js_mid_in = 0.040, Js_crs_in = 0.020, C_imp_in = 100,
 
-  # --- FILM DRAINAGE (time-based) ---
-  eps_l_dry = 0.15, tau_drain = 2000, eps_g_pack = 0.74, blend_wz = 0.03,
+  # --- THERMODYNAMIC STATE (T/P) ---
+  T_col = 298.15,         # column temperature [K]
+  P_col = 1.5e5,          # column absolute pressure [Pa] (~1.5 bar; open-atmosphere is downstream)
+  R_gas = 8.314,          # gas constant [J/mol/K]
+  MW_gas = 0.029,         # gas molar mass [kg/mol]
+  mu_ref = 2.0e-3,        # continuous-phase viscosity at T_ref [Pa s]
+  T_ref = 298.15,         # reference temperature [K]
+  E_visc = 1800,          # Andrade viscosity activation temp (B in exp(B/T)) [K]
+  sigma_ref = 0.045,      # clean-solvent surface tension at T_ref [N/m]
+  dsigma_dT = -1.5e-4,    # surface tension temperature coefficient [N/m/K]
+
+  # --- SURFACTANT (step 1) ---
+  c_surf = 5.0,           # bulk surfactant concentration [mol/m^3]
+  Gamma_inf = 4.0e-6,     # Langmuir plateau surface excess [mol/m^2]
+  K_ads = 2.0,            # Langmuir adsorption constant [m^3/mol]
+  cmc = 6.0,              # critical micelle concentration [mol/m^3]
+  K_mic = 1.0,            # micelle-buffering coeff above CMC [-]
+  mu_surf = 1.0e-6,       # surface (dilational) viscosity [N s/m]
+  mu_surf_ref = 1.0e-6,   # reference surface viscosity (mobility=1 at baseline) [N s/m]
+
+  # --- FILM ELASTICITY -> STABILITY (step 2) ---
+  E_stab_ref = 0.099,     # Gibbs elasticity that maps to film_stability = 1 [N/m]
+
+  # --- FILM DRAINAGE (physical; step 3) ---
+  eps_l_dry = 0.15,       # baseline equilibrium holdup anchor [-]
+  tau_drain = 2000,       # baseline drainage timescale anchor [s]
+  hold_exp = 0.6,         # sensitivity of equilibrium holdup to film stability [-]
+  eps_g_pack = 0.74, blend_wz = 0.03,
+
+  # --- FILM THICKNESS / DISJOINING (reporting; DLVO-style) ---
+  A_ham = 1.0e-20,        # Hamaker constant [J]
+  lambda_D = 1.0e-8,      # Debye length [m]
+  Pi_charge = 1.0e4,      # electrostatic disjoining-pressure scale (x coverage) [Pa]
 
   # --- BUBBLE POPULATION (coalescence - breakage) ---
   K_coal = 1.3e-4,        # coalescence coeff [1/s] (grows d_b)
@@ -63,12 +112,54 @@ params <- c(
   k_det_fine = 1.2e-5, k_det_mid = 6.0e-5, k_det_crs = 3.0e-4,   # detachment [1/s]
   k_burstloss_fine = 0.05, k_burstloss_mid = 0.30, k_burstloss_crs = 2.0, # burst dumps [-]
 
-  # --- REGIME ---
+  # --- REGIME (film_stability is DERIVED from surfactant; see derive_state_props) ---
   film_stability = 1.0, load_sens = 1.0, plug_crit = 1.0
 )
 
 stokes  <- function(dRho, d, mu) dRho * GRAV * d^2 / (18 * mu)
 rho_agg <- function(dp, db, rp, rg) (rp*dp^3 + rg*db^3) / (dp^3 + db^3)
+
+# --- THERMODYNAMIC + SURFACTANT DERIVATION (steps 1-3, T/P) ----------------
+# Turns raw inputs (T, P, surfactant, surface viscosity) into the effective
+# closures the ODE uses. All dimensionless factors are 1.0 at the baseline
+# state, so the baseline reproduces the previously calibrated column exactly.
+derive_state_props <- function(p) {
+  Tk <- p[["T_col"]]
+
+  # T/P thermodynamic state
+  mu_T      <- p[["mu_ref"]] * exp(p[["E_visc"]] * (1/Tk - 1/p[["T_ref"]]))   # Andrade
+  rho_gas_T <- p[["P_col"]] * p[["MW_gas"]] / (p[["R_gas"]] * Tk)             # ideal gas
+  sigma0_T  <- p[["sigma_ref"]] + p[["dsigma_dT"]] * (Tk - p[["T_ref"]])      # clean-solvent sigma(T)
+
+  # step 1: Langmuir adsorption (monomer activity capped at the CMC)
+  c_eff  <- min(p[["c_surf"]], p[["cmc"]])
+  theta  <- p[["K_ads"]] * c_eff / (1 + p[["K_ads"]] * c_eff)
+  theta  <- min(theta, 0.995)                              # keep sigma/E finite
+  Gamma  <- p[["Gamma_inf"]] * theta
+  sigma  <- sigma0_T + p[["R_gas"]] * Tk * p[["Gamma_inf"]] * log(1 - theta)  # Szyszkowski
+  # Gibbs-Marangoni elasticity with micelle buffering above the CMC
+  micelle_buffer <- 1 / (1 + p[["K_mic"]] * max(0, p[["c_surf"]] - p[["cmc"]]) / p[["cmc"]])
+  E_gibbs <- p[["R_gas"]] * Tk * p[["Gamma_inf"]] * theta / (1 - theta) * micelle_buffer
+
+  # step 2: elasticity -> film_stability (normalized ~1 at baseline)
+  film_stab <- E_gibbs / p[["E_stab_ref"]]
+
+  # step 3: drainage. Surface mobility (rigid/high surface viscosity -> slower).
+  mobility      <- 0.5 * (1 + p[["mu_surf"]] / p[["mu_surf_ref"]])
+  tau_drain_eff <- p[["tau_drain"]] * (mu_T / p[["mu_ref"]]) * mobility        # thicker/rigid -> slower
+  eps_l_dry_eff <- min(p[["eps_l_in"]], p[["eps_l_dry"]] * film_stab^p[["hold_exp"]])  # stabler -> wetter
+
+  # overrides consumed by the ODE
+  p[["mu_cont"]]        <- mu_T
+  p[["rho_gas"]]        <- rho_gas_T
+  p[["film_stability"]] <- film_stab
+  p[["tau_drain"]]      <- tau_drain_eff
+  p[["eps_l_dry"]]      <- eps_l_dry_eff
+
+  # derived reporting quantities
+  c(p, sigma_film = sigma, E_gibbs = E_gibbs, Gamma_surf = Gamma, theta_cov = theta,
+       mu_cont_T = mu_T, mobility = mobility)
+}
 
 column_model_psd <- function(z, state, parameters) {
   with(as.list(c(state, parameters)), {
@@ -79,6 +170,11 @@ column_model_psd <- function(z, state, parameters) {
     U <- U_up
     dt_res <- 1 / U
     foam_frac <- 1 / (1 + exp(-(z - H_pool) / blend_wz))
+
+    # (1) KRIEGER-DOUGHERTY local viscosity: solids concentrated in the drained
+    # border liquid raise the effective viscosity that resists settling.
+    phi_cond <- eps_s / (eps_s + eps_l)                              # solids fraction in border liquid
+    mu_eff   <- mu_cont * (1 - min(phi_cond, 0.999*phi_smax)/phi_smax)^(-2.5*phi_smax)
 
     # (2) BUBBLE POPULATION: coalescence (dry/unstable -> faster) - breakage
     coal_rate <- K_coal * (eps_g / eps_g_pack) / film_stability     # [1/s]
@@ -93,18 +189,18 @@ column_model_psd <- function(z, state, parameters) {
     dJ_g_foam <- -burst_flux                                         # dispersed foam gas
     dJ_g_slug <-  burst_flux                                         # retained slug gas (out the top)
 
-    # film drainage (foam dries -> eps_l falls toward eps_l_dry)
+    # film drainage toward the (surfactant-set) equilibrium holdup
     deps_l <- -(eps_l - eps_l_dry) / tau_drain / U
 
-    # (1) POOL decant with HINDERED settling (Richardson-Zaki)
+    # (1) POOL decant with HINDERED settling (Richardson-Zaki) + KD viscosity
     phi <- 1 - eps_g                                                 # condensed holdup
-    U_settle_sep <- stokes(rho_liquid - rho_foam, d_sep, mu_cont) * (1 - phi)^n_RZ
+    U_settle_sep <- stokes(rho_liquid - rho_foam, d_sep, mu_eff) * (1 - phi)^n_RZ
     dCimp_pool <- -(U_settle_sep / H_pool) * C_imp
 
-    # POOL particle settling (aggregate; uses current d_b)
+    # POOL particle settling (aggregate; uses current d_b and crowded mu_eff)
     settle_loss <- function(dp) {
       d_agg <- (dp^3 + d_b^3)^(1/3)
-      Uset  <- stokes(rho_agg(dp, d_b, rho_p, rho_gas) - rho_liquid, d_agg, mu_cont) * (1 - phi)^n_RZ
+      Uset  <- stokes(rho_agg(dp, d_b, rho_p, rho_gas) - rho_liquid, d_agg, mu_eff) * (1 - phi)^n_RZ
       max(0, Uset) / H_pool
     }
     sl_fine <- settle_loss(d_fine); sl_mid <- settle_loss(d_mid); sl_crs <- settle_loss(d_crs)
@@ -150,14 +246,28 @@ solve_column <- function(p) {
 }
 
 # --- solve + report --------------------------------------------------------
-out_psd <- solve_column(params)
-t_pool <- approx(out_psd$z, out_psd$t_res, params[["H_pool"]])$y
+dpar    <- derive_state_props(params)     # T/P + surfactant -> effective closures
+out_psd <- solve_column(dpar)
+t_pool <- approx(out_psd$z, out_psd$t_res, dpar[["H_pool"]])$y
 t_tot  <- out_psd$t_res[nrow(out_psd)]
-Jg_in  <- params[["eps_g_in"]]*params[["U_up"]]; Jg_out <- out_psd$J_g_total[nrow(out_psd)]
+Jg_in  <- dpar[["eps_g_in"]]*dpar[["U_up"]]; Jg_out <- out_psd$J_g_total[nrow(out_psd)]
 top <- out_psd[nrow(out_psd),]; ini <- out_psd[1,]
 
+cat(sprintf("Thermo: T %.1f K, P %.2f bar | mu(T) %.2f mPa.s, rho_gas %.2f kg/m3, sigma %.1f mN/m\n",
+            dpar[["T_col"]], dpar[["P_col"]]/1e5, dpar[["mu_cont"]]*1e3, dpar[["rho_gas"]], dpar[["sigma_film"]]*1e3))
+cat(sprintf("Surfactant: c %.1f mol/m3 (CMC %.1f) -> coverage %.2f, Gibbs E %.0f mN/m -> film_stability %.2f\n",
+            dpar[["c_surf"]], dpar[["cmc"]], dpar[["theta_cov"]], dpar[["E_gibbs"]]*1e3, dpar[["film_stability"]]))
+
+# Plateau-border radius & disjoining-set equilibrium film thickness (illustrative)
+r_pb  <- 0.2 * top$d_b * sqrt(max(top$eps_l, 1e-4))              # border radius proxy [m]
+P_cap <- dpar[["sigma_film"]] / r_pb                            # capillary suction [Pa]
+Pi_rep <- dpar[["Pi_charge"]] * dpar[["theta_cov"]]             # electrostatic disjoining scale [Pa]
+h_eq  <- if (Pi_rep > P_cap) dpar[["lambda_D"]] * log(Pi_rep / P_cap) else NA_real_
+cat(sprintf("Film: Plateau-border r_pb ~%.0f um, cap. suction %.0f Pa, eq. film h ~%.0f nm\n",
+            r_pb*1e6, P_cap, ifelse(is.na(h_eq), 0, h_eq*1e9)))
+
 cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence)\n",
-            params[["d_b_in"]]*1e3, top$d_b*1e3))
+            dpar[["d_b_in"]]*1e3, top$d_b*1e3))
 cat(sprintf("GAS balance (conserved, no vent): in %.2e -> out %.2e m/s => carried out top %.0f%%\n",
             Jg_in, Jg_out, 100*Jg_out/Jg_in))
 cat(sprintf("  gas state at top: foam bubbles %.0f%% + retained slug %.0f%% (slug released next unit up)\n",
@@ -178,18 +288,18 @@ plot(out_psd$z, out_psd$Js_mid, type="l", col="green", lwd=3, ylim=c(0,0.05),
      ylab="Solid flux (m/s)", xlab="Height (m)", main="PSD retention")
 lines(out_psd$z, out_psd$Js_fine, col="blue", lwd=2, lty=2)
 lines(out_psd$z, out_psd$Js_crs,  col="red",  lwd=2, lty=3)
-abline(v=params[["H_pool"]], col="gray", lty=2)
+abline(v=dpar[["H_pool"]], col="gray", lty=2)
 legend("right", legend=c("Mid","Fine","Coarse"), col=c("green","blue","red"), lty=c(1,2,3), lwd=2)
 
 plot(out_psd$z, out_psd$d_b*1e3, type="l", col="darkorange", lwd=3,
      ylab="Bubble d_b (mm)", xlab="Height (m)", main="Bubble growth & burst")
-abline(h=params[["d_b_burst"]]*1e3, col="red", lty=3)
+abline(h=dpar[["d_b_burst"]]*1e3, col="red", lty=3)
 legend("topleft", legend=c("d_b","burst onset"), col=c("darkorange","red"), lty=c(1,3), lwd=2)
 
 plot(out_psd$z, out_psd$J_g_total/Jg_in*100, type="l", col="black", lwd=3, ylim=c(0,100),
      ylab="Gas (% of inlet)", xlab="Height (m)", main="Gas state (conserved)")
 lines(out_psd$z, out_psd$J_g_foam/Jg_in*100, col="purple",    lwd=2, lty=2)
 lines(out_psd$z, out_psd$J_g_slug/Jg_in*100, col="firebrick", lwd=2, lty=3)
-abline(v=params[["H_pool"]], col="gray", lty=2)
+abline(v=dpar[["H_pool"]], col="gray", lty=2)
 legend("right", legend=c("Total (out top)","Foam bubbles","Slug (retained)"),
        col=c("black","purple","firebrick"), lty=c(1,2,3), lwd=2)
