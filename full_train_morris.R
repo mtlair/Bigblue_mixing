@@ -93,8 +93,9 @@ factors$name <- paste(factors$stage, factors$base, sep = ".")
 narrow <- list(
   "up1.v_tip"         = c(2,    22),   "up1.P_mix"         = c(0.5,  3.5),
   "up1.C_surfactant"  = c(2e-4, 8e-3), "up1.MW_surfactant" = c(400,  6000),
-  "up3.pop_frac"      = c(0.25, 0.85), "up4.ALR"           = c(1.5,  8),
-  "up4.mdot_gas_dry"  = c(0.15, 0.8),  "up4.T_system"      = c(350,  460))
+  "up1.D_particle"    = c(0.1,  0.5),  "up3.pop_frac"      = c(0.25, 0.85),
+  "up4.ALR"           = c(0.01, 2),    "up4.mdot_gas_dry"  = c(0.15, 0.8),
+  "up4.T_system"      = c(350,  460))
 for (nm in names(narrow)) {
   i <- match(nm, factors$name)
   if (!is.na(i)) { factors$min[i] <- narrow[[nm]][1]; factors$max[i] <- narrow[[nm]][2] }

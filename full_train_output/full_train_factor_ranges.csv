@@ -9,7 +9,7 @@
 "Q_template","UP1 mixer",0.1,2,FALSE
 "C_solid_mass","UP1 mixer",0.1,0.6,FALSE
 "C_temp_mass","UP1 mixer",0.01,0.1,FALSE
-"D_particle","UP1 mixer",0.5,2,FALSE
+"D_particle","UP1 mixer",0.1,0.5,FALSE
 "D_template","UP1 mixer",0.2,1.5,FALSE
 "C_binder","UP1 mixer",0.01,0.15,FALSE
 "C_monomer","UP1 mixer",0.001,0.03,FALSE
@@ -39,7 +39,7 @@
 "chi_parameter","UP3 separator",0.1,0.9,FALSE
 "S_base","UP3 separator",0.1,0.35,FALSE
 "S_ceiling","UP3 separator",0.45,0.6,FALSE
-"ALR","UP4 dryer",1.5,8,FALSE
+"ALR","UP4 dryer",0.01,2,FALSE
 "P_system","UP4 dryer",2e+05,7e+05,FALSE
 "P_feed","UP4 dryer",150000,1e+06,FALSE
 "mdot_L","UP4 dryer",0.002,0.02,FALSE
