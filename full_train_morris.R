@@ -100,6 +100,19 @@ for (nm in names(narrow)) {
   i <- match(nm, factors$name)
   if (!is.na(i)) { factors$min[i] <- narrow[[nm]][1]; factors$max[i] <- narrow[[nm]][2] }
 }
+
+# Optional: hold whole stages at nominal ("chunk out" the dominant stage) so the
+# remaining stages' sensitivities are not masked. FREEZE=up4 screens UP1+UP2+UP3
+# with the dryer fixed -> upstream features surface. Frozen inputs stay at their
+# nominal defaults (they are simply not in the factor list).
+freeze <- trimws(strsplit(Sys.getenv("FREEZE", ""), ",")[[1]])
+freeze <- freeze[nzchar(freeze)]
+if (length(freeze) > 0) {
+  drop <- factors$stage %in% freeze
+  cat(sprintf("FREEZE: %s held at nominal (%d factors dropped)\n",
+              paste(freeze, collapse = ","), sum(drop)))
+  factors <- factors[!drop, ]
+}
 k <- nrow(factors)
 
 # Emit the screening-range table (factor, stage/UP, min, max, log) as a CSV.
@@ -215,7 +228,8 @@ elementary_effects <- function(design, Y, k, r) {
 # -----------------------------------------------------------------------------
 # 4. RUN THE SCREEN
 # -----------------------------------------------------------------------------
-cache_file <- file.path(out_dir, sprintf("full_train_morris_r%d.rds", r_traj))
+ftag <- if (length(freeze) > 0) paste0("_frz-", paste(freeze, collapse = "-")) else ""
+cache_file <- file.path(out_dir, sprintf("full_train_morris_r%d%s.rds", r_traj, ftag))
 if (file.exists(cache_file)) {
   cat("Loading cached runs from", cache_file, "\n")
   cached <- readRDS(cache_file); design <- cached$design; Y <- cached$Y
