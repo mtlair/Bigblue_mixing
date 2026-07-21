@@ -216,7 +216,17 @@ foam_wash_column_ode <- function(stream, pars = list()) {
   stream$rho_slurry <- 1000 + (rho_L - 1000) / dil_w   # blend toward wash water
 
   stream$alpha_g <- max(0, stream$alpha_g * (1 - f_slug))
-  stream$D_b_m   <- as.numeric(top$d_b_fine)
+  # Entrained-microbubble size handed to the atomizer — NOT the mm foam bubble
+  # the column tracks (that is the foam being washed). The fine bubbles that
+  # survive in the feed liquid are set by mixer shear (Hinze: d ~ V_tip^-1.2) and
+  # film surface tension, calibrated to ~50 um at the reference tip speed. This
+  # is the population that gates effervescent atomization at the nozzle, so v_tip
+  # (and the film chemistry that sets sigma) reaches the droplet/particle size.
+  D_MICRO_REF <- 45e-6
+  D_micro <- D_MICRO_REF *
+             (P[["V_tip_ref"]] / max(P[["V_tip"]], 0.1))^P[["n_hinze"]] *
+             (dpar[["sigma_film"]] / P[["sigma_ref_film"]])^0.6
+  stream$D_b_m   <- min(max(D_micro, 5e-6), 5e-4)   # clamp to atomizer range
   stream$P_Pa    <- unname(dpar[["P_col"]])
 
   attr(stream, "up2_ode") <- list(
