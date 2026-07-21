@@ -108,6 +108,10 @@ params <- c(
   V_tip_ref = 14.5,       # reference tip speed (d_b_in normalizer) [m/s]
   n_hinze = 1.2,          # Hinze tip-speed exponent (d_born ~ V_tip^-1.2) [-]
 
+  # --- BIMODAL FOAM DISTRIBUTION (fine vs coarse bubble modes) ---
+  d_b_fine_ref = 0.3e-3,          # reference fine-mode bubble size [m]
+  frac_gas_coarse_ref = 0.40,     # fraction of inlet gas in coarse mode at baseline [-]
+
   # --- BUBBLE POPULATION (coalescence - breakage) ---
   K_coal = 1.3e-4,        # coalescence coeff [1/s] (grows d_b)
   K_break = 1.2e-4,       # breakage coeff [1/s] (restores toward d_b_in)
@@ -227,10 +231,19 @@ column_model_psd <- function(z, state, parameters) {
     phi_cond <- eps_s / (eps_s + eps_l)                              # solids fraction in border liquid
     mu_eff   <- mu_cont * (1 - min(phi_cond, 0.999*phi_smax)/phi_smax)^(-2.5*phi_smax)
 
-    # FILM THICKNESS / PLATEAU-BORDER GEOMETRY (local). d_b is bounded (d_b_cap)
+    # BIMODAL BUBBLE DYNAMICS: fine and coarse modes evolve independently
+    # Compute weighted-average bubble size for holdup/drainage calculations
+    J_g_foam_total <- J_g_foam_fine + J_g_foam_coarse
+    if (J_g_foam_total > 1e-9) {
+      d_b_avg <- (J_g_foam_fine * d_b_fine + J_g_foam_coarse * d_b_coarse) / J_g_foam_total
+    } else {
+      d_b_avg <- d_b_in  # fallback if no foam gas
+    }
+
+    # FILM THICKNESS / PLATEAU-BORDER GEOMETRY (local). d_b_avg is bounded (d_b_cap)
     # in the geometry so a runaway mean diameter cannot make the border curvature
-    # (and h_eq) blow up -- the burst d_b-sink below keeps d_b physical anyway.
-    d_b_eff <- min(d_b, d_b_cap)
+    # (and h_eq) blow up -- the burst d_b-sink below keeps d_b_coarse physical anyway.
+    d_b_eff <- min(d_b_avg, d_b_cap)
     r_pb   <- c_pb * d_b_eff * sqrt(max(eps_l, 1e-3))                # border radius [m]
     P_cap  <- sigma_film / r_pb                                      # capillary suction [Pa]
     Pi_bar <- Pi_charge * theta_cov                                  # disjoining barrier [Pa]
@@ -249,16 +262,25 @@ column_model_psd <- function(z, state, parameters) {
     d_b_crit <- d_b_burst * film_stability^a_fs * (sigma_ref_film / sigma_film)^a_sig
     M_visc   <- (mu_drain_ref / mu_cont)^n_visc                      # low mu -> faster drainage -> more burst
     M_armor  <- 1 / (1 + k_armor * phi_cond)                        # solids content armors film
-    M_bridge <- 1 + k_bridge * (d_crs / max(d_b, d_b_in)) * (eps_s / eps_s_in)  # coarse bridging
-    burst_rate <- K_burst * max(0, d_b - d_b_crit) / d_b_in * M_visc * M_armor * M_bridge
+    M_bridge <- 1 + k_bridge * (d_crs / max(d_b_avg, d_b_in)) * (eps_s / eps_s_in)  # coarse bridging
 
-    # bursting removes the coarsest bubbles -> pulls the mean d_b back down, so
-    # coarsening self-limits (bubbles burst before growing without bound).
-    dd_b <- (coal_rate * d_b - K_break * (d_b - d_b_in) - K_bsink * burst_rate * d_b) / U
+    # Fine mode: rarely bursts (d_b_fine << d_b_crit); stable, coalescence/breakage only
+    burst_rate_fine <- 1e-9 * K_burst  # effectively no burst for fine mode
+    dd_b_fine <- (coal_rate * d_b_fine - K_break * (d_b_fine - d_b_fine_ref)) / U
 
-    burst_flux <- burst_rate * J_g_foam / U
-    dJ_g_foam <- -burst_flux                                         # dispersed foam gas
-    dJ_g_slug <-  burst_flux                                         # retained slug gas (out the top)
+    # Coarse mode: bursts when d_b_coarse exceeds d_b_crit
+    burst_rate_coarse <- K_burst * max(0, d_b_coarse - d_b_crit) / d_b_in * M_visc * M_armor * M_bridge
+    dd_b_coarse <- (coal_rate * d_b_coarse - K_break * (d_b_coarse - d_b_in) - K_bsink * burst_rate_coarse * d_b_coarse) / U
+
+    # Gas conversion: burst transfers foam gas to slug gas
+    burst_flux_fine <- burst_rate_fine * J_g_foam_fine / U
+    burst_flux_coarse <- burst_rate_coarse * J_g_foam_coarse / U
+    dJ_g_foam_fine <- -burst_flux_fine                               # dispersed fine foam gas
+    dJ_g_foam_coarse <- -burst_flux_coarse                           # dispersed coarse foam gas
+    dJ_g_slug <- burst_flux_fine + burst_flux_coarse                 # retained slug gas (out the top)
+
+    # Use coarse burst rate for collapse wetting and particle loss
+    burst_rate <- burst_rate_coarse
 
     # DRAINAGE: liquid drains through the Plateau-border network, whose
     # permeability scales with r_pb^2 -> wider borders (bigger bubbles / wetter
@@ -275,10 +297,10 @@ column_model_psd <- function(z, state, parameters) {
     U_settle_sep <- stokes(rho_liquid - rho_foam, d_sep, mu_eff) * (1 - phi)^n_RZ
     dCimp_pool <- -(U_settle_sep / H_pool) * C_imp
 
-    # POOL particle settling (aggregate; uses current d_b and crowded mu_eff)
+    # POOL particle settling (aggregate; uses weighted d_b_avg and crowded mu_eff)
     settle_loss <- function(dp) {
-      d_agg <- (dp^3 + d_b^3)^(1/3)
-      Uset  <- stokes(rho_agg(dp, d_b, rho_p, rho_gas) - rho_liquid, d_agg, mu_eff) * (1 - phi)^n_RZ
+      d_agg <- (dp^3 + d_b_avg^3)^(1/3)
+      Uset  <- stokes(rho_agg(dp, d_b_avg, rho_p, rho_gas) - rho_liquid, d_agg, mu_eff) * (1 - phi)^n_RZ
       max(0, Uset) / H_pool
     }
     sl_fine <- settle_loss(d_fine); sl_mid <- settle_loss(d_mid); sl_crs <- settle_loss(d_crs)
@@ -292,13 +314,14 @@ column_model_psd <- function(z, state, parameters) {
     dJs_mid  <- -Js_mid  * ((1-foam_frac)*sl_mid  + foam_frac*lf_mid ) / U
     dJs_crs  <- -Js_crs  * ((1-foam_frac)*sl_crs  + foam_frac*lf_crs ) / U
 
-    # FOAM washing (channeling scales with current bubble size)
-    flow_cv         <- 4 * channel_cv * (d_b / d_b_ref)
+    # FOAM washing (channeling scales with weighted average bubble size)
+    flow_cv         <- 4 * channel_cv * (d_b_avg / d_b_ref)
     Wash_Efficiency <- 1 / (1 + flow_cv^2)
     dCimp_foam <- -k_drainage * Wash_Efficiency * (wash_ratio/(wash_ratio+1)) * C_imp
     dCimp <- ((1-foam_frac)*dCimp_pool + foam_frac*dCimp_foam) / U
 
-    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b, dJ_g_foam, dJ_g_slug, dt_res),
+    list(c(dJs_fine, dJs_mid, dJs_crs, dCimp, deps_l, dd_b_fine, dd_b_coarse,
+            dJ_g_foam_fine, dJ_g_foam_coarse, dJ_g_slug, dt_res),
          h_eq = h_eq, r_pb = r_pb, tau_local = tau_local,
          d_b_crit = d_b_crit, burst_rate = burst_rate)
   })
@@ -311,13 +334,23 @@ regime_of <- function(z, load_rel, p) {
   if (idx >= p[["plug_crit"]]) "plug" else "snowglobe"
 }
 solve_column <- function(p) {
+  # BIMODAL foam distribution: split inlet gas between fine and coarse modes
+  J_g_in_total <- p[["eps_g_in"]] * p[["U_up"]]
+  J_g_foam_coarse_init <- p[["frac_gas_coarse_ref"]] * J_g_in_total
+  J_g_foam_fine_init <- (1 - p[["frac_gas_coarse_ref"]]) * J_g_in_total
+
   s0 <- c(Js_fine=p[["Js_fine_in"]], Js_mid=p[["Js_mid_in"]], Js_crs=p[["Js_crs_in"]],
-          C_imp=p[["C_imp_in"]], eps_l=p[["eps_l_in"]], d_b=p[["d_b_in"]],
-          J_g_foam=p[["eps_g_in"]]*p[["U_up"]], J_g_slug=0, t_res=0)
+          C_imp=p[["C_imp_in"]], eps_l=p[["eps_l_in"]],
+          d_b_fine=p[["d_b_fine_ref"]], d_b_coarse=p[["d_b_in"]],
+          J_g_foam_fine=J_g_foam_fine_init, J_g_foam_coarse=J_g_foam_coarse_init,
+          J_g_slug=0, t_res=0)
   z <- seq(0, p[["H_total"]], by = 0.02)
   out <- as.data.frame(ode(s0, z, column_model_psd, p)); names(out)[1] <- "z"
   lr <- (out$Js_fine+out$Js_mid+out$Js_crs)/(p[["Js_fine_in"]]+p[["Js_mid_in"]]+p[["Js_crs_in"]])
-  out$J_g_total <- out$J_g_foam + out$J_g_slug     # conserved: carried out the top
+  out$J_g_total <- out$J_g_foam_fine + out$J_g_foam_coarse + out$J_g_slug  # conserved: carried out the top
+  # Compute weighted-average bubble diameter
+  J_g_foam_total <- out$J_g_foam_fine + out$J_g_foam_coarse
+  out$d_b_avg <- (out$J_g_foam_fine * out$d_b_fine + out$J_g_foam_coarse * out$d_b_coarse) / pmax(J_g_foam_total, 1e-9)
   out$eps_s <- p[["eps_s_in"]]*lr
   out$eps_g <- 1 - out$eps_l - out$eps_s
   out$solids_pct <- 100*out$eps_s/(out$eps_s+out$eps_l)
@@ -344,18 +377,22 @@ cat(sprintf("Film: eq. thickness h %.0f nm (sets holdup, wet-factor %.2f) | bord
 cat(sprintf("      drainage tau %.0f->%.0f s up z (wider borders drain faster) | eq. holdup %.3f\n",
             ini$tau_local, top$tau_local, dpar[["eps_l_dry"]]))
 
-cat(sprintf("Mixer (up1): tip speed %.1f m/s -> born d_b_in %.2f mm (Hinze; sigma %.1f mN/m)\n",
-            dpar[["V_tip"]], dpar[["d_b_in"]]*1e3, dpar[["sigma_film"]]*1e3))
-cat(sprintf("Bubble size d_b: inlet %.2f mm -> top %.2f mm (coalescence, burst-limited)\n",
-            dpar[["d_b_in"]]*1e3, top$d_b*1e3))
+cat(sprintf("Mixer (up1): tip speed %.1f m/s -> born d_b_coarse %.2f mm, fixed d_b_fine %.2f mm (Hinze; sigma %.1f mN/m)\n",
+            dpar[["V_tip"]], dpar[["d_b_in"]]*1e3, dpar[["d_b_fine_ref"]]*1e3, dpar[["sigma_film"]]*1e3))
+cat(sprintf("  inlet gas split: coarse %.1f%% + fine %.1f%% (frac_coarse_ref=%.2f)\n",
+            100*dpar[["frac_gas_coarse_ref"]], 100*(1-dpar[["frac_gas_coarse_ref"]]), dpar[["frac_gas_coarse_ref"]]))
+cat(sprintf("Bubble size d_b: coarse %.2f->%.2f mm, fine %.2f->%.2f mm (Hinze-born, coalescence-burst)\n",
+            ini$d_b_coarse*1e3, top$d_b_coarse*1e3, ini$d_b_fine*1e3, top$d_b_fine*1e3))
+cat(sprintf("  weighted-average d_b_avg: inlet %.2f mm -> top %.2f mm\n",
+            ini$d_b_avg*1e3, top$d_b_avg*1e3))
 d_b_crit0 <- dpar[["d_b_burst"]] * dpar[["film_stability"]]^dpar[["a_fs"]] *
              (dpar[["sigma_ref_film"]]/dpar[["sigma_film"]])^dpar[["a_sig"]]
 cat(sprintf("Burst trigger: film-rupture critical size d_b_crit %.2f mm (film_stab %.2f, sigma %.1f mN/m)\n",
             d_b_crit0*1e3, dpar[["film_stability"]], dpar[["sigma_film"]]*1e3))
 cat(sprintf("GAS balance (conserved, no vent): in %.2e -> out %.2e m/s => carried out top %.0f%%\n",
             Jg_in, Jg_out, 100*Jg_out/Jg_in))
-cat(sprintf("  gas state at top: foam bubbles %.0f%% + retained slug %.0f%% (slug released next unit up)\n",
-            100*top$J_g_foam/Jg_in, 100*top$J_g_slug/Jg_in))
+cat(sprintf("  gas state at top: fine %.1f%% + coarse %.1f%% (foam) + slug %.1f%% (slug released next unit up)\n",
+            100*top$J_g_foam_fine/Jg_in, 100*top$J_g_foam_coarse/Jg_in, 100*top$J_g_slug/Jg_in))
 cat(sprintf("Residence: pool %.2f h + foam %.2f h = %.2f h\n",
             t_pool/3600, (t_tot-t_pool)/3600, t_tot/3600))
 cat(sprintf("Solids: inlet %.1f%% -> top %.1f%% | plug %.0f%%\n",
@@ -371,10 +408,10 @@ cat(sprintf("Retention: fine=%.0f%% mid=%.0f%% coarse=%.0f%% | impurity %.0f->%.
 # (pool settling below H_pool vs foam detachment/burst above it).
 # =====================================================================
 cat("\n--- MASS BALANCE ---\n")
-# (a) gas: foam + slug must equal the inlet gas flux (no source/sink)
-gas_resid <- (top$J_g_foam + top$J_g_slug - Jg_in) / Jg_in
-cat(sprintf("Gas: J_foam+J_slug = %.4e vs inlet %.4e  => closure error %.2e (should be ~0)\n",
-            top$J_g_foam + top$J_g_slug, Jg_in, gas_resid))
+# (a) gas: foam (fine + coarse) + slug must equal the inlet gas flux (no source/sink)
+gas_resid <- (top$J_g_foam_fine + top$J_g_foam_coarse + top$J_g_slug - Jg_in) / Jg_in
+cat(sprintf("Gas: J_fine+J_coarse+J_slug = %.4e vs inlet %.4e  => closure error %.2e (should be ~0)\n",
+            top$J_g_foam_fine + top$J_g_foam_coarse + top$J_g_slug, Jg_in, gas_resid))
 # (b) solids per class, split pool (z<H_pool) vs foam (z>=H_pool)
 solid_bal <- function(nm) {
   Jin  <- ini[[nm]]; Jtop <- top[[nm]]
@@ -424,20 +461,23 @@ lines(out_psd$z, out_psd$Js_crs,  col="red",  lwd=2, lty=3)
 abline(v=dpar[["H_pool"]], col="gray", lty=2)
 legend("right", legend=c("Mid","Fine","Coarse"), col=c("green","blue","red"), lty=c(1,2,3), lwd=2)
 
-plot(out_psd$z, out_psd$d_b*1e3, type="l", col="darkorange", lwd=3,
-     ylim=c(0, max(out_psd$d_b*1e3, out_psd$d_b_crit*1e3)),
-     ylab="Bubble d_b (mm)", xlab="Height (m)", main="Bubble growth & burst trigger")
+plot(out_psd$z, out_psd$d_b_coarse*1e3, type="l", col="darkorange", lwd=3,
+     ylim=c(0, max(out_psd$d_b_coarse*1e3, out_psd$d_b_fine*1e3, out_psd$d_b_crit*1e3)),
+     ylab="Bubble d_b (mm)", xlab="Height (m)", main="Bubble growth & burst trigger (bimodal)")
+lines(out_psd$z, out_psd$d_b_fine*1e3, col="lightblue", lwd=2, lty=2)
+lines(out_psd$z, out_psd$d_b_avg*1e3, col="purple", lwd=2, lty=4)
 lines(out_psd$z, out_psd$d_b_crit*1e3, col="red", lwd=2, lty=3)
-legend("topleft", legend=c("d_b","d_b_crit (film rupture)"),
-       col=c("darkorange","red"), lty=c(1,3), lwd=2)
+legend("topleft", legend=c("d_b_coarse","d_b_fine","d_b_avg (weighted)","d_b_crit (film rupture)"),
+       col=c("darkorange","lightblue","purple","red"), lty=c(1,2,4,3), lwd=2)
 
 plot(out_psd$z, out_psd$J_g_total/Jg_in*100, type="l", col="black", lwd=3, ylim=c(0,100),
-     ylab="Gas (% of inlet)", xlab="Height (m)", main="Gas state (conserved)")
-lines(out_psd$z, out_psd$J_g_foam/Jg_in*100, col="purple",    lwd=2, lty=2)
+     ylab="Gas (% of inlet)", xlab="Height (m)", main="Gas state (conserved, bimodal foam)")
+lines(out_psd$z, out_psd$J_g_foam_coarse/Jg_in*100, col="darkorange", lwd=2, lty=2)
+lines(out_psd$z, out_psd$J_g_foam_fine/Jg_in*100, col="lightblue", lwd=2, lty=2)
 lines(out_psd$z, out_psd$J_g_slug/Jg_in*100, col="firebrick", lwd=2, lty=3)
 abline(v=dpar[["H_pool"]], col="gray", lty=2)
-legend("right", legend=c("Total (out top)","Foam bubbles","Slug (retained)"),
-       col=c("black","purple","firebrick"), lty=c(1,2,3), lwd=2)
+legend("right", legend=c("Total (out top)","Foam coarse","Foam fine","Slug (retained)"),
+       col=c("black","darkorange","lightblue","firebrick"), lty=c(1,2,2,3), lwd=2)
 
 # Film thickness (wired into drainage/holdup) + liquid holdup
 plot(out_psd$z, out_psd$h_eq*1e9, type="l", col="steelblue", lwd=3,
