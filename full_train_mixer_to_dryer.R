@@ -309,7 +309,7 @@ d2 <- attr(s, "up2_ode")
 cat(sprintf("  (491-ODE)      eta_gas %.2f  film_stab %.2f  sigma %.1f mN/m  retention f/m/c %.0f/%.0f/%.0f%%  imp->%.0f%%  gas-closure %.1e\n",
             d2$eta_gas, d2$film_stability, d2$sigma_mNm,
             100*d2$ret_fine, 100*d2$ret_mid, 100*d2$ret_crs, d2$impurity_out, d2$gas_closure))
-cat(sprintf("[UP3 separator]  cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
+cat(sprintf("[UP3 hi-g sep]  cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
             co$Product_Solids_MassFrac*100, co$Exit_Density_kg_m3/1000,
             co$Entrained_Gas_Holdup, res$cen_run[["floc_strength_Pa"]]))
 cat(sprintf("[feed->UP4]      rho_L %.0f  C_solid %.2f (UP3-tied)  alpha_g0 %.3f  mu_L %.4f  reslurry x%.2f\n",
