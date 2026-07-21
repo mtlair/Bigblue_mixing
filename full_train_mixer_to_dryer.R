@@ -5,16 +5,16 @@
 # =============================================================================
 #
 #   UP1 mixer            unified/up1_mixer_module.R      (pulled, deSolve ODE)
-#     -> foam-wash column  foam_wash_column()  [PLACEHOLDER - see note below]
-#       -> centrifuge      centrifuge_morris_sensitivity.R (unified_centrifuge_model)
+#     -> UP2 (foam-wash)   foam_wash_column()
+#       -> UP3 (centrifuge) centrifuge_morris_sensitivity.R (unified_centrifuge_model)
 #         -> reslurry      centrifuge_to_spray()  (dilution to sprayable solids)
-#           -> spray dryer morris_sensitivity_analysis.R (spray_dry_model)
+#           -> UP4 (spray dryer) morris_sensitivity_analysis.R (spray_dry_model)
 #
-# The mixer is "the 2nd step prior to the centrifuge"; the foam-wash column is
+# The mixer (UP1) is "the 2nd step prior to the centrifuge"; the foam-wash column (UP2) is
 # "the 1st step prior to the centrifuge". Composition, gas holdup, surface
 # chemistry, template state, temperature and (critically) the aggregate/floc
 # strength are DEFINED ONCE at the mixer and flow downstream through the shared
-# `stream` interface (unified/interface_stream.R), so the centrifuge and dryer
+# `stream` interface (unified/interface_stream.R), so the UP3 (centrifuge) and UP4 (dryer)
 # see the mixer's transformed values instead of independent knobs.
 #
 # >>> foam_wash_column() is a deliberately thin PLACEHOLDER <<<
@@ -155,26 +155,26 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
 # =============================================================================
 # NOMINAL END-TO-END RUN (prints the stream at every interface)
 # =============================================================================
-cat("=== FULL TRAIN: mixer -> foam-wash -> centrifuge -> reslurry -> dryer ===\n")
+cat("=== FULL TRAIN: UP1 -> UP2 (foam-wash) -> UP3 (centrifuge) -> reslurry -> UP4 (spray dryer) ===\n")
 cat("    (nominal inputs, capillary_bridge template)\n\n")
 res <- run_full_train(verbose = TRUE)
 
 m <- res$mixer; s <- res$stream; co <- res$cen_out; h <- res$handoff; sp <- res$spray
-cat(sprintf("\n[UP1 mixer]      C_solid %.3f  alpha_g %.3f  D_agg %.0f um  Bond %.3f  RTF %.3f\n",
+cat(sprintf("\n[UP1]            C_solid %.3f  alpha_g %.3f  D_agg %.0f um  Bond %.3f  RTF %.3f\n",
             s$C_solid, m[["Blended_Porosity"]], m[["Blended_Size_um"]],
             m[["Bond_Strength"]], m[["Residual_Template_Fraction"]]))
-cat(sprintf("[foam-wash]      alpha_g %.3f -> %.3f (washed)  D_b %.1f um  P %.2f atm\n",
+cat(sprintf("[UP2 foam-wash]  alpha_g %.3f -> %.3f (washed)  D_b %.1f um  P %.2f atm\n",
             m[["Blended_Porosity"]], s$alpha_g, s$D_b_m*1e6, s$P_Pa/1.013e5))
-cat(sprintf("[centrifuge]     cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
+cat(sprintf("[UP3 centrifuge] cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
             co$Product_Solids_MassFrac*100, co$Exit_Density_kg_m3/1000,
             co$Entrained_Gas_Holdup, res$cen_run[["floc_strength_Pa"]]))
 cat(sprintf("[reslurry 30%%]   rho_L %.0f  C_solid %.2f  alpha_g0 %.3f  mu_L %.4f  dil x%.2f\n",
             h[["rho_L"]], h[["C_solid_mass"]], h[["alpha_g_0"]], h[["mu_L"]], h[["dilution_x"]]))
-cat(sprintf("[spray dryer]    D_particle %.1f um  porosity %.3f  skin %.3f  rho_tap %.0f  X_moist %.3f\n",
+cat(sprintf("[UP4 spray dryer] D_particle %.1f um  porosity %.3f  skin %.3f  rho_tap %.0f  X_moist %.3f\n",
             sp[["D_particle_um"]], sp[["phi_porosity_z"]], sp[["theta_skin_z"]],
             sp[["rho_tapped"]], sp[["X_moisture"]]))
 
-cat("\n=== foam-wash sensitivity: how much gas removal changes the train ===\n")
+cat("\n=== UP2 (foam-wash) sensitivity: how much gas removal changes the train ===\n")
 cat(sprintf("  %-10s %-12s %-12s %-12s %-12s\n",
             "eta_gas", "cen_gas_hld", "reslurry_ag0", "D_particle", "porosity"))
 for (eg in c(0.0, 0.50, 0.75, 0.95)) {

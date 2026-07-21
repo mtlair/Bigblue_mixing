@@ -7,14 +7,13 @@ source module you are wrapping. You should not need the rest of the chain's
 history.
 
 ```
-UP1 mixer ──► intermediate_stage_1 ──► intermediate_stage_2 ──► UP2 spray dryer
-              (placeholder now)        (placeholder now)
+UP1 (mixer) ──► UP2 (foam-wash) ──► UP3 (centrifuge) ──► reslurry ──► UP4 (spray dryer)
 ```
 
 - Chain wiring:            `unified_model.R` → `run_unified()`
 - Stream definition/adapter: `unified/interface_stream.R`
 - Upstream module:         `unified/up1_mixer_module.R`  (`up1_run_mixer`)
-- Downstream module:       `unified/up2_spray_dryer_module.R` (`up2_run_dryer`)
+- Downstream module:       `unified/up2_spray_dryer_module.R` → now UP4 in the full train
 
 ---
 
@@ -41,50 +40,50 @@ value; "Consumed by" = where it is read downstream.
 #### Composition (mass fractions of total slurry unless noted)
 | Field | Meaning | Set by | Consumed by |
 |---|---|---|---|
-| `C_solid` | latex/polymer solids fraction (diluted by template feed in-tank) | UP1 | UP2 `C_sol` (+ `C_solid_rigid`) |
-| `C_solid_rigid` | rigid-template solids fraction (0 for liquid/gas templates) | UP1 | UP2 `C_sol` |
-| `C_binder` | binder concentration | UP1 | UP2 rheology, permeability, softness |
-| `C_monomer` | residual monomer | UP1 | UP2 softness, permeability, Fox Tg |
-| `C_plasticizer` | plasticizer | UP1 | UP2 softness, permeability, Fox Tg |
-| `C_surfactant` | surfactant | UP1 | UP2 surfactant stoichiometry |
-| `CMC` | critical micelle concentration | UP1 | (carried; not yet read by UP2) |
-| `HLB` | surfactant HLB | UP1 | UP2 (currently unused knob) |
-| `MW_surfactant` | surfactant MW **[g/mol]** | UP1 | UP2 (converted to kg/mol) |
-| `A_molecule` | surfactant molecule area **[nm²]** | UP1 | UP2 (converted to m²) |
-| `Delta_pH` | ΔpH vs isoelectric point | UP1 | UP2 DLVO `E_rep` |
-| `ionic_strength` | ionic strength [M] | UP1 | UP2 DLVO screening |
+| `C_solid` | latex/polymer solids fraction (diluted by template feed in-tank) | UP1 | UP4 `C_sol` (+ `C_solid_rigid`) |
+| `C_solid_rigid` | rigid-template solids fraction (0 for liquid/gas templates) | UP1 | UP4 `C_sol` |
+| `C_binder` | binder concentration | UP1 | UP4 rheology, permeability, softness |
+| `C_monomer` | residual monomer | UP1 | UP4 softness, permeability, Fox Tg |
+| `C_plasticizer` | plasticizer | UP1 | UP4 softness, permeability, Fox Tg |
+| `C_surfactant` | surfactant | UP1 | UP4 surfactant stoichiometry |
+| `CMC` | critical micelle concentration | UP1 | (carried; not yet read by UP4) |
+| `HLB` | surfactant HLB | UP1 | UP4 (currently unused knob) |
+| `MW_surfactant` | surfactant MW **[g/mol]** | UP1 | UP4 (converted to kg/mol) |
+| `A_molecule` | surfactant molecule area **[nm²]** | UP1 | UP4 (converted to m²) |
+| `Delta_pH` | ΔpH vs isoelectric point | UP1 | UP4 DLVO `E_rep` |
+| `ionic_strength` | ionic strength [M] | UP1 | UP4 DLVO screening |
 
 #### Physical state
 | Field | Meaning | Set by | Consumed by |
 |---|---|---|---|
-| `rho_slurry` | slurry density [kg/m³] | UP1 | UP2 `rho_L` |
-| `rho_polymer` | dry polymer density [kg/m³] (UP1 uses 1050) | UP1 | UP2 `rho_s` |
-| `T_K` | stream temperature [K] | UP1 exit T | UP2 `T_feed`; **stage 2 (pre-heater) should overwrite** |
-| `P_Pa` | stream pressure [Pa] | UP1 headspace | **stage 1 (pump) should overwrite** |
+| `rho_slurry` | slurry density [kg/m³] | UP1 | UP4 `rho_L` |
+| `rho_polymer` | dry polymer density [kg/m³] (UP1 uses 1050) | UP1 | UP4 `rho_s` |
+| `T_K` | stream temperature [K] | UP1 exit T | UP4 `T_feed`; **pre-heater (between UP3 and UP4) should overwrite** |
+| `P_Pa` | stream pressure [Pa] | UP1 headspace | **pump (between UP1 and UP2) should overwrite** |
 | `mu_exit_PaS` | mixer-exit apparent viscosity [Pa·s] (diagnostic) | UP1 | (diagnostic only) |
 
 #### Particulate state
 | Field | Meaning | Set by | Consumed by |
 |---|---|---|---|
-| `D_particle_um` | primary colloid particle diameter [µm] | UP1 | UP2 `a_prim`, `d_ratio` |
-| `D_agg_um` | blended aggregate size at mixer exit [µm] | UP1 | UP2 `d_ratio` (`D_particle/D_agg`) |
+| `D_particle_um` | primary colloid particle diameter [µm] | UP1 | UP4 `a_prim`, `d_ratio` |
+| `D_agg_um` | blended aggregate size at mixer exit [µm] | UP1 | UP4 `d_ratio` (`D_particle/D_agg`) |
 | `sphericity` | Ω at mixer exit (diagnostic) | UP1 | (diagnostic only) |
-| `WetSkin` | wet-skin fraction at mixer exit | UP1 | UP2 skin seed (× `SKIN_SURVIVAL`) |
+| `WetSkin` | wet-skin fraction at mixer exit | UP1 | UP4 skin seed (× `SKIN_SURVIVAL`) |
 
 #### Gas phase
 | Field | Meaning | Set by | Consumed by |
 |---|---|---|---|
-| `alpha_g` | entrained gas holdup (trapped microbubbles) | UP1 `Blended_Porosity` (capped 0.75) | UP2 `alpha_g_0`; **stage 2 (degas) may reduce** |
-| `D_b_m` | bubble diameter [m]; **`NA` until a stage sets it** | — | UP2: uses this if finite, else falls back to the `D_b` screening factor. **stage 1 (line shear) should set it.** |
+| `alpha_g` | entrained gas holdup (trapped microbubbles) | UP1 `Blended_Porosity` (capped 0.75) | UP4 `alpha_g_0` (via UP3); **UP2 may remove** |
+| `D_b_m` | bubble diameter [m]; **`NA` until a stage sets it** | — | UP4: uses this if finite, else falls back to the `D_b` screening factor. **UP2 should set it.** |
 
 #### Template phase
 | Field | Meaning | Set by | Consumed by |
 |---|---|---|---|
-| `template_type` | 1=rigid, 2=gas, 3=surface_weld, 4=capillary_bridge | UP1 equipment | UP2 gating |
-| `phi_templ_free` | free (interstitial) liquid-template volume fraction | UP1 (RTF split) | UP2 `phi_emulsion` (pore templating) |
-| `D_template_um` | template droplet/seed diameter [µm] | UP1 | UP2 `D_e`; **stages may ripen it** |
-| `RTF` | Residual_Template_Fraction: liquid template absorbed into cores | UP1 rev38 | UP2 (via `w_core`) |
-| `w_core` | core-absorbed template, mass fraction of slurry | UP1 (RTF × load) | UP2 softness, permeability, Fox Tg, burst inventory |
+| `template_type` | 1=rigid, 2=gas, 3=surface_weld, 4=capillary_bridge | UP1 equipment | UP4 gating |
+| `phi_templ_free` | free (interstitial) liquid-template volume fraction | UP1 (RTF split) | UP4 `phi_emulsion` (pore templating) |
+| `D_template_um` | template droplet/seed diameter [µm] | UP1 | UP4 `D_e`; **stages may ripen it** |
+| `RTF` | Residual_Template_Fraction: liquid template absorbed into cores | UP1 rev38 | UP4 (via `w_core`) |
+| `w_core` | core-absorbed template, mass fraction of slurry | UP1 (RTF × load) | UP4 softness, permeability, Fox Tg, burst inventory |
 
 #### Diagnostics (carried, not consumed by the dryer closure)
 `Softness_exit`, `Bond_Strength`, `Retained_Porosity`, `Mixing_Potential`.

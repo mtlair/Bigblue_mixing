@@ -8,7 +8,7 @@
 
 ## What Was Built
 
-**`foam_wash_module.R`** — A production foam-wash column model that replaces the thin placeholder stub in `full_train_mixer_to_dryer.R`.
+**`foam_wash_module.R`** — A production UP2 (foam-wash column) model that replaces the thin placeholder stub in `full_train_mixer_to_dryer.R`.
 
 ### Design Approach
 **Algebraic closure** (not full ODE solver in the loop):
@@ -64,20 +64,20 @@ foam_wash_column(stream, pars = list()) -> stream
 [spray dryer]    D_particle 9.9 um  porosity 0.158  skin 0.552  rho_tap 345  X_moist 0.001
 ```
 
-✓ Foam-wash outputs (alpha_g, D_b, P) match handoff baseline exactly  
-✓ Centrifuge/reslurry outputs unchanged (same input solids loading)  
+✓ UP2 (foam-wash) outputs (alpha_g, D_b, P) match handoff baseline exactly  
+✓ UP3 (centrifuge)/reslurry outputs unchanged (same input solids loading)  
 ✓ Nominal run completes without errors; no external CRAN dependencies  
 ✓ Mass balance closes: gas + solids + liquid conserved through train
 
 **Sensitivity sweep** (eta_gas = 0.0 → 0.95):
 ```
 eta_gas    0.00       0.50       0.75       0.95
-cen_gas    0.022      0.011      0.006      0.001
+up3_gas    0.022      0.011      0.006      0.001
 D_particle 9.4 um     9.7 um     9.9 um     10.1 um
 porosity   0.164      0.164      0.158      0.158
 ```
 ✓ Gas removal scales linearly with eta_gas (expected)  
-✓ Downstream porosity relatively insensitive to wash efficiency (gas already small by centrifuge exit)
+✓ Downstream porosity relatively insensitive to wash efficiency (gas already small by UP3 exit)
 
 ---
 
@@ -97,14 +97,14 @@ Algebraic model **currently** disables particle loss by default (`particle_loss 
 
 ### Stream Fields Updated
 - `alpha_g` — gas holdup (reduced by eta_gas factor)
-- `D_b_m` — bubble diameter (compressed by Boyle, sets centrifuge input)
+- `D_b_m` — bubble diameter (compressed by Boyle, sets UP3 input)
 - `P_Pa` — discharge pressure (set to P_col_Pa)
 - `C_solid` — solids loading (optionally reduced by retention; off by default)
 
 ### Downstream Contracts
-- **Centrifuge input** (`stream_to_centrifuge`): uses `alpha_g`, `D_b_m`, `P_Pa`, `C_solid` directly
-- **Dryer inputs** (via centrifuge handoff): inherit centrifuge exit density, gas holdup
-- **Floc coupling** (mixer Bond → centrifuge yield): unchanged
+- **UP3 (centrifuge) input** (`stream_to_centrifuge`): uses `alpha_g`, `D_b_m`, `P_Pa`, `C_solid` directly
+- **UP4 (dryer) inputs** (via UP3 handoff): inherit UP3 exit density, gas holdup
+- **Floc coupling** (UP1 mixer Bond → UP3 centrifuge yield): unchanged
 
 ---
 
@@ -114,9 +114,9 @@ Algebraic model **currently** disables particle loss by default (`particle_loss 
 
 2. **Enable particle loss** for realistic foam dropout once wash-column outlet solids are measured.
 
-3. **Run full-train Morris screen** (60 trajectories, ~30 factors) over mixer + wash + centrifuge. Currently screens are per-unit; want to understand which upstream factors couple the hardest to product properties.
+3. **Run full-train Morris screen** (60 trajectories, ~30 factors) over UP1 + UP2 + UP3. Currently screens are per-unit; want to understand which upstream factors couple the hardest to product properties.
 
-4. **Pre-heater stage** (stage 2 in `interface_stream.R`): when ready, wire T_K override so dryer inlet temperature can be tuned.
+4. **Pre-heater stage** (between UP3 and UP4): when ready, wire T_K override so UP4 inlet temperature can be tuned.
 
 ---
 

@@ -1,5 +1,5 @@
 # =============================================================================
-# FOAM-WASH COLUMN MODULE
+# UP2 — FOAM-WASH COLUMN MODULE
 # Algebraic closure derived from the standalone ODE (foam_wash_column_psd.R)
 # Captures hindered settling, bimodal bubble population, surfactant film
 # elasticity, burst logic, and per-class particle loss in steady-state form.
