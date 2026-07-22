@@ -139,6 +139,10 @@ nominal_x <- setNames(ifelse(factors$log,
                              (factors$min + factors$max) / 2),
                       factors$name)
 
+# Override nominal to 25% solid (the normal operating point; factor midpoint
+# would be 35% but calibration data and process target are at 20-25%).
+nominal_x["C_solid_mass"] <- 0.25
+
 # -----------------------------------------------------------------------------
 # 3. THE UNIFIED CHAIN
 # -----------------------------------------------------------------------------

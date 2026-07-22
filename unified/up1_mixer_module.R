@@ -308,7 +308,8 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # are easier to shear into contact: v_tip_crit ~ (a_ref/a)^3 from Pe).
   #
   # Calibration: 200 nm primary particles, aggregation onset observed at
-  # 6.81 m/s (nominal chemistry E_stab/phi_s = 48.55) -> C_emp = 0.1403.
+  # v_tip_crit = 6.81 m/s at 20% solid (E_stab/phi_s = 85.4 at C_solid=0.20).
+  # C_emp = v_tip_crit * phi_s / E_stab = 6.81 / 85.4 = 0.0797.
   # The Pe formula (C_phys = D_imp*kT/(6*pi*mu*a^3)) gives C ~169 at 100 nm
   # radius — a factor ~1200 larger, absorbed by the turbulent energy cascade
   # (shear at particle scale << v_tip/D_impeller).
@@ -317,8 +318,9 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # NOT varied with D_particle because D_particle in UP1 sets the flocculation
   # ODE kinetics and may differ from the colloidal-stability primary size.
   # To recalibrate for a different primary: C_new = v_tip_crit_obs * phi_s / E_stab.
-  # Calibration: 200 nm primary, v_tip_crit = 6.81 m/s, E_stab/phi_s = 48.55.
-  C_AGG_CAL   <- 0.1403
+  # Multi-point check: at 25% solid v_tip_crit ~ 5.45 m/s (1/phi_s scaling),
+  # so 6.12 m/s (ratio=1.12) shows moderate aggregation (observed d50=9.71 µm) ✓.
+  C_AGG_CAL   <- 0.0797
   dpH_ppc     <- s_pos(p$Delta_pH)
   W_bar_ppc   <- exp(1.0 * dpH_ppc - 5.0 * sqrt(p$ionic_strength))
   E_stab_exit <- s_max(0.01, s_min(100.0, W_bar_ppc)) * s_pos(1.0 + 10.0 * Theta_surf)

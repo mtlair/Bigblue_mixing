@@ -493,10 +493,12 @@ spray_dry_model <- function(x) {
   # Reference: a_prim_ref_min = minimum radius at full milling = a_prim × (1-MILL_MAX)
   #            = 100 nm × 0.30 = 30 nm. At this minimum, factor = 1.0 (baseline size).
   # Exponent PSF_EXP calibrated: at 200 nm primary (v_tip=8.5 m/s, no milling),
-  # UP4 d50 = 15.3 µm → base Dp_j = 7.54 µm → factor = 2.03 = (100nm/30nm)^PSF_EXP
-  # → PSF_EXP = log(2.03)/log(3.33) = 0.588.
+  # full chain (UP1->UP2 foam-wash->UP3->UP4) at 20% solid with C_AGG_CAL=0.0797,
+  # target UP4 d50 = 15.3 µm → PSF_EXP = 0.537 (factor = 3.333^0.537 = 1.926).
+  # (Prior value 0.588 was calibrated at 35% nominal solid, bypassing the foam-wash
+  #  column; 0.537 is the full-chain anchor at the 20% solid reference point.)
   a_prim_ref_min <- a_prim * 0.30   # 3e-8 m: minimum primary radius (full milling)
-  PSF_EXP        <- 0.588           # calibrated from UP4 d50 = 15.3 µm at v_tip=8.5
+  PSF_EXP        <- 0.537           # calibrated: UP4 d50 = 15.3 µm at 8.5 m/s / 20% solid
   packing_size_factor <- (a_prim_mod / a_prim_ref_min)^PSF_EXP
   Dp_j <- Dp_j * packing_size_factor
 
