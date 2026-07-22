@@ -550,6 +550,33 @@ spray_dry_model <- function(x) {
              (1 - 2 * min(X_moist, 0.2))
   rho_tapped <- rho_env * max(f_pack, 0.05)
 
+  ## --- Particle-morphology recalibration (MUTED by default) -----------------
+  # Mirror of unified/up2_spray_dryer_module.R. Anchored to bulk 0.30 g/cc with
+  # skeletal 1.70 g/cc: compact UP1-control granule phi ~ 0.65 at packing 0.50
+  # (-> 0.30 g/cc), atomizer-control (dispersed) feed gets a central-void hollow
+  # bump (total void ~0.85, lower sphericity). Regime weight from D_primary_exit
+  # vs D_agg. `morphology_recal` in [0,1]; 0 = current closure, unchanged.
+  morphology_recal <- if ("morphology_recal" %in% names(x)) x[["morphology_recal"]] else 0
+  if (morphology_recal > 0 && "D_agg_um" %in% names(x) &&
+      is.finite(x[["D_agg_um"]]) && x[["D_agg_um"]] > 0) {
+    RHO_SKEL <- 1700; F_PACK <- 0.50
+    PHI_INTRA_BASE <- 0.65; HOLLOW_MAX <- 0.575
+    OMEGA_COMPACT <- 0.90; OMEGA_HOLLOW_DROP <- 0.35
+    AGG_REF <- 0.70
+    D_pexit_m  <- if ("D_primary_exit_um" %in% names(x) && is.finite(x[["D_primary_exit_um"]]))
+                    x[["D_primary_exit_um"]] else x[["D_agg_um"]]
+    agg_frac_m <- max(0, 1 - min(D_pexit_m / x[["D_agg_um"]], 1))
+    w_disp     <- max(0, 1 - min(agg_frac_m / AGG_REF, 1))
+    phi_hollow <- w_disp * HOLLOW_MAX
+    phi_recal  <- 1 - (1 - PHI_INTRA_BASE) * (1 - phi_hollow)
+    omega_recal<- OMEGA_COMPACT - w_disp * OMEGA_HOLLOW_DROP
+    tap_recal  <- RHO_SKEL * (1 - phi_recal) * F_PACK
+    k <- min(max(morphology_recal, 0), 1)
+    phi_porosity <- (1 - k) * phi_porosity + k * phi_recal
+    Omega_struct <- (1 - k) * Omega_struct + k * omega_recal
+    rho_tapped   <- (1 - k) * rho_tapped   + k * tap_recal
+  }
+
   c(d_droplet_um   = d50 * 1e6,
     d10_um         = d10 * 1e6,
     d90_um         = d90 * 1e6,

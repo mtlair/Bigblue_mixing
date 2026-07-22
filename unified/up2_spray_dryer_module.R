@@ -376,6 +376,45 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
              (1 - 2 * min(X_moist, 0.2))
   rho_tapped <- rho_env * max(f_pack, 0.05)
 
+  ## --- Particle-morphology recalibration (MUTED by default) -----------------
+  # Anchored to the measured powder bulk density (~0.30 g/cc) with the true
+  # polymer skeletal density 1.70 g/cc. The current closure returns near-solid
+  # particles (phi ~ 0.03) and reaches ~0.22 g/cc tapped only via an implausibly
+  # low packing fraction -- right bulk number, wrong mechanism. This overlay
+  # replaces porosity, sphericity and tapped density with a physically anchored
+  # pair (bulk = rho_skel * (1 - phi) * packing):
+  #   * compact UP1-control granule: intra-particle void phi ~ 0.65 (loosely
+  #     packed primary aggregate), packing 0.50 -> 1.70*(1-0.65)*0.50 = 0.30 g/cc.
+  #   * atomizer-control (dispersed) feed: central-void hollow bump (SEM cond2:
+  #     crumpled collapsed shells) -> total void ~0.85, tapped ~0.13 g/cc, and
+  #     lower sphericity (irregular vs rounded granule).
+  # Regime weight from the same aggregation fraction the size-template uses
+  # (D_primary_exit vs D_agg): dispersed feed -> w_disp -> 1, aggregated -> 0.
+  # Governed by `morphology_recal` in [0,1] (0 = current closure, unchanged).
+  # NOTE: uses skeletal 1.70 g/cc for the DRY powder; the UP1 slurry still uses
+  # rho_polymer = 1050. If 1.70 is the true polymer density, UP1 phi_s (hence the
+  # viscosity/aggregation-onset calibration) should be revisited -- see DATA_REVIEW.
+  morphology_recal <- if (!is.null(x[["morphology_recal"]])) x[["morphology_recal"]] else 0
+  if (morphology_recal > 0 && !is.null(feed$D_agg_um) &&
+      is.finite(feed$D_agg_um) && feed$D_agg_um > 0) {
+    RHO_SKEL <- 1700; F_PACK <- 0.50                 # kg/m3 ; inter-particle packing
+    PHI_INTRA_BASE <- 0.65; HOLLOW_MAX <- 0.575      # compact void ; dispersed central-void bump
+    OMEGA_COMPACT <- 0.90; OMEGA_HOLLOW_DROP <- 0.35 # rounded granule ; collapse penalty
+    AGG_REF <- 0.70
+    D_pexit_m  <- if (!is.null(feed$D_primary_exit_um) && is.finite(feed$D_primary_exit_um))
+                    feed$D_primary_exit_um else feed$D_agg_um
+    agg_frac_m <- max(0, 1 - min(D_pexit_m / feed$D_agg_um, 1))
+    w_disp     <- max(0, 1 - min(agg_frac_m / AGG_REF, 1))     # 1 dispersed, 0 aggregated
+    phi_hollow <- w_disp * HOLLOW_MAX
+    phi_recal  <- 1 - (1 - PHI_INTRA_BASE) * (1 - phi_hollow)  # total void fraction
+    omega_recal<- OMEGA_COMPACT - w_disp * OMEGA_HOLLOW_DROP
+    tap_recal  <- RHO_SKEL * (1 - phi_recal) * F_PACK
+    k <- min(max(morphology_recal, 0), 1)
+    phi_porosity <- (1 - k) * phi_porosity + k * phi_recal
+    Omega_struct <- (1 - k) * Omega_struct + k * omega_recal
+    rho_tapped   <- (1 - k) * rho_tapped   + k * tap_recal
+  }
+
   c(d_droplet_um   = d50 * 1e6,
     d10_um         = d10 * 1e6,
     d90_um         = d90 * 1e6,

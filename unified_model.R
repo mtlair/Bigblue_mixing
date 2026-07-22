@@ -177,9 +177,10 @@ run_unified <- function(x, template_type = TEMPLATE_TYPE, verbose = FALSE) {
     if (verbose) print_stream(stream, "stream: dryer feed")
 
     x_up2 <- as.list(x[up2_names])
-    # Forward the (muted-by-default) size-template knob if the caller set it;
-    # it is not a screened factor, so it is not in up2_names.
-    if ("size_template" %in% names(x)) x_up2[["size_template"]] <- x[["size_template"]]
+    # Forward the (muted-by-default) overlay knobs if the caller set them;
+    # they are not screened factors, so they are not in up2_names.
+    if ("size_template" %in% names(x))    x_up2[["size_template"]]    <- x[["size_template"]]
+    if ("morphology_recal" %in% names(x)) x_up2[["morphology_recal"]] <- x[["morphology_recal"]]
     r2 <- up2_run_dryer(stream, x_up2)
     setNames(c(r1$outputs[up1_keep], r2), unified_output_names)
   }, error = function(e) setNames(rep(NA_real_, n_out), unified_output_names))

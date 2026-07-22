@@ -223,6 +223,64 @@ Two findings the harness surfaced:
 
 ---
 
+## Part 5 — Particle morphology & density (SEM + bulk density)
+
+**SEM (folder `sem/`, keyed by `sem_sample_no_filename` in `visc.xlsx`)** confirms
+the two-regime morphology predicted from size + solids:
+
+- **cond2 (atomizer-control, Sample 110495):** crumpled, collapsed, raisin-like
+  **hollow shells** with a micro-porous nodular surface and visible broken shells.
+- **cond11 (deep UP1-control, v_tip 12.4 m/s, Sample 110045) & cond14:** **compact,
+  rounded granules** — no collapse. cond5 (6.9 m/s, just above onset) reads as
+  intermediate, consistent with sitting on the aggregation boundary.
+
+So the dry-particle morphology switches on the **same `v_tip_crit`** as wet
+aggregation: dispersed feed → high-Péclet **hollow shell**; pre-aggregated feed →
+**compact granule**.
+
+**Bulk density reconciliation (skeletal 1.70 g/cc, bulk ~0.30 g/cc).**
+"Compact" is *not* "solid": a 0.30 g/cc bulk with a 1.70 g/cc skeletal density
+forces substantial internal porosity even in the UP1-control granules —
+
+| packing f | envelope g/cc | φ_intra |
+|---|---|---|
+| 0.45 | 0.67 | 0.61 |
+| **0.50** | **0.60** | **0.65** |
+| 0.55 | 0.55 | 0.68 |
+
+So the compact granules are **~65 % internal void** (loosely packed primary
+aggregates), and cond2 more still (central void → ~85 %). The old closure returned
+φ ≈ 0.03 (near-solid) and matched ~0.22 g/cc tapped only via an implausible packing
+of ~0.22 — the **right bulk number by compensating errors**, which would mispredict
+how density responds to PSD/process and gets every porosity-driven property wrong.
+
+**Recalibration — `morphology_recal` knob (MUTED by default), both dryers.**
+Anchored to bulk 0.30 g/cc with skeletal 1.70 g/cc: bulk = ρ_skel·(1−φ)·packing.
+
+| regime | φ (total void) | sphericity Ω | tapped |
+|---|---|---|---|
+| UP1-control (compact granule) | 0.65 | 0.90 | **0.30 g/cc** (anchor) |
+| atomizer-control (cond2, hollow) | 0.85 | 0.55 | 0.13 g/cc |
+
+The hollow bump and the sphericity drop are gated on the **same aggregation
+fraction** (`D_primary_exit` vs `D_agg`) the size-template uses, so no new regime
+switch is introduced. `morphology_recal = 0` (default) leaves the current closure
+bit-for-bit unchanged (verified on R); `= 1` applies the anchored pair. This folds
+in the regime-dependent porosity **and** sphericity correction (φ↑, Ω↓ for the
+dispersed feed).
+
+**Open coupling to flag:** the recalibration uses skeletal **1.70 g/cc for the dry
+powder**, but the **UP1 slurry still uses `rho_polymer = 1050`**. If 1.70 is the
+true polymer density, UP1 `phi_s` (and therefore the viscosity / aggregation-onset
+calibration, which assumed 1050) should be revisited — a distinct pass, since it
+shifts the wet-side anchors. Also, porosity and particle *size* are physically
+coupled (a more porous particle is larger); here the size-template and the
+morphology recalibration are kept as independent knobs, so enabling both is
+additive rather than self-consistent — acceptable for a muted capability, to be
+unified when both are turned on against real density data.
+
+---
+
 ## Toward the goal — experimental ranges
 
 With the UP1 and UP4-atomizer closures calibrated and validated UP1→UP4-direct,
