@@ -293,10 +293,11 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   x["D_primary_phys_um"] <- s$D_primary_phys_um # physical colloid bead (200 nm base)
   # Viscosity coupling (couple_viscosity = TRUE): wire UP1 apparent slurry viscosity
   # as the power-law reference for the nozzle atomization, replacing the centrifuge
-  # serum-based estimate.  The UP1 value embeds floc (D_agg/D_pri)^1.67 effects:
+  # serum-based estimate.  The UP1 value embeds floc (D_agg/D_pri)^1.29 effects:
   # higher D_agg -> higher mu_slurry_up1 -> larger SMD -> coarser powder and wider
-  # d90/d10.  Default OFF because the floc exponent (1.67) needs validation from
-  # multi-point rheology data before it can be used quantitatively.
+  # d90/d10.  The floc exponent was recalibrated (1.67 -> 1.29) against the
+  # 9-condition rheology set (visc.xlsx, geomean 0.201 Pa.s); see DATA_REVIEW.md.
+  # Still default OFF pending nozzle-geometry calibration of the SMD scale.
   if (couple_viscosity) x["mu_slurry_up1"] <- s$mu_exit_PaS
   sp <- spray_dry_model(x)
 

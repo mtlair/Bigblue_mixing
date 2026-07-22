@@ -33,11 +33,24 @@ Mixing in UP1 transforms them into shear-thinning floc suspensions — the flow
 index drops from ~0.9 to a mean of **0.44**, and the low-shear viscosity rises
 1–2 orders of magnitude.
 
-**Aggregation is a sharp on/off switch in tip speed.**
+**Two process control regimes.** The nine conditions split into two regimes that
+control the *final (dry) product size* by different mechanisms:
+
+- **cond2 — atomizer-control regime.** Its UP1 feed never aggregates (v_tip
+  4.37 m/s < onset, so the slurry stays a dispersed ~0.18 µm colloid, near-water
+  0.005 Pa·s). With no upstream structure to template the particle, the **UP4
+  atomizer sets the product size**: the dry d50 (19.85 µm) is a droplet-shell — the
+  *largest* dry particle in the set despite the *lowest* solids and finest wet feed.
+- **cond 4/5/8/9/11/12/14/15 — UP1-control regime.** UP1 forms a ~10 µm aggregate
+  (v_tip > onset) that templates the particle through drying, so the **UP1 aggregate
+  sets the product size**: dry d50 = 12.3 µm mean ≈ 1.2× the wet aggregate, and it
+  does *not* balloon out to the 20–27 µm droplet-shell the atomizer alone would give.
+
+**Aggregation is a sharp on/off switch in tip speed** (the UP1 regime boundary):
 
 | cond | v_tip (m/s) | solid % | wet d50 (µm) | regime |
 |---|---|---|---|---|
-| 2 | 4.37 | 13.2 | **0.183** | dispersed (primary bead) |
+| 2 | 4.37 | 13.2 | **0.183** | atomizer-control (no UP1 aggregate) |
 | 5 | 6.92 | 19.6 | 9.97 | aggregated |
 | 15 | 7.41 | 24.9 | 9.71 | aggregated |
 | 8 | 8.48 | 19.2 | 9.60 | aggregated |
@@ -47,11 +60,11 @@ index drops from ~0.9 to a mean of **0.44**, and the low-shear viscosity rises
 | 4 | 10.57 | 20.0 | 10.19 | aggregated |
 | 11 | 12.40 | 19.6 | 12.00 | aggregated |
 
-The one condition below ~6.8 m/s (cond2) stays at the ~0.18 µm primary particle;
-every condition above it jumps to a **flat ~10 µm aggregate plateau**
-(mean 10.19 µm, CV 7 %) that barely moves with tip speed. There is **no milling
-rollover** anywhere in the tested envelope — cond11, the highest tip speed
-(12.4 m/s), has the *largest* wet d50, not a reduced one.
+The one condition below ~6.8 m/s (cond2, atomizer-control) stays at the ~0.18 µm
+primary particle; every condition above it (UP1-control) jumps to a **flat ~10 µm
+aggregate plateau** (mean 10.19 µm, CV 7 %) that barely moves with tip speed. There
+is **no milling rollover** anywhere in the tested envelope — cond11, the highest tip
+speed (12.4 m/s), has the *largest* wet d50, not a reduced one.
 
 **Viscosity is highly scattered and not a clean function of the process.**
 Across the eight aggregated conditions (all ~19–25 % solids, all ~10 µm aggregate)
@@ -61,16 +74,27 @@ the high outlier and cond12 (0.020, run at the high 150 lb/hr feed) the low one.
 This is genuine process/sample variability; a deterministic closure can only be
 expected to hit the **central tendency** (geometric mean 0.201 Pa·s, median 0.227).
 
-**Dry PSD is set by atomization, not by the wet aggregate.**
-Post-UP4 dry d50 is 8.8–15.3 µm for the aggregated feeds (dry/wet ratio ≈ 0.7–1.6,
-mean ~1.2) and 19.85 µm for the dispersed cond2 — a 108× jump over its 0.18 µm wet
-size, because each atomized droplet dries to a particle built from many colloidal
-beads. Backing out droplet size from dry d50 and the solids loading gives a
-physically sensible airblast SMD band of **15–27 µm**. Within the aggregated set
-the dry d50 is *anti*-correlated with UP1 tip speed (corr −0.91) and wet d50
-(−0.79): harder mixing upstream yields a finer dry powder. No single measured
-atomizer variable (`max_up4atom_psig`, `up4atom_scfm`, `up4_feed`) explains it on
-its own, so the dry PSD is genuinely multi-factor.
+**Dry PSD — which unit controls depends on the regime.**
+In the **UP1-control** regime the post-UP4 dry d50 is 8.8–15.3 µm (mean 12.3),
+≈ 1.2× the wet aggregate, and *anti*-correlated with UP1 tip speed (corr −0.91)
+and wet d50 (−0.79): harder mixing upstream builds a denser aggregate that dries
+to a finer, more compact particle (cond11, highest shear, gives the smallest dry
+d50 at 8.82 µm despite the largest wet aggregate). The **atomizer-control** cond2
+inflates 108× (0.18 → 19.85 µm) — a hollow droplet-shell whose size is set by the
+atomizer, not the colloid.
+
+**Atomizer operating envelope (from `up4atom_scfm`, `up4_feed`, `max_up4atom_psig`).**
+Converting the recorded flows (air at 0.0765 lb/ft³; feed lb/hr → kg/s; psig →
+absolute Pa) gives the true nozzle envelope:
+
+| Nozzle input | Measured (9 cond) | Prior model factor range | Status |
+|---|---|---|---|
+| ALR = ṁ_air/ṁ_feed | **0.90–1.78** (mean 1.50) | 1.0–10.0 | model ran up to ~6× too high |
+| Atomizing-air pressure | **1.20–1.80×10⁵ Pa** (2.7–11.4 psig) | 2.0–7.0×10⁵ Pa | entire model range *above* the real max |
+| Liquid feed ṁ_L | **0.0135–0.0194 kg/s** | 0.002–0.020 kg/s | low end ~7× below any real run |
+
+For the atomizer-control regime, cond2 anchors the droplet→particle scale: dry
+19.85 µm at ALR 1.39 back-solves to a ~40 µm atomization droplet at 12.7 % solids.
 
 ---
 
@@ -109,6 +133,15 @@ holds.
 | `unified/up1_mixer_module.R` | `MILL_MARGIN` 1.8 → **2.5** | no attrition observed ≤ 12.4 m/s; pushes v_tip_mill to ~17 m/s, out of the validated range, removing the spurious cond11 rollover |
 | `unified/up1_mixer_module.R` | floc exponent 1.67 → **1.29** | targets the geometric-mean slurry viscosity (0.201 Pa·s) of all 8 aggregated conditions instead of the single 0.770 Pa·s outlier |
 | `unified_model.R`, `morris_sensitivity_analysis.R` | `n_flow` factor range 0.40–1.00 → **0.20–0.67** | measured post-UP1 flow-index envelope (mean 0.44); the old range never reached the observed low end and was centred too high |
+| `unified_model.R`, `morris_sensitivity_analysis.R` | `ALR` 1.0–10.0 → **0.9–1.8** | measured `up4atom_scfm`/`up4_feed` ratio; the old range ran the nozzle at up to ~6× the real air-liquid ratio |
+| `unified_model.R`, `morris_sensitivity_analysis.R` | atomizing-air pressure 2.0–7.0×10⁵ → **1.2–1.8×10⁵ Pa** | measured `max_up4atom_psig`; the entire prior range sat *above* the real maximum |
+| `unified_model.R`, `morris_sensitivity_analysis.R` | `mdot_L` 0.002–0.020 → **0.013–0.020 kg/s** | measured `up4_feed` (107–154 lb/hr); the old low end was ~7× below any real run |
+
+Because `morris_sensitivity_analysis.R`'s factor table also sets the full-train
+nominal (`sp_mid` = range midpoints), these three corrections move the chain's
+nominal atomizer operating point onto the measured process, not just the screen.
+The `couple_viscosity` note in `full_train_mixer_to_dryer.R` was updated to the
+recalibrated 1.29 floc exponent.
 
 `C_AGG_CAL` (0.0797, the aggregation-onset tip speed) was **kept** — the data
 brackets onset between 4.37 m/s (cond2, dispersed) and 6.92 m/s (cond5,
@@ -118,11 +151,23 @@ aggregated), fully consistent with the calibrated 6.81 m/s at 20 % solids.
 (target 10.19) and η = 0.200 Pa·s (target geomean 0.201) — versus the old
 0.855 Pa·s.
 
-### Not changed — flagged for follow-up
-- **Dry-PSD (UP4) recalibration** was not attempted: the target band is well
-  characterised (dry/wet ≈ 1.2, implied droplet SMD 15–27 µm, anti-correlated
-  with UP1 shear), but it needs each condition's atomizer settings mapped to the
-  dryer's `ALR` / `P_atom_air` inputs before `Dp50` can be tuned against it.
+### Open structural gap — the dry-PSD control regime
+The atomizer *inputs* are now grounded in the data, but the dryer's
+particle-formation still has one structural gap that the data exposes:
+
+- **The model has no regime switch for the final particle size.** Both dryer
+  implementations (`up2_run_dryer`, `spray_dry_model`) compute the dry particle as
+  a droplet→shell only (`Dp ∝ droplet · (solids/(1−porosity))^{1/3}`). They receive
+  the UP1 aggregate (`D_agg_um`) but use it only for shell porosity, never as the
+  size template. The data shows the opposite control in 8 of 9 conditions: when a
+  UP1 aggregate exists it *sets* the product size (dry ≈ 1.2·D_agg ≈ 12 µm), and
+  only in the dispersed cond2 does the atomizer droplet-shell control (19.85 µm).
+  Adding a regime switch on aggregate presence (d_ratio) — aggregate-template when
+  UP1-control, droplet-shell when atomizer-control — is the next change. It touches
+  particle formation in *both* dryers and currently rests on a single
+  atomizer-regime point (cond2), so it is specced here and left for confirmation
+  rather than applied blind. The absolute SMD scale also still awaits nozzle
+  geometry (`D_h`, `A_L`), the standing high-priority calibration gap.
 - **Viscosity scatter** (CV 77 %) is real process variability; the closure now
   hits the central tendency but cannot reproduce the per-condition spread from
   the recorded factors alone.

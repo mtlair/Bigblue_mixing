@@ -94,10 +94,10 @@ factors <- rbind(
   fac("Delta_pH",       0.0,    5.0,   FALSE, "pH",    "up1", "Surface", "delta pH vs isoelectric point"),
   fac("template_dose",  0.02,   1.10,  FALSE, "-",     "up1", "Polymer", "template liquid / interstitial void"),
   # --- UP2 dryer side --------------------------------------------------------
-  fac("ALR",            1.0,    10.0,  FALSE, "-",     "up2", "Process", "atomizing air-liquid mass ratio"),
-  fac("P_atom_air",     2.0e5,  7.0e5, FALSE, "Pa",    "up2", "Process", "atomizing air supply pressure"),
+  fac("ALR",            0.9,    1.8,   FALSE, "-",     "up2", "Process", "atomizing air-liquid mass ratio (measured up4atom_scfm/up4_feed, visc.xlsx: 0.90-1.78)"),
+  fac("P_atom_air",     1.2e5,  1.8e5, FALSE, "Pa",    "up2", "Process", "atomizing air supply pressure (measured max_up4atom_psig, visc.xlsx: 2.7-11.4 psig abs)"),
   fac("P_feed",         1.5e5,  1.0e6, FALSE, "Pa",    "up2", "Process", "feed pump / hold-line pressure"),
-  fac("mdot_L",         0.002,  0.020, FALSE, "kg/s",  "up2", "Process", "liquid feed mass flow to nozzle"),
+  fac("mdot_L",         0.013,  0.020, FALSE, "kg/s",  "up2", "Process", "liquid feed mass flow to nozzle (measured up4_feed, visc.xlsx: 0.0135-0.0194 kg/s)"),
   fac("sigma",          0.030,  0.070, FALSE, "N/m",   "up2", "Surface", "liquid surface tension"),
   fac("mu_L",           0.0012, 0.0560,TRUE,  "Pa s",  "up2", "Polymer", "serum (continuous phase) viscosity"),
   fac("T_dryer_in",     330,    470,   FALSE, "K",     "up2", "Process", "dryer gas inlet temperature"),

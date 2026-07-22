@@ -63,12 +63,13 @@
 
   <div class="card">
     <h2>1 · Aggregation onset — wet d50 vs tip speed</h2>
-    <p class="desc">Below ~6.8&nbsp;m/s the colloid stays at its 0.18&nbsp;µm primary bead (cond2). Above it, every condition jumps to a
-    flat <b>~10&nbsp;µm aggregate plateau</b> that barely moves with tip speed — and never rolls back down. The old model's milling
+    <p class="desc">Below ~6.8&nbsp;m/s the colloid never aggregates and stays at its 0.18&nbsp;µm primary bead — cond2, the
+    <b>atomizer-control</b> regime, where UP4 sets the product size. Above it (<b>UP1-control</b>), every condition jumps to a
+    flat <b>~10&nbsp;µm aggregate plateau</b> that barely moves with tip speed and never rolls back down. The old model's milling
     onset would have shrunk d50 right at the highest point (cond11); the recalibration removes that.</p>
     <div class="legend">
-      <span><span class="sw" style="background:var(--s-violet)"></span>Dispersed (v_tip &lt; onset)</span>
-      <span><span class="sw" style="background:var(--s-blue)"></span>Aggregated</span>
+      <span><span class="sw" style="background:var(--s-violet)"></span>Atomizer-control (cond2)</span>
+      <span><span class="sw" style="background:var(--s-blue)"></span>UP1-control (aggregated)</span>
       <span><span class="swl" style="background:var(--s-aqua)"></span>Recalibrated plateau (10.2&nbsp;µm)</span>
       <span><span class="swl" style="background:var(--s-orange);height:0;border-top:2px dashed var(--s-orange)"></span>Old milling onset</span>
     </div>
@@ -104,9 +105,9 @@
     </div>
 
     <div class="card">
-      <h2>4 · Wet → dry inflation</h2>
-      <p class="desc">Dry powder size is set by atomization, not the wet aggregate: the dispersed cond2 inflates 108× (0.18→19.9&nbsp;µm).
-      For aggregated feeds dry/wet ≈ 1.2, and dry d50 falls as UP1 shear rises.</p>
+      <h2>4 · Two control regimes: wet → dry</h2>
+      <p class="desc"><b>Atomizer-control</b> (cond2): no UP1 aggregate, so the atomizer sets a droplet-shell — 108× inflation (0.18→19.9&nbsp;µm).
+      <b>UP1-control</b> (rest): the aggregate templates the particle, dry/wet ≈ 1.2, and dry d50 <i>falls</i> as UP1 shear rises.</p>
       <table>
         <thead><tr><th>cond</th><th>v_tip</th><th>wet d50</th><th>dry d50</th><th>dry/wet</th></tr></thead>
         <tbody id="t4"></tbody>
@@ -115,9 +116,10 @@
     </div>
   </div>
 
-  <p class="foot">Recalibration applied to <span class="kbd">unified/up1_mixer_module.R</span>:
-  AGG_FACTOR_CAL 48.7→50.0 · MILL_MARGIN 1.8→2.5 · floc exponent 1.67→1.29;
-  and the <span class="kbd">n_flow</span> screening range 0.40–1.00→0.20–0.67. See <span class="kbd">DATA_REVIEW.md</span>.</p>
+  <p class="foot"><b>UP1 recalibration</b> (<span class="kbd">unified/up1_mixer_module.R</span>):
+  AGG_FACTOR_CAL 48.7→50.0 · MILL_MARGIN 1.8→2.5 · floc exponent 1.67→1.29 · <span class="kbd">n_flow</span> range 0.40–1.00→0.20–0.67.
+  <b>Atomizer inputs grounded in the measured flows</b>: ALR 1.0–10.0→0.9–1.8 · air pressure 2.0–7.0→1.2–1.8×10⁵&nbsp;Pa · ṁ_L 0.002–0.020→0.013–0.020&nbsp;kg/s.
+  See <span class="kbd">DATA_REVIEW.md</span>.</p>
 </div>
 
 <div class="tip" id="tip"></div>

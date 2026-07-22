@@ -96,10 +96,10 @@ fac <- function(name, min, max, log, unit, desc)
 
 factors <- rbind(
   #   name             min     max     log    unit     description
-  fac("ALR",           1.0,    10.0,   FALSE, "-",     "air-liquid mass ratio m_G/m_L"),
-  fac("P_system",      2.0e5,  7.0e5,  FALSE, "Pa",    "atomizing air supply pressure"),
+  fac("ALR",           0.9,    1.8,    FALSE, "-",     "air-liquid mass ratio m_G/m_L (measured up4atom_scfm/up4_feed, visc.xlsx: 0.90-1.78)"),
+  fac("P_system",      1.2e5,  1.8e5,  FALSE, "Pa",    "atomizing air supply pressure (measured max_up4atom_psig, visc.xlsx: 2.7-11.4 psig abs)"),
   fac("P_feed",        1.5e5,  1.0e6,  FALSE, "Pa",    "liquid feed line (hold) pressure"),
-  fac("mdot_L",        0.002,  0.020,  FALSE, "kg/s",  "liquid feed mass flow"),
+  fac("mdot_L",        0.013,  0.020,  FALSE, "kg/s",  "liquid feed mass flow (measured up4_feed, visc.xlsx: 107-154 lb/hr = 0.0135-0.0194 kg/s)"),
   fac("sigma",         0.030,  0.070,  FALSE, "N/m",   "liquid surface tension"),
   fac("mu_L",          0.0012, 0.0560, TRUE,  "Pa s",  "serum (continuous phase) viscosity"),
   fac("rho_L",         1000,   1300,   FALSE, "kg/m3", "liquid (slurry) density"),
