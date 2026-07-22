@@ -1,0 +1,206 @@
+"output","factor","module","mu_star","sigma"
+"size Dp50","P_atom_air","up2",15.4578,12.0999
+"size Dp50","Delta_pH","up1",12.562,19.9285
+"size Dp50","C_solid_mass","up1",12.5588,15.156
+"size Dp50","ionic_strength","up1",11.5924,17.0744
+"size Dp50","C_surfactant","up1",9.9368,16.5498
+"size Dp50","MW_surfactant","up1",8.3934,15.6418
+"size Dp50","tau_mix","up1",7.8908,8.9531
+"size Dp50","v_tip","up1",7.6607,10.7257
+"size Dp50","Q_gas","up1",7.6575,16.1953
+"size Dp50","A_molecule","up1",5.3418,10.2123
+"size Dp50","sigma","up2",5.1193,4.6228
+"size Dp50","Q_template","up1",4.6834,7.4338
+"size Dp50","Q_colloid","up1",4.6414,4.27
+"size Dp50","T_bp_solv","up2",4.378,7.2582
+"size Dp50","T_mix","up1",4.1555,6.8235
+"size Dp50","ALR","up2",4.0548,2.4646
+"size Dp50","P_feed","up2",3.6105,3.7911
+"size Dp50","template_dose","up1",3.1906,6.3001
+"size Dp50","HLB","up1",1.7094,7.8334
+"size Dp50","P_mix","up1",1.7056,5.0806
+"size Dp50","D_particle","up1",1.1275,2.3435
+"size Dp50","mdot_L","up2",0.876,0.7523
+"size Dp50","T_dryer_in","up2",0.4184,0.8213
+"size Dp50","mdot_gas_dry","up2",0.3607,0.4893
+"size Dp50","mu_L","up2",0.2591,0.568
+"size Dp50","C_gas_diss_temp","up1",0.193,0.444
+"size Dp50","C_monomer","up1",0.1161,0.1888
+"size Dp50","C_plasticizer","up1",0.1121,0.2246
+"size Dp50","t_hold","up2",0.0913,0.1392
+"size Dp50","D_template","up1",0.0881,0.1764
+"size Dp50","k_perm_bind","up2",0.0783,0.1692
+"size Dp50","n_flow","up2",0.0736,0.2368
+"size Dp50","D_b","up2",0.06,0.0728
+"size Dp50","k_perm_plast","up2",0.057,0.144
+"size Dp50","CMC","up1",0.0428,0.1476
+"size Dp50","k_perm_mono","up2",0.0418,0.0748
+"size Dp50","C_binder","up1",0.026,0.081
+"size Dp50","Tg_polymer","up2",0.0177,0.0657
+"size Dp50","Y_in","up2",0.0052,0.0193
+"size Dp50","C_temp_mass","up1",0.002,0.0092
+"size Dp50","D_surf","up1",1e-04,1e-04
+"porosity","Delta_pH","up1",0.182,0.2223
+"porosity","ionic_strength","up1",0.1771,0.2433
+"porosity","v_tip","up1",0.1464,0.2178
+"porosity","C_surfactant","up1",0.1218,0.2059
+"porosity","C_solid_mass","up1",0.0846,0.1539
+"porosity","MW_surfactant","up1",0.0629,0.138
+"porosity","A_molecule","up1",0.0338,0.0992
+"porosity","Q_gas","up1",0.0321,0.1031
+"porosity","Q_template","up1",0.0261,0.0723
+"porosity","HLB","up1",0.0111,0.0607
+"porosity","Q_colloid","up1",0.01,0.0357
+"porosity","P_mix","up1",0.005,0.0189
+"porosity","D_particle","up1",0.0046,0.0135
+"porosity","tau_mix","up1",0.0043,0.0183
+"porosity","CMC","up1",0,0
+"porosity","D_surf","up1",0,0
+"porosity","C_monomer","up1",0,0
+"porosity","C_binder","up1",0,0
+"porosity","T_mix","up1",0,0
+"porosity","C_gas_diss_temp","up1",0,0
+"porosity","C_plasticizer","up1",0,0
+"porosity","C_temp_mass","up1",0,0
+"porosity","D_template","up1",0,0
+"porosity","template_dose","up1",0,0
+"porosity","ALR","up2",0,0
+"porosity","P_atom_air","up2",0,0
+"porosity","P_feed","up2",0,0
+"porosity","mdot_L","up2",0,0
+"porosity","sigma","up2",0,0
+"porosity","mu_L","up2",0,0
+"porosity","T_dryer_in","up2",0,0
+"porosity","mdot_gas_dry","up2",0,0
+"porosity","Y_in","up2",0,0
+"porosity","t_hold","up2",0,0
+"porosity","D_b","up2",0,0
+"porosity","Tg_polymer","up2",0,0
+"porosity","n_flow","up2",0,0
+"porosity","k_perm_mono","up2",0,0
+"porosity","k_perm_plast","up2",0,0
+"porosity","k_perm_bind","up2",0,0
+"porosity","T_bp_solv","up2",0,0
+"sphericity","Delta_pH","up1",0.3165,0.3867
+"sphericity","ionic_strength","up1",0.308,0.4231
+"sphericity","v_tip","up1",0.2547,0.3788
+"sphericity","C_surfactant","up1",0.2119,0.3581
+"sphericity","C_solid_mass","up1",0.1471,0.2676
+"sphericity","MW_surfactant","up1",0.1094,0.2399
+"sphericity","A_molecule","up1",0.0587,0.1725
+"sphericity","Q_gas","up1",0.0559,0.1792
+"sphericity","Q_template","up1",0.0454,0.1257
+"sphericity","HLB","up1",0.0193,0.1056
+"sphericity","Q_colloid","up1",0.0174,0.0621
+"sphericity","P_mix","up1",0.0086,0.0329
+"sphericity","D_particle","up1",0.008,0.0235
+"sphericity","tau_mix","up1",0.0075,0.0318
+"sphericity","CMC","up1",0,0
+"sphericity","D_surf","up1",0,0
+"sphericity","C_monomer","up1",0,0
+"sphericity","C_binder","up1",0,0
+"sphericity","T_mix","up1",0,0
+"sphericity","C_gas_diss_temp","up1",0,0
+"sphericity","C_plasticizer","up1",0,0
+"sphericity","C_temp_mass","up1",0,0
+"sphericity","D_template","up1",0,0
+"sphericity","template_dose","up1",0,0
+"sphericity","ALR","up2",0,0
+"sphericity","P_atom_air","up2",0,0
+"sphericity","P_feed","up2",0,0
+"sphericity","mdot_L","up2",0,0
+"sphericity","sigma","up2",0,0
+"sphericity","mu_L","up2",0,0
+"sphericity","T_dryer_in","up2",0,0
+"sphericity","mdot_gas_dry","up2",0,0
+"sphericity","Y_in","up2",0,0
+"sphericity","t_hold","up2",0,0
+"sphericity","D_b","up2",0,0
+"sphericity","Tg_polymer","up2",0,0
+"sphericity","n_flow","up2",0,0
+"sphericity","k_perm_mono","up2",0,0
+"sphericity","k_perm_plast","up2",0,0
+"sphericity","k_perm_bind","up2",0,0
+"sphericity","T_bp_solv","up2",0,0
+"skin","mdot_gas_dry","up2",0.6969,0.5056
+"skin","mu_L","up2",0.3379,0.3272
+"skin","T_dryer_in","up2",0.3176,0.4069
+"skin","C_solid_mass","up1",0.2871,0.3369
+"skin","T_mix","up1",0.2221,0.3177
+"skin","ionic_strength","up1",0.096,0.1554
+"skin","Delta_pH","up1",0.0865,0.133
+"skin","mdot_L","up2",0.0757,0.1735
+"skin","Q_template","up1",0.0719,0.1101
+"skin","Q_colloid","up1",0.0675,0.1129
+"skin","C_surfactant","up1",0.0547,0.1118
+"skin","MW_surfactant","up1",0.0328,0.081
+"skin","v_tip","up1",0.0204,0.0305
+"skin","C_plasticizer","up1",0.0133,0.0137
+"skin","C_monomer","up1",0.013,0.016
+"skin","Y_in","up2",0.0118,0.032
+"skin","A_molecule","up1",0.0106,0.0193
+"skin","C_binder","up1",0.0049,0.0067
+"skin","template_dose","up1",0.0032,0.0044
+"skin","HLB","up1",0.0028,0.015
+"skin","tau_mix","up1",0.0027,0.0046
+"skin","Q_gas","up1",0.001,0.0028
+"skin","D_template","up1",8e-04,0.0022
+"skin","D_particle","up1",5e-04,0.001
+"skin","P_mix","up1",1e-04,5e-04
+"skin","C_gas_diss_temp","up1",1e-04,2e-04
+"skin","D_b","up2",0,0
+"skin","CMC","up1",0,0
+"skin","D_surf","up1",0,0
+"skin","C_temp_mass","up1",0,0
+"skin","ALR","up2",0,0
+"skin","P_atom_air","up2",0,0
+"skin","P_feed","up2",0,0
+"skin","sigma","up2",0,0
+"skin","t_hold","up2",0,0
+"skin","Tg_polymer","up2",0,0
+"skin","n_flow","up2",0,0
+"skin","k_perm_mono","up2",0,0
+"skin","k_perm_plast","up2",0,0
+"skin","k_perm_bind","up2",0,0
+"skin","T_bp_solv","up2",0,0
+"tapped density","Delta_pH","up1",154.7051,188.9799
+"tapped density","ionic_strength","up1",150.518,206.7969
+"tapped density","v_tip","up1",124.4691,185.1581
+"tapped density","C_surfactant","up1",103.5424,175.0031
+"tapped density","C_solid_mass","up1",71.8986,130.7894
+"tapped density","MW_surfactant","up1",53.4878,117.2658
+"tapped density","A_molecule","up1",28.7004,84.3245
+"tapped density","Q_gas","up1",27.3096,87.6023
+"tapped density","Q_template","up1",22.2019,61.4517
+"tapped density","HLB","up1",9.4218,51.6047
+"tapped density","Q_colloid","up1",8.5103,30.3356
+"tapped density","P_mix","up1",4.2192,16.0559
+"tapped density","D_particle","up1",3.9022,11.4835
+"tapped density","tau_mix","up1",3.655,15.5289
+"tapped density","CMC","up1",1e-04,3e-04
+"tapped density","D_surf","up1",0,2e-04
+"tapped density","C_monomer","up1",0,1e-04
+"tapped density","C_binder","up1",0,1e-04
+"tapped density","T_mix","up1",0,0
+"tapped density","C_gas_diss_temp","up1",0,0
+"tapped density","C_plasticizer","up1",0,0
+"tapped density","C_temp_mass","up1",0,0
+"tapped density","D_template","up1",0,0
+"tapped density","template_dose","up1",0,0
+"tapped density","ALR","up2",0,0
+"tapped density","P_atom_air","up2",0,0
+"tapped density","P_feed","up2",0,0
+"tapped density","mdot_L","up2",0,0
+"tapped density","sigma","up2",0,0
+"tapped density","mu_L","up2",0,0
+"tapped density","T_dryer_in","up2",0,0
+"tapped density","mdot_gas_dry","up2",0,0
+"tapped density","Y_in","up2",0,0
+"tapped density","t_hold","up2",0,0
+"tapped density","D_b","up2",0,0
+"tapped density","Tg_polymer","up2",0,0
+"tapped density","n_flow","up2",0,0
+"tapped density","k_perm_mono","up2",0,0
+"tapped density","k_perm_plast","up2",0,0
+"tapped density","k_perm_bind","up2",0,0
+"tapped density","T_bp_solv","up2",0,0
