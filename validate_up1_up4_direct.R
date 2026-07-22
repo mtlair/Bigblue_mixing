@@ -29,6 +29,24 @@ eval(parse(text = paste(lines[1:cut], collapse = "\n")))
 dat     <- read.csv("data/cond_process.csv")
 RHO_AIR <- 0.0765   # lb/ft3, standard air
 
+# --- Dryer air mass flow from an evaporative energy balance -------------------
+# Sizes the drying-gas flow to evaporate the feed water down to <=0.5% residual
+# moisture, given the measured inlet/outlet temperatures. The product is not
+# hygroscopic, so drying is not limited by the air's moisture-carrying capacity
+# (inlet dew point ignored) -- the binding constraint is the energy balance:
+#   mdot_gas * cp_gas * (Tin - Tout) = mdot_evap * h_fg + mdot_feed * cp_feed * (Tout - Tfeed)
+# Constants match the UP2 dryer module (h_fg = 2.30e6 J/kg, cp_gas = 1005 J/kg.K).
+dryer_airflow <- function(row) {
+  h_fg <- 2.30e6; cp_gas <- 1005; resid <- 0.005; LB <- 0.4536; HR <- 3600
+  s    <- row$solid_pct / 100
+  feed <- row$up4_feed_lbhr * LB / HR                       # kg/s
+  Tin  <- row$up4_Tin_C; Tout <- row$up4_Tout_C; Tf <- row$up1_exit_temp_C
+  mevap <- feed * (1 - s) - resid / (1 - resid) * feed * s  # water evaporated [kg/s]
+  cp_feed <- (1 - s) * 4180 + s * 1500                      # J/kg.K
+  Q <- mevap * h_fg + feed * cp_feed * (Tout - Tf)          # J/s
+  Q / (cp_gas * (Tin - Tout))                               # kg/s drying gas
+}
+
 # --- one condition, UP1 -> (bypass) -> UP4 -----------------------------------
 run_cond <- function(row, size_template = 0) {
   x <- nominal_x
@@ -44,6 +62,14 @@ run_cond <- function(row, size_template = 0) {
   x["ALR"]        <- air_lbhr / row$up4_feed_lbhr
   x["P_atom_air"] <- (row$up4_psig + 14.696) * 6894.76         # Pa, absolute
   x["mdot_L"]     <- row$up4_feed_lbhr * 0.4536 / 3600         # kg/s
+  # UP4 dryer thermals from the data: measured inlet temperature + the dryer air
+  # mass flow back-solved from an evaporative energy balance (feed rate, solids,
+  # <=0.5% residual moisture, measured Tin/Tout; product non-hygroscopic so the
+  # balance is energy-limited, independent of inlet dew point).
+  if (!is.null(row$up4_Tin_C) && is.finite(row$up4_Tin_C)) {
+    x["T_dryer_in"]   <- row$up4_Tin_C + 273.15
+    x["mdot_gas_dry"] <- dryer_airflow(row)
+  }
   x["size_template"] <- size_template
 
   eq <- equipment; eq$template_type <- TEMPLATE_TYPE

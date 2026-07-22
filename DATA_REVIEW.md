@@ -325,6 +325,39 @@ unified when both are turned on against real density data.
 
 ---
 
+## Part 6 — Dryer thermals (evaporative air-flow estimate)
+
+`visc.xlsx` now carries the dryer inlet/outlet temperatures (`up4_Tin ≈ 152 °C`,
+`up4_Tout ≈ 88 °C`). With those, the drying-gas mass flow is back-solved from an
+**evaporative energy balance** — sized to dry the feed to ≤ 0.5 % residual moisture:
+
+> `mdot_gas · cp_gas · (Tin − Tout) = mdot_evap · h_fg + mdot_feed · cp_feed · (Tout − Tfeed)`
+
+using the feed rate (`up4_feed`) and solids (`up1_feed_solid%`, no intermediate
+dilution). The product is **not hygroscopic**, so drying is not limited by the
+air's moisture capacity (inlet dew point ignored) — the binding constraint is
+energy. Result: **mdot_gas ≈ 0.40–0.62 kg/s** (air/feed ≈ 30×, humidity rise only
+~0.025 kg/kg — far below saturation, confirming the energy-limited regime). Code:
+`dryer_airflow()` in `validate_up1_up4_direct.R`; constants match the UP2 module
+(`h_fg = 2.30e6`, `cp_gas = 1005`).
+
+**This finally grounds the drying-dependent properties.** The nominal thermals
+(127 °C, 0.32 kg/s) were badly off; the real dryer runs **hotter (152 °C) with ~1.5×
+the air**. Feeding the measured `T_dryer_in` + the evaporative `mdot_gas` per
+condition, **skin jumps from ~0.1 to ~0.75–0.82** — strong shell formation, which is
+exactly what the SEM shows (skinned shells/granules). The thermal factor windows
+were retuned to the measured envelope: `T_dryer_in` 330–470 → **410–440 K**,
+`mdot_gas_dry` 0.10–1.00 → **0.40–0.62 kg/s** (and `sp_mid` nominal 0.25 → 0.47).
+
+**Flag:** the model's *kinetic* residual moisture `X_moisture` still ranges
+0.004–0.16 across conditions, inconsistent with the operational ≤ 0.5 % design
+basis. Since the process dries to ≤ 0.5 % by construction (non-hygroscopic,
+energy-sized air), the drying-kinetics closure (`tau_dry`, `t_res`) needs its own
+calibration / a 0.5 % cap before `X_moisture` (and the moisture-plasticized `Tg`)
+can be trusted — a distinct follow-up. The thermal *inputs* are now data-grounded.
+
+---
+
 ## Toward the goal — experimental ranges
 
 With the UP1 and UP4-atomizer closures calibrated and validated UP1→UP4-direct,
