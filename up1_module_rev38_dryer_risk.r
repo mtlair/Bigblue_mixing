@@ -383,7 +383,7 @@ run_single_simulation <- function(parameters) {
   s_max <- function(a, b) 0.5 * ((a + b) + sqrt((a - b)^2 + 1e-8))
   cbrt <- function(x) sign(x) * abs(x)^(1/3)
   
-  p$rho_water <- 1000.0; p$rho_polymer <- 1050.0; p$k_sparge <- 0.05
+  p$rho_water <- 1000.0; p$rho_polymer <- 1700.0; p$k_sparge <- 0.05  # 1050 -> 1700 skeletal (legacy file; not sourced by the chain)
 
   # Templating mode: gas template activates the non-penetrating gas path so
   # template loading is routed into trapped gas rather than rigid inventory.

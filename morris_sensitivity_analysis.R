@@ -153,7 +153,9 @@ gamma_a  <- 1.4       # heat capacity ratio, air                [-]
 A_L      <- 1.0e-6    # liquid passage area                     [m2]
 A_G      <- 5.0e-6    # gas passage area                        [m2]
 D_h      <- 1.0e-3    # nozzle hydraulic diameter               [m]
-rho_s    <- 1400      # dry solid (polymer) density             [kg/m3]
+rho_s    <- 1700      # dry solid (polymer) skeletal density     [kg/m3]
+                      # (was 1400; reconciled to the true 1.70 g/cc skeletal
+                      #  density used by UP1 rho_polymer and the morphology recal)
 a_prim   <- 1.0e-7    # primary colloid particle radius         [m]
 kB       <- 1.380649e-23
 N_Av     <- 6.02214e23
