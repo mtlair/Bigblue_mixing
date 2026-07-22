@@ -223,7 +223,15 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   s_max <- function(a, b) 0.5 * ((a + b) + sqrt((a - b)^2 + 1e-8))
   cbrt <- function(x) sign(x) * abs(x)^(1/3)
 
-  p$rho_water <- 1000.0; p$rho_polymer <- 1050.0; p$k_sparge <- 0.05
+  # rho_polymer = 1700: true skeletal density of the (filled) polymer, reconciled
+  # with the measured powder bulk density (~0.30 g/cc) and the SEM porosity work.
+  # Was 1050 (generic latex). This lowers phi_s (0.192 -> 0.128 at 20% solid), so
+  # the aggregation-onset constant C_AGG_CAL and the viscosity floc exponent are
+  # re-derived below to hold the MEASURED anchors (onset ~6.8 m/s, slurry
+  # eta ~0.20 Pa.s). The wet-d50 plateau (AGG_FACTOR_CAL) is a direct PSD
+  # measurement and is unchanged. Keeps UP2 rho_s (= feed$rho_polymer) consistent
+  # with the 1.70 g/cc skeletal density used by the morphology recalibration.
+  p$rho_water <- 1000.0; p$rho_polymer <- 1700.0; p$k_sparge <- 0.05
 
   t_type <- if (!is.null(p$template_type)) p$template_type else 1
   if (t_type == 2) p$chi_npgas <- 1.0
@@ -308,19 +316,14 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # are easier to shear into contact: v_tip_crit ~ (a_ref/a)^3 from Pe).
   #
   # Calibration: 200 nm primary particles, aggregation onset observed at
-  # v_tip_crit = 6.81 m/s at 20% solid (E_stab/phi_s = 85.4 at C_solid=0.20).
-  # C_emp = v_tip_crit * phi_s / E_stab = 6.81 / 85.4 = 0.0797.
-  # The Pe formula (C_phys = D_imp*kT/(6*pi*mu*a^3)) gives C ~169 at 100 nm
-  # radius — a factor ~1200 larger, absorbed by the turbulent energy cascade
-  # (shear at particle scale << v_tip/D_impeller).
-  # C_AGG_CAL encodes BOTH the turbulent-cascade correction and the primary
-  # particle size (200 nm, the majority population in this colloid). It is
-  # NOT varied with D_particle because D_particle in UP1 sets the flocculation
-  # ODE kinetics and may differ from the colloidal-stability primary size.
+  # v_tip_crit = 6.81 m/s at 20% solid. v_tip_crit = C_AGG_CAL * E_stab / phi_s,
+  # with E_stab = 16.4 at nominal chemistry, so C_AGG_CAL = 6.81 * phi_s / E_stab.
+  # rho_polymer 1050 -> 1700 lowers phi_s(20%) from 0.192 to 0.1282, so to hold
+  # the SAME measured onset C_AGG_CAL is re-derived: 6.81 * 0.1282 / 16.4 = 0.0532
+  # (was 0.0797 at phi_s = 0.192). The onset location (cond2 dispersed at 4.37 m/s,
+  # cond5 aggregated at 6.92 m/s) is a measurement and is preserved by construction.
   # To recalibrate for a different primary: C_new = v_tip_crit_obs * phi_s / E_stab.
-  # Multi-point check: at 25% solid v_tip_crit ~ 5.45 m/s (1/phi_s scaling),
-  # so 6.12 m/s (ratio=1.12) shows moderate aggregation (observed d50=9.71 µm) ✓.
-  C_AGG_CAL   <- 0.0797
+  C_AGG_CAL   <- 0.0532
   dpH_ppc     <- s_pos(p$Delta_pH)
   W_bar_ppc   <- exp(1.0 * dpH_ppc - 5.0 * sqrt(p$ionic_strength))
   E_stab_exit <- s_max(0.01, s_min(100.0, W_bar_ppc)) * s_pos(1.0 + 10.0 * Theta_surf)
@@ -456,10 +459,12 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   #   over-predicted the typical slurry ~4×, which propagates to the coupled
   #   nozzle viscosity (mu_exit_PaS -> UP2 mu_slurry0 when couple_viscosity).
   #   Recalibration: mu_base ≈ 1.25e-3 Pa·s (post 0.7^-0.3 term) and
-  #   D_agg/D_pri = 10.2/0.2 = 51 -> mu_floc = 0.201/1.25e-3 = 160
-  #   -> exponent A = log(160)/log(51) = 1.29.
+  #   D_agg/D_pri = 10.2/0.2 = 51 -> mu_floc = 0.201/1.25e-3 = 160 -> A = 1.29.
+  #   rho_polymer 1050 -> 1700 lowers phi_s (0.192 -> 0.128 at 20% solid), so
+  #   mu_base drops to ~1.03e-3 Pa.s; holding eta = 0.20 Pa.s re-derives the
+  #   exponent: mu_floc = 0.201/1.03e-3 = 195 -> A = log(195)/log(51) = 1.34.
   # In the stable regime D_agg/D_pri → 1 so mu_floc_factor → 1 (no correction).
-  mu_floc_factor     <- s_max(1.0, (D_agg_phys_um / D_pri_cal_um)^1.29)
+  mu_floc_factor     <- s_max(1.0, (D_agg_phys_um / D_pri_cal_um)^1.34)
   Blended_Viscosity_PaS <- mu_base_exit * mu_floc_factor * (1 + (100.0 / 50.0))^(0.7 - 1)
 
   rho_colloid_kg_m3 <- (phi_s * p$rho_polymer) + ((1.0 - phi_s) * p$rho_water)

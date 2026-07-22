@@ -297,11 +297,27 @@ bit-for-bit unchanged (verified on R); `= 1` applies the anchored pair. This fol
 in the regime-dependent porosity **and** sphericity correction (φ↑, Ω↓ for the
 dispersed feed).
 
-**Open coupling to flag:** the recalibration uses skeletal **1.70 g/cc for the dry
-powder**, but the **UP1 slurry still uses `rho_polymer = 1050`**. If 1.70 is the
-true polymer density, UP1 `phi_s` (and therefore the viscosity / aggregation-onset
-calibration, which assumed 1050) should be revisited — a distinct pass, since it
-shifts the wet-side anchors. Also, porosity and particle *size* are physically
+**Density coupling — now reconciled (UP1 `rho_polymer` 1050 → 1700).**
+UP1's polymer density was raised from the generic-latex 1050 to the true skeletal
+**1700 kg/m³**, so the whole chain (UP1 slurry, UP2 `rho_s`, and the morphology
+recalibration's 1.70 g/cc) uses one consistent density. This lowers `phi_s`
+(0.192 → 0.128 at 20 % solid), so the two `phi_s`-dependent wet-side constants were
+re-derived to hold the **measured** anchors:
+
+| constant | old (phi_s=0.192) | new (phi_s=0.128) | anchor held |
+|---|---|---|---|
+| `C_AGG_CAL` (onset) | 0.0797 | **0.0532** | onset ~6.8 m/s at 20 % (cond2 dispersed, cond5 aggregated) |
+| floc exponent | 1.29 | **1.34** | slurry η geomean 0.20 Pa·s |
+| `AGG_FACTOR_CAL` | 50.0 | 50.0 (unchanged) | wet d50 plateau 10.2 µm (direct PSD measurement) |
+| `MILL_MARGIN` | 3.5 | 3.5 (unchanged) | onset preserved ⇒ milling still out of envelope |
+
+Verified on R (UP1→UP4-direct harness): onset classification unchanged, wet d50
+plateau = 10.20 µm, slurry η geomean = 0.209 Pa·s — the wet-side calibration is
+preserved under the corrected density. `SG_Colloid` rises (~1.01 → ~1.09), which is
+the physically correct consequence. `unified_output/` regenerated. (The legacy
+`up1_module_rev38_dryer_risk.r`, not sourced by the chain, still uses 1050.)
+
+Porosity and particle *size* are physically
 coupled (a more porous particle is larger); here the size-template and the
 morphology recalibration are kept as independent knobs, so enabling both is
 additive rather than self-consistent — acceptable for a muted capability, to be
