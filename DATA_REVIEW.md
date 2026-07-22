@@ -238,6 +238,34 @@ So the dry-particle morphology switches on the **same `v_tip_crit`** as wet
 aggregation: dispersed feed → high-Péclet **hollow shell**; pre-aggregated feed →
 **compact granule**.
 
+**Visual morphology survey (1500×, one class per sample):**
+
+| Sample | cond | v_tip | morphology |
+|---|---|---|---|
+| 110495 | cond2 | 4.37 | **hollow — crumpled/collapsed shells** |
+| 110041 | cond5 | 6.92 | compact granule (borderline, reads dense) |
+| 110043 | cond9 | 9.62 | compact granule |
+| 110045 | cond11 | 12.40 | compact granule (clearest dense) |
+| 110048 | cond14 | 9.61 | compact granule |
+| 109384 | cond15 | 7.41 | compact granules |
+| 110494 | cond1 | — (SEM-only) | compact granule |
+| 110042 | cond6 | — (SEM-only) | compact granule |
+
+**cond2 is the only hollow sample; every other sample is a compact dense granule.**
+The SEM-only samples (cond1, 6, 10, 13, 16) need their process conditions to place
+them in the regime framework, but morphologically they read dense.
+
+**Automated image analysis did not yield reliable per-cond shape numbers.** A
+watershed-segmentation pipeline (circularity, solidity) over the SEM set does *not*
+separate the regimes: the discriminating feature is the **internal void**, which is
+not present in a 2-D *surface* projection, and both regimes have irregular
+projected outlines (crumpled shells vs lobed raspberry granules), so circularity
+conflates them; large-granule counts per frame are also too low (n ≈ 3–10) for
+stable statistics. Reliable quantification needs **dynamic image analysis** on
+dispersed powder (thousands of particles) for sphericity and **cross-section SEM**
+(FIB/microtome) for a true void fraction — the surface images give the *qualitative*
+class cleanly but not calibrated numbers.
+
 **Bulk density reconciliation (skeletal 1.70 g/cc, bulk ~0.30 g/cc).**
 "Compact" is *not* "solid": a 0.30 g/cc bulk with a 1.70 g/cc skeletal density
 forces substantial internal porosity even in the UP1-control granules —
