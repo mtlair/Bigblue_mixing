@@ -418,6 +418,12 @@ spray_dry_model <- function(x) {
   tau_dry <- (modes_m^2 / kappa) * (1 + 20 * theta_skin / Perm_shell)
   X_j     <- exp(-t_res / tau_dry)                # residual water per mode
   X_moist <- sum(modes_w * X_j)                   # fraction of initial water
+  # Operational moisture reconciliation (mirror of up2_run_dryer): energy-sized
+  # air leaves <= w_moist_target (0.5%) in the non-hygroscopic powder, so cap
+  # X_moist at the value yielding the target powder moisture. Sweepable to ~1%.
+  w_moist_target <- if ("w_moist_target" %in% names(x)) x[["w_moist_target"]] else 0.005
+  X_moist <- min(X_moist, w_moist_target * C_sol /
+                          (max(1 - C_sol, 1e-6) * (1 - w_moist_target)))
 
   ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
   # in co-current drying particles approach the outlet gas temperature

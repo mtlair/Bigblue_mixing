@@ -17,16 +17,16 @@ UNIFIED CHAIN - nominal factor values, per templating strategy
   up2_D_particle_um                21.15
   up2_Dp90_um                      58.16
   up2_theta_skin_z                 0.745
-  up2_Omega_struct_z               0.9444
-  up2_phi_porosity_z               0.06829
-  up2_rho_tapped                   462.7
-  up2_Tg_product_K                 250.6
-  up2_X_moisture                   0.09361
+  up2_Omega_struct_z               0.9443
+  up2_phi_porosity_z               0.06846
+  up2_rho_tapped                   568.4
+  up2_Tg_product_K                 280.5
+  up2_X_moisture                   0.001125
   up2_Perm_shell_rel               1.283
   up2_D_pore_um                    1.154
   up2_solv_retained                0.03178
-  up2_f_burst_solv                 0.01108
-  up2_sigma_y_cake_MPa             0.3338
+  up2_f_burst_solv                 0.01069
+  up2_sigma_y_cake_MPa             0.3399
 
 ================ template_type = 2 (gas) ================
   up1_Mixing_Potential             1765
@@ -44,16 +44,16 @@ UNIFIED CHAIN - nominal factor values, per templating strategy
   up2_D_particle_um                30.86
   up2_Dp90_um                      83.09
   up2_theta_skin_z                 0.7125
-  up2_Omega_struct_z               0.9561
-  up2_phi_porosity_z               0.04341
-  up2_rho_tapped                   387.5
-  up2_Tg_product_K                 247.8
-  up2_X_moisture                   0.1971
+  up2_Omega_struct_z               0.956
+  up2_phi_porosity_z               0.0435
+  up2_rho_tapped                   638.9
+  up2_Tg_product_K                 276.6
+  up2_X_moisture                   0.0009853
   up2_Perm_shell_rel               1.283
   up2_D_pore_um                    1.118
   up2_solv_retained                0.03682
-  up2_f_burst_solv                 0.007951
-  up2_sigma_y_cake_MPa             0.3584
+  up2_f_burst_solv                 0.007736
+  up2_sigma_y_cake_MPa             0.3634
 
 ================ template_type = 3 (surface_weld) ================
   up1_Mixing_Potential             387.9
@@ -72,15 +72,15 @@ UNIFIED CHAIN - nominal factor values, per templating strategy
   up2_Dp90_um                      53.24
   up2_theta_skin_z                 0.7026
   up2_Omega_struct_z               0.9535
-  up2_phi_porosity_z               0.07177
-  up2_rho_tapped                   510.5
-  up2_Tg_product_K                 247.2
-  up2_X_moisture                   0.03625
+  up2_phi_porosity_z               0.07189
+  up2_rho_tapped                   549.5
+  up2_Tg_product_K                 275.7
+  up2_X_moisture                   0.0009853
   up2_Perm_shell_rel               2.049
   up2_D_pore_um                    1.085
   up2_solv_retained                0.03521
-  up2_f_burst_solv                 0.006228
-  up2_sigma_y_cake_MPa             0.296
+  up2_f_burst_solv                 0.00608
+  up2_sigma_y_cake_MPa             0.2996
 
 ================ template_type = 4 (capillary_bridge) ================
 --- stream: mixer exit ---
@@ -172,14 +172,14 @@ UNIFIED CHAIN - nominal factor values, per templating strategy
   up2_D_particle_um                18.41
   up2_Dp90_um                      50.77
   up2_theta_skin_z                 0.7206
-  up2_Omega_struct_z               0.9462
-  up2_phi_porosity_z               0.09171
-  up2_rho_tapped                   463.2
-  up2_Tg_product_K                 247.2
-  up2_X_moisture                   0.06656
+  up2_Omega_struct_z               0.9461
+  up2_phi_porosity_z               0.09185
+  up2_rho_tapped                   533.4
+  up2_Tg_product_K                 275.7
+  up2_X_moisture                   0.0009853
   up2_Perm_shell_rel               1.3
   up2_D_pore_um                    1.13
   up2_solv_retained                0.03265
-  up2_f_burst_solv                 0.009451
-  up2_sigma_y_cake_MPa             0.3468
+  up2_f_burst_solv                 0.009239
+  up2_sigma_y_cake_MPa             0.3508
 

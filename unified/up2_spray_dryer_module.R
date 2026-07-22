@@ -273,6 +273,16 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   tau_dry <- (modes_m^2 / kappa) * (1 + 20 * theta_skin / Perm_shell)
   X_j     <- exp(-t_res / tau_dry)
   X_moist <- sum(modes_w * X_j)
+  # Operational moisture reconciliation: the dryer air is energy-sized to leave
+  # <= w_moist_target (0.5%) moisture in the powder, and the product is not
+  # hygroscopic, so the final moisture cannot exceed the target regardless of the
+  # per-mode drying kinetics. Cap X_moist (fraction of FEED water retained) at the
+  # value that yields the target POWDER moisture w_wat at this solids loading:
+  #   w_wat = X_moist(1-Csol)/(X_moist(1-Csol)+Csol)  ->  X_cap = t*Csol/((1-Csol)(1-t)).
+  # Default 0.005; a future study can sweep w_moist_target up to ~0.01 (1%).
+  w_moist_target <- if (!is.null(x[["w_moist_target"]])) x[["w_moist_target"]] else 0.005
+  X_moist_cap <- w_moist_target * C_sol / (max(1 - C_sol, 1e-6) * (1 - w_moist_target))
+  X_moist <- min(X_moist, X_moist_cap)
 
   ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
   T_particle <- 0.85 * T_out + 0.15 * T_feed

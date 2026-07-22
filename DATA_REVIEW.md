@@ -349,12 +349,26 @@ exactly what the SEM shows (skinned shells/granules). The thermal factor windows
 were retuned to the measured envelope: `T_dryer_in` 330–470 → **410–440 K**,
 `mdot_gas_dry` 0.10–1.00 → **0.40–0.62 kg/s** (and `sp_mid` nominal 0.25 → 0.47).
 
-**Flag:** the model's *kinetic* residual moisture `X_moisture` still ranges
-0.004–0.16 across conditions, inconsistent with the operational ≤ 0.5 % design
-basis. Since the process dries to ≤ 0.5 % by construction (non-hygroscopic,
-energy-sized air), the drying-kinetics closure (`tau_dry`, `t_res`) needs its own
-calibration / a 0.5 % cap before `X_moisture` (and the moisture-plasticized `Tg`)
-can be trusted — a distinct follow-up. The thermal *inputs* are now data-grounded.
+**Moisture reconciliation (applied).** The energy-sized air leaves ≤ 0.5 % moisture
+in the non-hygroscopic powder, so the final moisture cannot exceed that regardless
+of the per-mode drying kinetics. Both dryers now cap `X_moist` (fraction of feed
+water retained) at the value that yields the target **powder** moisture
+`w_moist_target` (default **0.5 %**), via
+`X_cap = t·Csol / ((1−Csol)(1−t))`. Result: powder moisture is pinned at 0.5 %
+across all conditions (was an inconsistent 0.4–16 % of feed water from the raw
+kinetics), and the moisture-plasticized `Tg` now uses the operational value. The
+parameter is a single knob — a future study can **sweep `w_moist_target` up to
+~1 %**. (The drying-kinetics closure itself, `tau_dry`/`t_res`, is still
+uncalibrated in an absolute sense; the cap makes the *reported* moisture
+operationally correct until that closure is calibrated.)
+
+**Direct-path scope of the thermals.** `T_dryer_in` (~425 K) is a dryer setpoint,
+valid regardless of path. `mdot_gas` was sized on the **direct-path** feed
+(`up1_feed_solid%` ≈ 20 %, no intermediate dilution) — correct for the UP1→UP4
+runs the data describes. When UP2/UP3 come online, UP3 concentrates the feed
+(~45 %), so `mdot_gas` must be **re-derived from the post-UP3 solids** (same
+evaporative method, different input); the `full_train` nominal is tagged
+accordingly.
 
 ---
 

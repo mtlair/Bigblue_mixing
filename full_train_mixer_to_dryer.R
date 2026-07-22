@@ -76,7 +76,10 @@ sp_mid["T_system"]     <- 423   # dryer inlet ~150 C
 sp_mid["T_feed"]       <- 300   # atomizing air ~ ambient
 sp_mid["T_sticky_K"]   <- 493   # melt/clumping ~220 C (heat-resistant product)
 sp_mid["mdot_gas_dry"] <- 0.47  # evaporative estimate from up4_feed + solids to
-                                # <=0.5% moisture (visc.xlsx Tin/Tout balance, mean ~0.47 kg/s)
+                                # <=0.5% moisture (visc.xlsx Tin/Tout balance, mean ~0.47 kg/s).
+                                # DIRECT-PATH value (sized on ~20% UP1 solids). UP3
+                                # concentrates the feed (~45%), so re-derive mdot_gas
+                                # from the post-UP3 solids once UP3 is calibrated.
 sp_mid["size_template"] <- 0    # MUTED: UP1 aggregate size-template overlay off
                                 # (set to 1 to let the aggregate template the dry
                                 #  particle in the UP1-control regime; see DATA_REVIEW.md)
