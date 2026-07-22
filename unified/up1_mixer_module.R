@@ -333,8 +333,12 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   v_tip_ratio <- p$v_tip / s_max(0.1, v_tip_crit)          # >1 past aggregation
   mill_ratio  <- p$v_tip / s_max(0.1, v_tip_mill)          # >1 past milling
 
-  # Smooth onsets (0 below threshold, saturating to 1 well above it)
-  agg_on  <- tanh(2.0 * s_pos(v_tip_ratio - 1.0))
+  # Smooth onsets (0 below threshold, saturating to 1 well above it).
+  # k=8 gives a steep aggregation transition that saturates within ~20% above
+  # v_tip_crit — multi-point PSD calibration (v_tip = 6.12, 8.5, 9.64, 12.44 m/s)
+  # shows this steeper onset is required for AGG_FACTOR_CAL to be consistent
+  # across operating points. k=2 (prior) overestimated D_agg at higher v_tip.
+  agg_on  <- tanh(8.0 * s_pos(v_tip_ratio - 1.0))
   mill_on <- tanh(2.0 * s_pos(mill_ratio  - 1.0))
 
   # Aggregation dominates in the band between the two thresholds, then is
@@ -353,10 +357,11 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # Formula: D_agg transitions from D_pri_cal in the stable regime, peaks
   # in the aggregation band (~12-15 µm), and falls to D_primary_exit_um in
   # the milling regime where shear breaks flocs back to primaries.
-  # Derivation of AGG_FACTOR_CAL: (9.6/0.2 - 1) / agg_on(8.5 m/s, crit=6.81)
-  #   = 47 / tanh(2 * (8.5/6.81 - 1)) = 47 / 0.460 = 102.
+  # Derivation of AGG_FACTOR_CAL (k=8 onset): (9.6/0.2 - 1) / agg_on(8.5 m/s, crit=6.81)
+  #   = 47 / tanh(8 * (8.5/6.81 - 1)) = 47 / tanh(1.984) = 47 / 0.965 = 48.7.
+  #   Multi-point check (9.64 m/s, 12.44 m/s) confirms 48.7 ± 5 across all points.
   D_pri_cal_um   <- 0.2    # 200 nm physical primary (calibration colloid)
-  AGG_FACTOR_CAL <- 102.0  # calibrated from d50 = 9.6 µm at v_tip = 8.5 m/s
+  AGG_FACTOR_CAL <- 48.7   # multi-point calibration: k=8 onset, d50=9.6 µm @ 8.5 m/s
   D_agg_phys_um  <- D_primary_exit_um +
     (D_pri_cal_um - D_primary_exit_um + D_pri_cal_um * AGG_FACTOR_CAL * agg_on) * (1.0 - mill_on)
   D_agg_phys_um  <- max(D_primary_exit_um, D_agg_phys_um)
