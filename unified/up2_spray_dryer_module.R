@@ -347,7 +347,14 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   if (size_template > 0 && !is.null(feed$D_agg_um) &&
       is.finite(feed$D_agg_um) && feed$D_agg_um > 0) {
     TEMPLATE_DENSIFY <- 1.20                              # dry/wet, UP1-control set
-    w_tmpl    <- min(max(1 - d_ratio, 0), 1) * min(max(size_template, 0), 1)
+    # Aggregation fraction: how far D_agg sits above the un-aggregated baseline
+    # D_primary_exit_um (what D_agg floors to when the feed never aggregates).
+    # -> 0 in the atomizer-control regime (dispersed feed, D_agg == baseline)
+    #    so the droplet-shell is kept untouched there at any knob setting.
+    D_pexit  <- if (!is.null(feed$D_primary_exit_um) && is.finite(feed$D_primary_exit_um))
+                  feed$D_primary_exit_um else feed$D_agg_um
+    agg_frac <- max(0, 1 - min(D_pexit / feed$D_agg_um, 1))
+    w_tmpl    <- agg_frac * min(max(size_template, 0), 1)
     Dp50_sh   <- exp(sum(modes_w * log(Dp_j)))           # shell distribution centre
     Dp_target <- TEMPLATE_DENSIFY * feed$D_agg_um * 1e-6
     Dp_j      <- Dp_j * (Dp_target / Dp50_sh)^w_tmpl     # log-blend toward template

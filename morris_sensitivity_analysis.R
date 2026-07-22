@@ -521,7 +521,12 @@ spray_dry_model <- function(x) {
   if (size_template > 0 && "D_agg_um" %in% names(x) &&
       is.finite(x[["D_agg_um"]]) && x[["D_agg_um"]] > 0) {
     TEMPLATE_DENSIFY <- 1.20                              # dry/wet, UP1-control set
-    w_tmpl    <- min(max(1 - d_ratio, 0), 1) * min(max(size_template, 0), 1)
+    # Aggregation fraction vs the un-aggregated baseline D_primary_exit_um: -> 0
+    # in the atomizer-control regime (dispersed feed) so the droplet-shell stands.
+    D_pexit  <- if ("D_primary_exit_um" %in% names(x) && is.finite(x[["D_primary_exit_um"]]))
+                  x[["D_primary_exit_um"]] else x[["D_agg_um"]]
+    agg_frac <- max(0, 1 - min(D_pexit / x[["D_agg_um"]], 1))
+    w_tmpl    <- agg_frac * min(max(size_template, 0), 1)
     Dp50_sh   <- exp(sum(modes_w * log(Dp_j)))           # shell distribution centre
     Dp_target <- TEMPLATE_DENSIFY * x[["D_agg_um"]] * 1e-6
     Dp_j      <- Dp_j * (Dp_target / Dp50_sh)^w_tmpl     # log-blend toward template

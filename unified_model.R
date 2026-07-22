@@ -176,7 +176,11 @@ run_unified <- function(x, template_type = TEMPLATE_TYPE, verbose = FALSE) {
     stream <- intermediate_stage_2(stream)   # placeholder (hold / pre-conditioning)
     if (verbose) print_stream(stream, "stream: dryer feed")
 
-    r2 <- up2_run_dryer(stream, as.list(x[up2_names]))
+    x_up2 <- as.list(x[up2_names])
+    # Forward the (muted-by-default) size-template knob if the caller set it;
+    # it is not a screened factor, so it is not in up2_names.
+    if ("size_template" %in% names(x)) x_up2[["size_template"]] <- x[["size_template"]]
+    r2 <- up2_run_dryer(stream, x_up2)
     setNames(c(r1$outputs[up1_keep], r2), unified_output_names)
   }, error = function(e) setNames(rep(NA_real_, n_out), unified_output_names))
   res
