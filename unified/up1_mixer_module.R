@@ -329,7 +329,14 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # Milling needs appreciably more energy than aggregation onset: the shear
   # must exceed the aggregate cohesive strength, taken here as MILL_MARGIN x
   # the aggregation threshold.
-  MILL_MARGIN <- 1.8
+  # Data check (9-condition PSD set, visc.xlsx): no attrition/rollover is seen
+  # anywhere in the tested envelope. The highest tip speed (cond11, v_tip =
+  # 12.40 m/s, 19.6% solid) has the LARGEST wet d50 (12.0 µm) — still at/above
+  # the ~10.2 µm aggregation plateau, not below it. At 20% solid v_tip_crit ~
+  # 6.81 m/s, so MILL_MARGIN = 1.8 put v_tip_mill ~ 12.3 m/s and would have
+  # spuriously shrunk d50 right at cond11. Raised to 2.5 (v_tip_mill ~ 17 m/s)
+  # so milling only switches on beyond the validated range.
+  MILL_MARGIN <- 2.5
   v_tip_mill  <- MILL_MARGIN * v_tip_crit
 
   v_tip_ratio <- p$v_tip / s_max(0.1, v_tip_crit)          # >1 past aggregation
@@ -353,17 +360,21 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # Milled primary size handed downstream (unchanged until milling regime)
   D_primary_exit_um <- s_max(0.01, p$D_particle * mill_size_factor)
 
-  # Physical aggregate d50 at mixer exit — calibrated to PSD measurement:
-  #   d50 = 9.6 µm at v_tip = 8.5 m/s (just above v_tip_crit = 6.81 m/s)
-  #   with and without gas injection.
-  # Formula: D_agg transitions from D_pri_cal in the stable regime, peaks
-  # in the aggregation band (~12-15 µm), and falls to D_primary_exit_um in
-  # the milling regime where shear breaks flocs back to primaries.
-  # Derivation of AGG_FACTOR_CAL (k=8 onset): (9.6/0.2 - 1) / agg_on(8.5 m/s, crit=6.81)
-  #   = 47 / tanh(8 * (8.5/6.81 - 1)) = 47 / tanh(1.984) = 47 / 0.965 = 48.7.
-  #   Multi-point check (9.64 m/s, 12.44 m/s) confirms 48.7 ± 5 across all points.
+  # Physical aggregate d50 at mixer exit — calibrated to the PSD measurement set:
+  #   post-UP1 wet d50 (sample_type "m", visc.xlsx) is a tight plateau of
+  #   10.19 ± 0.7 µm (mean of the 8 aggregated conditions, v_tip 6.9–12.4 m/s,
+  #   CV 7%), independent of tip speed above onset — exactly the flat, saturated
+  #   behaviour the k=8 tanh produces. The single dispersed condition (cond2,
+  #   v_tip = 4.37 m/s < onset) stays at the 0.18 µm primary, confirming the
+  #   stable/aggregated switch.
+  # Formula: D_agg transitions from D_pri_cal in the stable regime, saturates on
+  # the aggregation plateau, and falls to D_primary_exit_um only in the milling
+  # regime (not reached in the data — see MILL_MARGIN).
+  # Derivation of AGG_FACTOR_CAL (k=8 onset, saturated agg_on -> 1):
+  #   d50_plateau = D_pri_cal * (1 + AGG_FACTOR_CAL) = 0.2 * 51 = 10.2 µm
+  #   -> AGG_FACTOR_CAL = 10.19/0.2 - 1 = 50.0 (was 48.7, single-point to 9.6 µm).
   D_pri_cal_um   <- 0.2    # 200 nm physical primary (calibration colloid)
-  AGG_FACTOR_CAL <- 48.7   # multi-point calibration: k=8 onset, d50=9.6 µm @ 8.5 m/s
+  AGG_FACTOR_CAL <- 50.0   # 9-condition calibration: wet d50 plateau = 10.2 µm
   D_agg_phys_um  <- D_primary_exit_um +
     (D_pri_cal_um - D_primary_exit_um + D_pri_cal_um * AGG_FACTOR_CAL * agg_on) * (1.0 - mill_on)
   D_agg_phys_um  <- max(D_primary_exit_um, D_agg_phys_um)
@@ -432,12 +443,19 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # Floc network correction: aggregates trap interstitial liquid, raising the
   # apparent viscosity at the impeller shear rate far above the bare
   # hard-sphere Krieger-Dougherty prediction.
-  # Calibration: η_measured ≈ 0.770 Pa·s at γ ≈ 12 1/s at v_tip = 8.5 m/s
-  #   (power-law K=5.83, n=0.20, measured at UP1 outlet).
-  #   μ_KD_bare ≈ 0.0012 Pa·s → floc factor = 636 at D_agg/D_pri = 9.6/0.2 = 48
-  #   → exponent A = log(636)/log(48) = 1.67.
+  # Calibration (9-condition low-shear rheology set, visc.xlsx, γ ≈ 12.7 1/s):
+  #   the aggregated conditions span 0.020–0.770 Pa·s (CV 77%) — genuine
+  #   process/sample scatter that is NOT a clean function of solids, tip speed
+  #   or wet d50. The closure targets the central tendency: geometric mean
+  #   η = 0.201 Pa·s (median 0.227) at the ~20% solid plateau. The prior 1.67
+  #   exponent was anchored to the single highest point (cond8, 0.770 Pa·s) and
+  #   over-predicted the typical slurry ~4×, which propagates to the coupled
+  #   nozzle viscosity (mu_exit_PaS -> UP2 mu_slurry0 when couple_viscosity).
+  #   Recalibration: mu_base ≈ 1.25e-3 Pa·s (post 0.7^-0.3 term) and
+  #   D_agg/D_pri = 10.2/0.2 = 51 -> mu_floc = 0.201/1.25e-3 = 160
+  #   -> exponent A = log(160)/log(51) = 1.29.
   # In the stable regime D_agg/D_pri → 1 so mu_floc_factor → 1 (no correction).
-  mu_floc_factor     <- s_max(1.0, (D_agg_phys_um / D_pri_cal_um)^1.67)
+  mu_floc_factor     <- s_max(1.0, (D_agg_phys_um / D_pri_cal_um)^1.29)
   Blended_Viscosity_PaS <- mu_base_exit * mu_floc_factor * (1 + (100.0 / 50.0))^(0.7 - 1)
 
   rho_colloid_kg_m3 <- (phi_s * p$rho_polymer) + ((1.0 - phi_s) * p$rho_water)

@@ -106,7 +106,7 @@ factors <- rbind(
   fac("t_hold",         5,      600,   TRUE,  "s",     "up2", "Process", "pressurized hold before nozzle"),
   fac("D_b",            2.0e-5, 2.0e-4,TRUE,  "m",     "up2", "Process", "feed bubble diameter (until the transfer-line stage sets it)"),
   fac("Tg_polymer",     280,    380,   FALSE, "K",     "up2", "Polymer", "dry-polymer glass transition"),
-  fac("n_flow",         0.40,   1.00,  FALSE, "-",     "up2", "Polymer", "power-law flow index"),
+  fac("n_flow",         0.20,   0.67,  FALSE, "-",     "up2", "Polymer", "power-law flow index (measured post-UP1 slurry envelope, visc.xlsx: 0.20-0.67, mean 0.44)"),
   fac("k_perm_mono",    5.0,    60.0,  FALSE, "-",     "up2", "Polymer", "monomer permeation coefficient"),
   fac("k_perm_plast",   5.0,    60.0,  FALSE, "-",     "up2", "Polymer", "plasticizer permeation coefficient"),
   fac("k_perm_bind",    2.0,    40.0,  FALSE, "-",     "up2", "Polymer", "binder pore-blocking coefficient"),
