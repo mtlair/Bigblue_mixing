@@ -76,6 +76,9 @@ sp_mid["T_system"]     <- 423   # dryer inlet ~150 C
 sp_mid["T_feed"]       <- 300   # atomizing air ~ ambient
 sp_mid["T_sticky_K"]   <- 493   # melt/clumping ~220 C (heat-resistant product)
 sp_mid["mdot_gas_dry"] <- 0.25  # lands outlet ~80-85 C
+sp_mid["size_template"] <- 0    # MUTED: UP1 aggregate size-template overlay off
+                                # (set to 1 to let the aggregate template the dry
+                                #  particle in the UP1-control regime; see DATA_REVIEW.md)
 sp_from_centrifuge <- c("rho_L", "C_solid_mass", "alpha_g_0", "sigma", "D_b", "mu_L",
                         "C_surfactant", "C_monomer", "C_plasticizer", "C_binder",
                         "I_strength", "Delta_pH")

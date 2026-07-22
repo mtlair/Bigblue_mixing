@@ -330,6 +330,29 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
 
   Dp_j <- modes_m * ((1 - a_trap_j) * (1 - phi_e) * rho_L * C_sol /
                      (rho_s * (1 - phi_j)))^(1/3)
+
+  # --- UP1 aggregate size-template regime (MUTED by default) ----------------
+  # Two dry-PSD control regimes are seen in the calibration data (visc.xlsx):
+  #   * atomizer-control  - dispersed feed (no UP1 aggregate): the droplet-shell
+  #     above sets the product size (e.g. cond2, dry d50 19.85 um).
+  #   * UP1-control       - a UP1 aggregate templates the particle, so the dry
+  #     size tracks the aggregate: dry d50 ~ TEMPLATE_DENSIFY * D_agg (~1.2x wet).
+  # This overlay lets the aggregate TEMPLATE the size, preserved as a capability
+  # for a future experiment but muted for now via the `size_template` knob [0,1]:
+  #   0 -> droplet-shell only (current calibration, bit-for-bit unchanged)
+  #   1 -> full template in the aggregated regime
+  # The atomizer-control regime is unaffected at ANY setting: d_ratio -> 1 for a
+  # dispersed feed, so the template weight w_tmpl -> 0 there automatically.
+  size_template <- if (!is.null(x[["size_template"]])) x[["size_template"]] else 0
+  if (size_template > 0 && !is.null(feed$D_agg_um) &&
+      is.finite(feed$D_agg_um) && feed$D_agg_um > 0) {
+    TEMPLATE_DENSIFY <- 1.20                              # dry/wet, UP1-control set
+    w_tmpl    <- min(max(1 - d_ratio, 0), 1) * min(max(size_template, 0), 1)
+    Dp50_sh   <- exp(sum(modes_w * log(Dp_j)))           # shell distribution centre
+    Dp_target <- TEMPLATE_DENSIFY * feed$D_agg_um * 1e-6
+    Dp_j      <- Dp_j * (Dp_target / Dp50_sh)^w_tmpl     # log-blend toward template
+  }
+
   grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)
   cdfp <- Reduce(`+`, Map(function(w, m, s)
             w * pnorm((grp - log(m)) / log(s)), modes_w, Dp_j, modes_s))

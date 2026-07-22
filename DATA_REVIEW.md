@@ -151,25 +151,40 @@ aggregated), fully consistent with the calibrated 6.81 m/s at 20 % solids.
 (target 10.19) and η = 0.200 Pa·s (target geomean 0.201) — versus the old
 0.855 Pa·s.
 
-### Open structural gap — the dry-PSD control regime
-The atomizer *inputs* are now grounded in the data, but the dryer's
-particle-formation still has one structural gap that the data exposes:
+### Dry-PSD control regime — size-template overlay (implemented, muted)
+The two control regimes are now represented in both dryers
+(`up2_run_dryer`, `spray_dry_model`) as a switchable **size-template overlay**,
+governed by a `size_template` knob in [0, 1]:
 
-- **The model has no regime switch for the final particle size.** Both dryer
-  implementations (`up2_run_dryer`, `spray_dry_model`) compute the dry particle as
-  a droplet→shell only (`Dp ∝ droplet · (solids/(1−porosity))^{1/3}`). They receive
-  the UP1 aggregate (`D_agg_um`) but use it only for shell porosity, never as the
-  size template. The data shows the opposite control in 8 of 9 conditions: when a
-  UP1 aggregate exists it *sets* the product size (dry ≈ 1.2·D_agg ≈ 12 µm), and
-  only in the dispersed cond2 does the atomizer droplet-shell control (19.85 µm).
-  Adding a regime switch on aggregate presence (d_ratio) — aggregate-template when
-  UP1-control, droplet-shell when atomizer-control — is the next change. It touches
-  particle formation in *both* dryers and currently rests on a single
-  atomizer-regime point (cond2), so it is specced here and left for confirmation
-  rather than applied blind. The absolute SMD scale also still awaits nozzle
-  geometry (`D_h`, `A_L`), the standing high-priority calibration gap.
+- **`size_template = 0` (default, muted).** The dry particle is the droplet→shell
+  only (`Dp ∝ droplet · (solids/(1−porosity))^{1/3}`) — current calibration is
+  bit-for-bit unchanged. This is deliberate: the UP1→UP4 chain scale is still
+  anchored on the existing (through-UP2/UP3) calibration and the nozzle-geometry
+  SMD gap is open, so the template stays off until the base calibration checks out.
+- **`size_template = 1` (future experiment).** In the **UP1-control** regime the
+  UP1 aggregate templates the particle — the per-mode sizes log-blend toward
+  `TEMPLATE_DENSIFY · D_agg` (`TEMPLATE_DENSIFY = 1.20`, the measured dry/wet ratio),
+  reproducing dry d50 ≈ 12 µm. The **atomizer-control** regime is untouched at any
+  setting: a dispersed feed has `d_ratio → 1`, so the template weight `w_tmpl → 0`
+  and cond2 keeps its droplet-shell (19.85 µm) automatically.
+
+The overlay is exposed as `sp_mid["size_template"] <- 0` in
+`full_train_mixer_to_dryer.R`. The absolute SMD scale still awaits nozzle geometry
+(`D_h`, `A_L`) — the standing high-priority gap.
+
+### Scope of this calibration
+The `visc.xlsx` runs are **UP1 → UP4 direct** — they do *not* pass through UP2
+(foam-wash) or UP3 (centrifuge). Accordingly, this pass recalibrates only the UP1
+closures and the UP4 atomizer inputs; UP2/UP3 are untouched. Routing calibration
+data through UP2/UP3 is the next stage, once the UP1/UP4 models check out against
+this direct data. The end goal is to use the calibrated model to set the
+**experimental ranges** for the next design of experiments.
+
+### Still open
 - **Viscosity scatter** (CV 77 %) is real process variability; the closure now
   hits the central tendency but cannot reproduce the per-condition spread from
   the recorded factors alone.
 - **`couple_viscosity` default** remains `FALSE`; the recalibrated viscosity now
   makes turning it on defensible for a process-representative run.
+- **UP1→UP4-direct validation harness** (bypassing UP2/UP3) to check the
+  recalibrated model against `visc.xlsx` before the UP2/UP3 stage.

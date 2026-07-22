@@ -509,6 +509,24 @@ spray_dry_model <- function(x) {
   packing_size_factor <- (a_prim_mod / a_prim_ref_min)^PSF_EXP
   Dp_j <- Dp_j * packing_size_factor
 
+  # --- UP1 aggregate size-template regime (MUTED by default) ----------------
+  # Mirror of unified/up2_spray_dryer_module.R. Two dry-PSD control regimes seen
+  # in visc.xlsx: atomizer-control (dispersed feed -> droplet-shell sets size) vs
+  # UP1-control (a UP1 aggregate templates the particle, dry d50 ~ 1.2 * D_agg).
+  # This overlay lets the aggregate TEMPLATE the size; preserved for a future
+  # experiment but muted for now via `size_template` in [0,1] (0 = droplet-shell
+  # only, current calibration unchanged). Dispersed feeds (d_ratio -> 1) are
+  # unaffected at any setting since the template weight w_tmpl -> 0.
+  size_template <- if ("size_template" %in% names(x)) x[["size_template"]] else 0
+  if (size_template > 0 && "D_agg_um" %in% names(x) &&
+      is.finite(x[["D_agg_um"]]) && x[["D_agg_um"]] > 0) {
+    TEMPLATE_DENSIFY <- 1.20                              # dry/wet, UP1-control set
+    w_tmpl    <- min(max(1 - d_ratio, 0), 1) * min(max(size_template, 0), 1)
+    Dp50_sh   <- exp(sum(modes_w * log(Dp_j)))           # shell distribution centre
+    Dp_target <- TEMPLATE_DENSIFY * x[["D_agg_um"]] * 1e-6
+    Dp_j      <- Dp_j * (Dp_target / Dp50_sh)^w_tmpl     # log-blend toward template
+  }
+
   grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)
   cdfp <- Reduce(`+`, Map(function(w, m, s)
             w * pnorm((grp - log(m)) / log(s)), modes_w, Dp_j, modes_s))
