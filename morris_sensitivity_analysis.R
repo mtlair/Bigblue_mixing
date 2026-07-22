@@ -162,7 +162,8 @@ A_molec  <- 0.5e-18   # surfactant molecule area capacity       [m2]
 HLB      <- 12        # surfactant HLB (foam stability driver)  [-]
 phi_m    <- 0.63      # Krieger-Dougherty max packing           [-]
 Tg_solv  <- 150       # solvent (monomer/plasticizer) Tg, Fox   [K]
-d_ratio  <- 0.10      # primary particle / aggregate size ratio [-]
+d_ratio  <- 0.10      # primary/aggregate size ratio: fallback constant [-]
+                      # (overridden inside spray_dry_model when D_agg_um is wired)
 C_cham   <- 0.80      # mixing chamber / air supply pressure    [-]
 k_rip0   <- 4.0e-15   # Ostwald ripening rate at 1 atm          [m3/s]
 cp_gas   <- 1005      # dryer gas heat capacity                 [J/kg K]
@@ -201,9 +202,22 @@ spray_dry_model <- function(x) {
   # D_primary_exit_um carries the result: unchanged at low v_tip, attrite past
   # the critical tip speed. UP4 uses it as the physical primary size without
   # any v_tip awareness of its own.
-  a_prim_mod <- if (!is.null(x[["D_primary_exit_um"]]) && !is.na(x[["D_primary_exit_um"]]))
+  # Prefer D_primary_phys_um (200 nm physical colloid base) over D_primary_exit_um
+  # (ODE-scaled, 1.25 µm base) for packing/surfactant/Pe calculations.
+  a_prim_mod <- if ("D_primary_phys_um" %in% names(x) && !is.na(x[["D_primary_phys_um"]]))
+                  max(0.01e-6, x[["D_primary_phys_um"]] * 1e-6 / 2)
+                else if ("D_primary_exit_um" %in% names(x) && !is.na(x[["D_primary_exit_um"]]))
                   max(0.01e-6, x[["D_primary_exit_um"]] * 1e-6 / 2)
                 else a_prim     # fall back to module constant if stream not wired
+
+  # Physical d_ratio: D_primary_exit / D_agg_phys, wired from UP1 stream.
+  # Calibration: D_agg ≈ 9.6 µm at v_tip = 8.5 m/s (just above critical 6.81 m/s).
+  # Falls back to module constant 0.10 when the stream field is absent.
+  d_ratio_stream <- if ("D_agg_um" %in% names(x) && !is.na(x[["D_agg_um"]]) &&
+                        x[["D_agg_um"]] > 0)
+                      min(max(a_prim_mod * 2e6 / x[["D_agg_um"]], 0.01), 1.0)
+                    else d_ratio
+  d_ratio <- d_ratio_stream
 
   ## --- Module 0b: Formulation - Flory-Huggins free-volume swelling ---------
   # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
@@ -473,15 +487,17 @@ spray_dry_model <- function(x) {
   # per-mode particle diameters (solids balance) and mixture quantiles
   Dp_j <- modes_m * ((1 - a_trap_j) * (1 - phi_e) * rho_L * C_sol /
                      (rho_s * (1 - phi_j)))^(1/3)
-  # Colloid milling coupling: the primary particle size modulation (via v_tip)
-  # affects packing efficiency and final particle size. Smaller primaries from
-  # milling (higher v_tip) reduce voidage -> smaller final particles. Apply to Dp_j.
-  # Ratio: a_prim_mod / a_prim_ref. When a_prim_mod is smaller (higher v_tip),
-  # factor is <1 and reduces final size (correct direction). Strong coupling.
-  # Smaller primaries pack more efficiently -> smaller final particle.
-  # a_prim_mod comes from the stream (UP1 three-regime closure), so this
-  # factor is now driven by actual primary size, not recomputed from v_tip.
-  packing_size_factor <- (a_prim_mod / a_prim)^0.75
+  # Colloid milling coupling: the physical primary size (a_prim_mod from the UP1
+  # three-regime closure) sets packing efficiency in the dried aggregate.
+  # Larger primaries (less milled) pack more loosely -> larger final particle.
+  # Reference: a_prim_ref_min = minimum radius at full milling = a_prim × (1-MILL_MAX)
+  #            = 100 nm × 0.30 = 30 nm. At this minimum, factor = 1.0 (baseline size).
+  # Exponent PSF_EXP calibrated: at 200 nm primary (v_tip=8.5 m/s, no milling),
+  # UP4 d50 = 15.3 µm → base Dp_j = 7.54 µm → factor = 2.03 = (100nm/30nm)^PSF_EXP
+  # → PSF_EXP = log(2.03)/log(3.33) = 0.588.
+  a_prim_ref_min <- a_prim * 0.30   # 3e-8 m: minimum primary radius (full milling)
+  PSF_EXP        <- 0.588           # calibrated from UP4 d50 = 15.3 µm at v_tip=8.5
+  packing_size_factor <- (a_prim_mod / a_prim_ref_min)^PSF_EXP
   Dp_j <- Dp_j * packing_size_factor
 
   grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)

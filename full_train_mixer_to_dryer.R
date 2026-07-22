@@ -287,6 +287,8 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   x["D_template"]        <- s$D_template_um * 1e-6
   x["T_feed"]            <- s$T_K
   x["D_primary_exit_um"] <- s$D_primary_exit_um  # UP1 three-regime primary size
+  x["D_agg_um"]         <- s$D_agg_um           # UP1 calibrated aggregate d50
+  x["D_primary_phys_um"] <- s$D_primary_phys_um # physical colloid bead (200 nm base)
   sp <- spray_dry_model(x)
 
   list(mixer = r1$outputs, stream = s, cen_run = cen_run,

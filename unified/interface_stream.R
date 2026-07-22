@@ -30,8 +30,10 @@
 #                  downstream stages should use.
 #   v_tip_crit     critical tip speed [m/s] (aggregation onset; diagnostic)
 #   v_tip_ratio    v_tip / v_tip_crit (>1 aggregation, >>1 milling; diagnostic)
-#   D_agg_um       aggregate (blended) size at mixer exit (enlarged in the
-#                  aggregation regime, broken back down under milling)
+#   D_agg_um       aggregate d50 at mixer exit [µm] — physically calibrated:
+#                  ~9.6 µm at v_tip = 8.5 m/s (just above critical 6.81 m/s).
+#                  Grows in the aggregation regime, falls back to D_primary_exit_um
+#                  in the milling regime. Drives d_ratio in the dryer.
 #   sphericity     Omega at mixer exit (diagnostic)
 #   WetSkin        wet-skin fraction at mixer exit (partially survives
 #                  atomization; seeds the dryer skin state)
@@ -101,9 +103,10 @@ stream_from_up1 <- function(up1_res, pars, equipment) {
     # particulate state
     D_particle_um      = p$D_particle,           # input primary size (reference)
     D_primary_exit_um  = ex$D_primary_exit_um,   # UP1 three-regime milled primary size
+    D_primary_phys_um  = ex$D_primary_phys_um,   # physical colloid bead (200 nm base)
     v_tip_crit         = ex$v_tip_crit,           # critical tip speed [m/s] (diagnostic)
     v_tip_ratio        = ex$v_tip_ratio,          # regime indicator >1=milling (diagnostic)
-    D_agg_um       = unname(out[["Blended_Size_um"]]),
+    D_agg_um       = ex$D_agg_phys_um,     # physically calibrated aggregate d50 [µm]
     sphericity     = unname(out[["Blended_Sphericity"]]),
     WetSkin        = unname(out[["Blended_WetSkin"]]),
     # gas phase

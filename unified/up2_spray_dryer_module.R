@@ -103,8 +103,13 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   w_core <- feed$w_core
   # Primary radius from the UP1 three-regime closure (milled size past the
   # critical tip speed); fall back to the input primary if the field is absent.
-  D_prim_um <- if (!is.null(feed$D_primary_exit_um) && !is.na(feed$D_primary_exit_um))
-                 feed$D_primary_exit_um else feed$D_particle_um
+  # Prefer D_primary_phys_um (200 nm physical calibration bead) over
+  # D_primary_exit_um (ODE-scaled, 1.25 µm base) for packing/Pe/surfactant.
+  D_prim_um <- if (!is.null(feed$D_primary_phys_um) && !is.na(feed$D_primary_phys_um))
+                 feed$D_primary_phys_um
+               else if (!is.null(feed$D_primary_exit_um) && !is.na(feed$D_primary_exit_um))
+                 feed$D_primary_exit_um
+               else feed$D_particle_um
   a_prim <- (D_prim_um / 2) * 1e-6
   d_ratio <- min(max(D_prim_um / max(feed$D_agg_um, 1e-6), 0.01), 1.0)
   rho_s  <- feed$rho_polymer

@@ -347,6 +347,27 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # Milled primary size handed downstream (unchanged until milling regime)
   D_primary_exit_um <- s_max(0.01, p$D_particle * mill_size_factor)
 
+  # Physical aggregate d50 at mixer exit — calibrated to PSD measurement:
+  #   d50 = 9.6 µm at v_tip = 8.5 m/s (just above v_tip_crit = 6.81 m/s)
+  #   with and without gas injection.
+  # Formula: D_agg transitions from D_pri_cal in the stable regime, peaks
+  # in the aggregation band (~12-15 µm), and falls to D_primary_exit_um in
+  # the milling regime where shear breaks flocs back to primaries.
+  # Derivation of AGG_FACTOR_CAL: (9.6/0.2 - 1) / agg_on(8.5 m/s, crit=6.81)
+  #   = 47 / tanh(2 * (8.5/6.81 - 1)) = 47 / 0.460 = 102.
+  D_pri_cal_um   <- 0.2    # 200 nm physical primary (calibration colloid)
+  AGG_FACTOR_CAL <- 102.0  # calibrated from d50 = 9.6 µm at v_tip = 8.5 m/s
+  D_agg_phys_um  <- D_primary_exit_um +
+    (D_pri_cal_um - D_primary_exit_um + D_pri_cal_um * AGG_FACTOR_CAL * agg_on) * (1.0 - mill_on)
+  D_agg_phys_um  <- max(D_primary_exit_um, D_agg_phys_um)
+
+  # Physical milled primary: the calibration colloid primary (200 nm) scaled by
+  # the same mill_size_factor as D_primary_exit_um, but anchored to the actual
+  # bead diameter — not the ODE kinetics parameter D_particle (1.25 µm).
+  # Downstream packing calculations (dryer) use this so the base reference is
+  # the physical 200 nm bead, not the ODE aggregate.
+  D_primary_phys_um <- D_pri_cal_um * mill_size_factor   # [µm], physical colloid bead
+
   phi_solvent <- p$C_monomer + p$C_plasticizer
   Swelling_Softness <- exp(25.0 * phi_solvent)
 
@@ -401,7 +422,16 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   phi_m <- 0.64
   safe_phi_exit <- s_min(phi_effective_exit, phi_m - 0.01)
   mu_base_exit <- 0.001 * (1 - (safe_phi_exit / phi_m))^(-2.5 * phi_m)
-  Blended_Viscosity_PaS <- mu_base_exit * (1 + (100.0 / 50.0))^(0.7 - 1)
+  # Floc network correction: aggregates trap interstitial liquid, raising the
+  # apparent viscosity at the impeller shear rate far above the bare
+  # hard-sphere Krieger-Dougherty prediction.
+  # Calibration: η_measured ≈ 0.770 Pa·s at γ ≈ 12 1/s at v_tip = 8.5 m/s
+  #   (power-law K=5.83, n=0.20, measured at UP1 outlet).
+  #   μ_KD_bare ≈ 0.0012 Pa·s → floc factor = 636 at D_agg/D_pri = 9.6/0.2 = 48
+  #   → exponent A = log(636)/log(48) = 1.67.
+  # In the stable regime D_agg/D_pri → 1 so mu_floc_factor → 1 (no correction).
+  mu_floc_factor     <- s_max(1.0, (D_agg_phys_um / D_pri_cal_um)^1.67)
+  Blended_Viscosity_PaS <- mu_base_exit * mu_floc_factor * (1 + (100.0 / 50.0))^(0.7 - 1)
 
   rho_colloid_kg_m3 <- (phi_s * p$rho_polymer) + ((1.0 - phi_s) * p$rho_water)
   SG_Colloid <- rho_colloid_kg_m3 / 997.0
@@ -487,7 +517,9 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
                  template_fill      = fill,
                  C_temp_rigid       = (p$Q_template * p$C_temp_mass) / (p$Q_colloid + p$Q_template),
                  D_primary_exit_um  = D_primary_exit_um,  # three-regime milled primary size
-                 v_tip_crit         = v_tip_crit,          # critical tip speed [m/s]
+                 D_agg_phys_um      = D_agg_phys_um,       # physically calibrated aggregate d50 [µm]
+                 D_primary_phys_um  = D_primary_phys_um,   # physical colloid bead (200 nm base)
+                 v_tip_crit         = v_tip_crit,           # critical tip speed [m/s]
                  v_tip_ratio        = v_tip_ratio)          # regime indicator (>1 = milling)
 
   list(outputs = outputs, extras = extras)
