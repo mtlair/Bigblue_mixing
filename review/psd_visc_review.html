@@ -116,8 +116,23 @@
     </div>
   </div>
 
+  <div class="card">
+    <h2>5 · UP1→UP4-direct validation</h2>
+    <p class="desc">Replaying all 9 conditions UP1→UP4 <i>directly</i> (bypassing UP2/UP3, matching the data path) — geometric RMS ratio, 1.00 = perfect.</p>
+    <table>
+      <thead><tr><th>Quantity</th><th>RMS ratio</th><th>Read</th></tr></thead>
+      <tbody>
+        <tr><td>Wet d50 (UP1-control, 8)</td><td>1.07</td><td style="text-align:left">aggregation plateau reproduced to ~7%</td></tr>
+        <tr><td>Viscosity (UP1-control, 8)</td><td>2.78</td><td style="text-align:left">sits at geomean; 0.02–0.77 scatter irreducible</td></tr>
+        <tr><td>Dry d50, muted (8)</td><td>1.81</td><td style="text-align:left">droplet-shell alone over-predicts</td></tr>
+        <tr><td>Dry d50, size_template=1 (8)</td><td><b>1.25</b></td><td style="text-align:left">aggregate-template confirms UP1-control</td></tr>
+      </tbody>
+    </table>
+    <p class="foot">Harness: <span class="kbd">validate_up1_up4_direct.R</span>. Tested on R 4.3.3; muted default is bit-for-bit unchanged.</p>
+  </div>
+
   <p class="foot"><b>UP1 recalibration</b> (<span class="kbd">unified/up1_mixer_module.R</span>):
-  AGG_FACTOR_CAL 48.7→50.0 · MILL_MARGIN 1.8→2.5 · floc exponent 1.67→1.29 · <span class="kbd">n_flow</span> range 0.40–1.00→0.20–0.67.
+  AGG_FACTOR_CAL 48.7→50.0 · MILL_MARGIN 1.8→3.5 · floc exponent 1.67→1.29 · <span class="kbd">n_flow</span> range 0.40–1.00→0.20–0.67.
   <b>Atomizer inputs grounded in the measured flows</b>: ALR 1.0–10.0→0.9–1.8 · air pressure 2.0–7.0→1.2–1.8×10⁵&nbsp;Pa · ṁ_L 0.002–0.020→0.013–0.020&nbsp;kg/s.
   See <span class="kbd">DATA_REVIEW.md</span>.</p>
 </div>

@@ -130,7 +130,7 @@ holds.
 | File | Change | Rationale |
 |---|---|---|
 | `unified/up1_mixer_module.R` | `AGG_FACTOR_CAL` 48.7 → **50.0** | plateau d50 = 0.2·(1+50) = 10.2 µm = measured mean 10.19 |
-| `unified/up1_mixer_module.R` | `MILL_MARGIN` 1.8 → **2.5** | no attrition observed ≤ 12.4 m/s; pushes v_tip_mill to ~17 m/s, out of the validated range, removing the spurious cond11 rollover |
+| `unified/up1_mixer_module.R` | `MILL_MARGIN` 1.8 → **3.5** | no attrition observed ≤ 12.4 m/s; the UP1→UP4-direct harness showed that under nominal chemistry v_tip_crit runs ~3.9–5.9 m/s (below the 6.81 calibration point), so 2.5 still milled cond11/cond14 down to ~8.3 µm — 3.5 keeps every measured condition on the plateau, milling only above ~13.7 m/s |
 | `unified/up1_mixer_module.R` | floc exponent 1.67 → **1.29** | targets the geometric-mean slurry viscosity (0.201 Pa·s) of all 8 aggregated conditions instead of the single 0.770 Pa·s outlier |
 | `unified_model.R`, `morris_sensitivity_analysis.R` | `n_flow` factor range 0.40–1.00 → **0.20–0.67** | measured post-UP1 flow-index envelope (mean 0.44); the old range never reached the observed low end and was centred too high |
 | `unified_model.R`, `morris_sensitivity_analysis.R` | `ALR` 1.0–10.0 → **0.9–1.8** | measured `up4atom_scfm`/`up4_feed` ratio; the old range ran the nozzle at up to ~6× the real air-liquid ratio |
@@ -180,11 +180,54 @@ data through UP2/UP3 is the next stage, once the UP1/UP4 models check out agains
 this direct data. The end goal is to use the calibrated model to set the
 **experimental ranges** for the next design of experiments.
 
+## Part 4 — UP1→UP4-direct validation
+
+`validate_up1_up4_direct.R` replays all nine conditions **UP1 → UP4 directly**
+(bypassing UP2/UP3, matching the data path). Each condition's UP1 setpoints
+(v_tip, solids, exit T/P) and UP4 atomizer setpoints (ALR, air pressure, feed
+flow) come from `data/cond_process.csv`; formulation chemistry is held at nominal
+(the data doesn't resolve it, so the aggregation onset is common to all runs).
+Output: `unified_output/up1_up4_direct_validation.csv`. Accuracy as a geometric
+RMS ratio (1.00 = perfect):
+
+| Quantity | RMS ratio | Read |
+|---|---|---|
+| **Wet d50, UP1-control (8)** | **1.07** | aggregation plateau reproduced to ~7 % |
+| Wet d50, all 9 | 1.90 | inflated only by cond2 (see note) |
+| **Viscosity, UP1-control (8)** | 2.78 | closure sits at the geomean (0.20 Pa·s); the 0.02–0.77 scatter is irreducible from the recorded inputs — an expected miss, not a bias |
+| **Dry d50, muted (8)** | 1.81 | droplet-shell alone over-predicts (up to 35 µm) |
+| **Dry d50, `size_template=1` (8)** | **1.25** | the aggregate-template overlay lands the dry PSD at 11–16 µm vs measured 8.8–15.3 — strong support for the UP1-control mechanism |
+| Dry d50, cond2 (atomizer-control) | 17.6 vs 19.85 µm | droplet-shell is the right mechanism here (~12 % low) |
+
+Two findings the harness surfaced:
+1. **`MILL_MARGIN` raised 2.5 → 3.5** (above) — the harness caught that nominal
+   chemistry gives a lower onset than the calibration point, so 2.5 spuriously
+   milled the high-solids/high-v_tip conditions.
+2. **cond2 dispersed-size reporting basis.** In the atomizer-control regime the
+   stream reports `D_agg_um` = `D_primary_exit_um` (the ODE primary, 1.25 µm),
+   not the physical 0.2 µm bead the wet PSD measures (0.18 µm). The *regime* is
+   classified correctly (below onset); only the reported dispersed size is on the
+   ODE basis. A future tidy-up would report `D_primary_phys_um` there. It does not
+   affect the UP1-control conditions or the dry PSD.
+
 ### Still open
-- **Viscosity scatter** (CV 77 %) is real process variability; the closure now
-  hits the central tendency but cannot reproduce the per-condition spread from
-  the recorded factors alone.
+- **Viscosity scatter** (CV 77 %) is real process variability; the closure hits
+  the central tendency but cannot reproduce the per-condition spread.
 - **`couple_viscosity` default** remains `FALSE`; the recalibrated viscosity now
   makes turning it on defensible for a process-representative run.
-- **UP1→UP4-direct validation harness** (bypassing UP2/UP3) to check the
-  recalibrated model against `visc.xlsx` before the UP2/UP3 stage.
+- **Turning the size-template on** (`size_template=1`) once its 1.2·D_agg
+  densification is pinned down — the dry-d50 RMS of 1.25 is already a strong
+  first anchor.
+- **Regenerated `unified_output/`** now reflects the recalibrated model (Morris
+  cache busted and re-run).
+
+---
+
+## Toward the goal — experimental ranges
+
+With the UP1 and UP4-atomizer closures calibrated and validated UP1→UP4-direct,
+the model is ready to propose **experimental ranges** for the next DoE: the
+recalibrated factor windows (`n_flow`, `ALR`, atomizing pressure, `mdot_L`) now
+bracket the real process, and the Morris screen ranks which of them actually move
+each product property. Routing the calibration through UP2/UP3 is the following
+stage, once this direct calibration is accepted.

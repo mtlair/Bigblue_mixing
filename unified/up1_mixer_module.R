@@ -332,11 +332,15 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # Data check (9-condition PSD set, visc.xlsx): no attrition/rollover is seen
   # anywhere in the tested envelope. The highest tip speed (cond11, v_tip =
   # 12.40 m/s, 19.6% solid) has the LARGEST wet d50 (12.0 µm) — still at/above
-  # the ~10.2 µm aggregation plateau, not below it. At 20% solid v_tip_crit ~
-  # 6.81 m/s, so MILL_MARGIN = 1.8 put v_tip_mill ~ 12.3 m/s and would have
-  # spuriously shrunk d50 right at cond11. Raised to 2.5 (v_tip_mill ~ 17 m/s)
-  # so milling only switches on beyond the validated range.
-  MILL_MARGIN <- 2.5
+  # the ~10.2 µm aggregation plateau, not below it. v_tip_mill must therefore
+  # sit above the whole validated envelope. The UP1->UP4-direct harness
+  # (validate_up1_up4_direct.R) showed that under nominal formulation chemistry
+  # v_tip_crit runs ~3.9-5.9 m/s (below the 6.81 calibration point), so the
+  # earlier MILL_MARGIN = 2.5 still milled cond11 and cond14 (25% solid) down to
+  # ~8.3 µm. Raised to 3.5: every measured condition stays on the plateau, and
+  # milling only switches on above ~13.7 m/s (19.6% solid) — beyond the data,
+  # which bounds the milling onset only from below.
+  MILL_MARGIN <- 3.5
   v_tip_mill  <- MILL_MARGIN * v_tip_crit
 
   v_tip_ratio <- p$v_tip / s_max(0.1, v_tip_crit)          # >1 past aggregation
