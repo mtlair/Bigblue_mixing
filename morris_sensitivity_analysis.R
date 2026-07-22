@@ -246,6 +246,13 @@ spray_dry_model <- function(x) {
   mu_serum   <- mu_L * (1 + 10 * C_bind)          # binder thickening (K_fluid)
   mu_slurry0 <- mu_serum *
                 (1 - min(phi_disp, 0.60) / phi_m)^(-2.5 * phi_m)
+  # Override: when the UP1 mixer exit slurry viscosity is wired in, use it
+  # directly as the power-law reference, bypassing the serum-based KD build-up.
+  # mu_slurry_up1 is the full apparent slurry viscosity at the mixer exit shear
+  # rate (~100-1000 s⁻¹), so it already embeds suspension + floc effects.
+  if ("mu_slurry_up1" %in% names(x) && !is.na(x[["mu_slurry_up1"]])) {
+    mu_slurry0 <- x[["mu_slurry_up1"]]
+  }
   # power-law slurry: mu_app(g) = K g^(n-1), anchored so mu_slurry0 is the
   # measured apparent viscosity at the rheometer reference rate gamma_ref;
   # floored at the serum high-shear limit

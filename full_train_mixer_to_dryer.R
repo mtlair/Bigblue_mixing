@@ -253,7 +253,9 @@ foam_wash_column_ode <- function(stream, pars = list()) {
 run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
                            wash_pars = list(), cen_op = cen_nominal,
                            reslurry_add = 0, spray_op = sp_mid,
-                           up2 = c("ode", "algebraic"), verbose = FALSE) {
+                           up2 = c("ode", "algebraic"),
+                           couple_viscosity = FALSE,   # TRUE: wire UP1 slurry visc to nozzle
+                           verbose = FALSE) {
   up2 <- match.arg(up2)
   eq <- mx_equipment; eq$template_type <- template_type
   p1 <- up1_pars_from_x(mixer_x)
@@ -289,6 +291,13 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   x["D_primary_exit_um"] <- s$D_primary_exit_um  # UP1 three-regime primary size
   x["D_agg_um"]         <- s$D_agg_um           # UP1 calibrated aggregate d50
   x["D_primary_phys_um"] <- s$D_primary_phys_um # physical colloid bead (200 nm base)
+  # Viscosity coupling (couple_viscosity = TRUE): wire UP1 apparent slurry viscosity
+  # as the power-law reference for the nozzle atomization, replacing the centrifuge
+  # serum-based estimate.  The UP1 value embeds floc (D_agg/D_pri)^1.67 effects:
+  # higher D_agg -> higher mu_slurry_up1 -> larger SMD -> coarser powder and wider
+  # d90/d10.  Default OFF because the floc exponent (1.67) needs validation from
+  # multi-point rheology data before it can be used quantitatively.
+  if (couple_viscosity) x["mu_slurry_up1"] <- s$mu_exit_PaS
   sp <- spray_dry_model(x)
 
   list(mixer = r1$outputs, stream = s, cen_run = cen_run,
@@ -315,11 +324,48 @@ cat(sprintf("  (491-ODE)      eta_gas %.2f  film_stab %.2f  sigma %.1f mN/m  ret
 cat(sprintf("[UP3 hi-g sep]  cake solids %.1f%%  exit dens %.2f g/cc  gas holdup %.3f  floc_used %.0f Pa\n",
             co$Product_Solids_MassFrac*100, co$Exit_Density_kg_m3/1000,
             co$Entrained_Gas_Holdup, res$cen_run[["floc_strength_Pa"]]))
-cat(sprintf("[feed->UP4]      rho_L %.0f  C_solid %.2f (UP3-tied)  alpha_g0 %.3f  mu_L %.4f  reslurry x%.2f\n",
-            h[["rho_L"]], h[["C_solid_mass"]], h[["alpha_g_0"]], h[["mu_L"]], h[["dilution_x"]]))
+cat(sprintf("[feed->UP4]      rho_L %.0f  C_solid %.2f (UP3-tied)  alpha_g0 %.3f  mu_slurry %.4f Pa.s  reslurry x%.2f\n",
+            h[["rho_L"]], h[["C_solid_mass"]], h[["alpha_g_0"]], s$mu_exit_PaS, h[["dilution_x"]]))
 cat(sprintf("[UP4 dryer]      D_particle %.1f um  porosity %.3f  skin %.3f  rho_tap %.0f  X_moist %.3f\n",
             sp[["D_particle_um"]], sp[["phi_porosity_z"]], sp[["theta_skin_z"]],
             sp[["rho_tapped"]], sp[["X_moisture"]]))
+
+# =============================================================================
+# CALIBRATION GAPS — what additional data are needed
+# =============================================================================
+# Current state: UP1->UP2->UP3->UP4 chain calibrated at 8.5 m/s / 20% solid.
+# Remaining gaps (in priority order):
+#
+# 1. NOZZLE GEOMETRY (high priority — sets SMD scale)
+#    Need: nozzle hydraulic diameter D_h [m], liquid orifice area A_L [m2],
+#    air supply port geometry (currently hardcoded: D_h=1e-3, A_L=7.85e-7 m2).
+#    Source: as-built drawing or vendor spec sheet for the two-fluid nozzle.
+#
+# 2. OPERATING CONDITIONS AT NOZZLE (high priority — sets U_rel, ALR)
+#    Need: liquid feed mass flow mdot_L [kg/s], atomizing air mass flow or ALR,
+#    air supply pressure P_G [Pa], feed line pressure P_F [Pa].
+#    Source: plant historian / DCS at each v_tip / solid loading test point.
+#
+# 3. FEED GAS HOLDUP (medium priority — drives pore structure via SMD*F_flash)
+#    Need: alpha_g_0 at each operating condition (entrained gas in the feed
+#    before the nozzle). Can be estimated from UP2/UP3 outputs but direct
+#    measurement (e.g. Coriolis density or in-line gamma densitometry) reduces
+#    uncertainty. Sparge gas flow + sparger geometry needed for UP1 closure.
+#
+# 4. PSD WIDTH (d10, d90) alongside d50
+#    Need: full PSD or at least d10/d90/d50 for each test point to calibrate
+#    the distribution-width model (w_c, w_f, Oh_e weights in Module 5b).
+#    Currently only d50 is calibrated; d90/d10 sensitive to mu_eff_hs and ALR.
+#
+# 5. VISCOSITY vs SHEAR RATE at each solid loading / v_tip
+#    Need: rotational rheometry (K, n) for feeds used in v_tip sweep to anchor
+#    n_flow (power-law index) and confirm mu_exit_PaS -> nozzle extrapolation.
+#    Currently n_flow is a free Morris factor (0.40-1.00).
+#
+# 6. RESIDUAL TEMPLATE FRACTION (RTF) measurement
+#    Need: solvent extraction or TGA on mixer-exit wet cake to anchor RTF model
+#    (currently from C_AGG_CAL / absorption kinetics approximation).
+# =============================================================================
 
 cat("\n=== UP2 (491-ODE) sensitivity: surfactant dose -> film stability -> train ===\n")
 cat(sprintf("  %-12s %-10s %-12s %-12s %-12s %-12s\n",

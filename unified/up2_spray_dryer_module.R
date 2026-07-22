@@ -147,6 +147,11 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   mu_serum   <- mu_L * (1 + 10 * C_bind)          # binder thickening (K_fluid)
   mu_slurry0 <- mu_serum *
                 (1 - min(phi_disp, 0.60) / phi_m)^(-2.5 * phi_m)
+  # Override: use UP1 mixer exit slurry viscosity directly when available,
+  # bypassing the serum-based KD build-up (avoids double-counting floc effects).
+  if (!is.null(feed$mu_exit_PaS) && !is.na(feed$mu_exit_PaS)) {
+    mu_slurry0 <- feed$mu_exit_PaS
+  }
   mu_app <- function(gdot)
     pmax(1e-3, mu_slurry0 * (gdot / gamma_ref)^(n_fl - 1))
 
