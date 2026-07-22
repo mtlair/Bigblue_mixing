@@ -1,0 +1,6 @@
+# Morris run cache (regenerated on every run; delete to force re-screen)
+unified_output/*.rds
+full_train_output/*.rds
+
+# Stray default plot device from non-interactive Rscript runs
+Rplots.pdf

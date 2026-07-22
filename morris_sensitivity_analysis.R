@@ -195,8 +195,20 @@ spray_dry_model <- function(x) {
   phi_e  <- x[["phi_emulsion"]]
   D_e    <- x[["D_template"]]
   T_bpS  <- x[["T_bp_solv"]]
+  v_tip  <- if (!is.null(x[["v_tip_ms"]]) && !is.na(x[["v_tip_ms"]]))
+              x[["v_tip_ms"]] else 12  # default mixer tip speed [m/s]
 
-  ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
+  ## --- Module 0a: Colloid milling & destabilization (v_tip-dependent) --------
+  # Higher mixer tip speed (v_tip) causes shear-driven milling of primary
+  # particles and destabilization of aggregates. The effect scales with
+  # shear rate ∝ v_tip. Reference speed 12 m/s -> a_prim = 1e-7 m (100 nm).
+  # Scaling: higher shear (v_tip) reduces primary size. Attrition ~log(v_tip).
+  v_tip_ref  <- 12.0                              # reference mixer speed [m/s]
+  mill_factor <- (v_tip_ref / v_tip)^0.8          # milling attrition: strong inverse shear
+  a_prim_mod <- 1.0e-7 * mill_factor              # modulated primary radius [m]
+  d_ratio_mod <- 0.10 * (1 + 0.5 * (v_tip - v_tip_ref) / v_tip_ref)  # destabilization
+
+  ## --- Module 0b: Formulation - Flory-Huggins free-volume swelling ---------
   # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
   # matrix exponentially and independently of temperature
   phi_solvent <- C_mono + C_plas
@@ -217,7 +229,7 @@ spray_dry_model <- function(x) {
   rho_lm <- (1 - phi_e) * rho_L + phi_e * rho_solv  # liquid mixture density
   w_e    <- phi_e * rho_solv / rho_lm               # solvent mass fraction
 
-  ## --- Module 0b: Feed rheology (Krieger-Dougherty + power-law thinning) ---
+  ## --- Module 0c: Feed rheology (Krieger-Dougherty + power-law thinning) ---
   phi_s      <- C_sol * rho_L / rho_s             # solid phase volume fraction
   phi_disp   <- phi_s * (1 - phi_e) + phi_e       # solids + emulsion droplets
   mu_serum   <- mu_L * (1 + 10 * C_bind)          # binder thickening (K_fluid)
@@ -229,11 +241,11 @@ spray_dry_model <- function(x) {
   mu_app <- function(gdot)
     pmax(1e-3, mu_slurry0 * (gdot / gamma_ref)^(n_fl - 1))
 
-  ## --- Module 0c: Surfactant molar stoichiometry (v47 Sect. 5) -------------
+  ## --- Module 0d: Surfactant molar stoichiometry (v47 Sect. 5) -------------
   # monolayer capacity vs total interfacial demand: primary colloid surface
   # (3*phi_s/a per m3, the dominant sink) plus bubble surface (6*alpha/D_b)
   cap_area   <- (C_surf / MW_surf) * rho_L * N_Av * A_molec   # [m2/m3]
-  part_area  <- 3 * phi_s * (1 - phi_e) / a_prim              # [m2/m3]
+  part_area  <- 3 * phi_s * (1 - phi_e) / a_prim_mod          # [m2/m3]
   gas_area   <- 6 * alpha0 / D_b                              # [m2/m3]
   emu_area   <- 6 * phi_e / D_e                               # [m2/m3]
   theta_surf <- min(1, cap_area / (part_area + gas_area + emu_area))
@@ -241,7 +253,7 @@ spray_dry_model <- function(x) {
   # under-stabilized foam sheds entrained gas before the nozzle
   alpha_g    <- alpha0 * (0.3 + 0.7 * theta_surf)
 
-  ## --- Module 0d: Pressurized hold - coalescence / Ostwald ripening --------
+  ## --- Module 0e: Pressurized hold - coalescence / Ostwald ripening --------
   # LSW kinetics D^3 ~ t; Henry's-law gas solubility makes ripening faster
   # under the liquid-line pressure, surfactant coverage retards both
   k_rip <- k_rip0 * (P_F / P_atm) * (1 - 0.8 * theta_surf)
@@ -361,8 +373,8 @@ spray_dry_model <- function(x) {
   ## --- Module 6b: Drying kinetics -------------------------------------------
   # d2-law evaporation coefficient, scaled by outlet-state driving force
   kappa <- 5e-8 * pmax(T_out - T_feed, 1) / 100 * (1 - RH_out)  # [m2/s]
-  # Stokes-Einstein diffusivity of primary colloid particles
-  D_diff <- kB * T_feed / (6 * pi * mu_L * a_prim)              # [m2/s]
+  # Stokes-Einstein diffusivity of primary colloid particles (milling-affected)
+  D_diff <- kB * T_feed / (6 * pi * mu_L * a_prim_mod)          # [m2/s]
   Pe <- kappa / (8 * D_diff)                      # drying Peclet number
 
   # theta_skin,z : skin network fraction. Colloidal instability (low DLVO
@@ -375,7 +387,7 @@ spray_dry_model <- function(x) {
   # Fractal openness (v47 Sect. 9): unstable colloid -> DLCA, open flocs
   # (low D_f, high structural porosity); stable -> compact RLCA packing
   D_f <- 1.8 + 0.7 * min((stability - 1) / 5, 1)
-  phi_struct <- 0.30 * theta_skin * (1 - d_ratio^(3 - D_f))
+  phi_struct <- 0.30 * theta_skin * (1 - d_ratio_mod^(3 - D_f))
 
   ## --- Module 6c: Per-mode drying & residual moisture ----------------------
   # d2-law drying time per droplet mode, retarded by the skin (falling-rate
@@ -416,7 +428,7 @@ spray_dry_model <- function(x) {
   phi_cake <- 0.45 + 0.19 * min((stability - 1) / 5, 1)
   sigma_y  <- sig_y0 * (phi_cake / 0.64)^4 * (1 + 2 / stability) /
               sqrt(Softness) * (1 - 0.85 * S_stick)
-  P_cap    <- 2 * sigma_eff / (0.3 * a_prim)      # meniscus capillary stress
+  P_cap    <- 2 * sigma_eff / (0.3 * a_prim_mod)  # meniscus capillary stress
   Pi_col   <- P_cap / max(sigma_y, 1e3)           # collapse severity number
   f_col    <- Pi_col^2 / (1 + Pi_col^2)           # 0 = locks open, 1 = yields
 
@@ -464,6 +476,14 @@ spray_dry_model <- function(x) {
   # per-mode particle diameters (solids balance) and mixture quantiles
   Dp_j <- modes_m * ((1 - a_trap_j) * (1 - phi_e) * rho_L * C_sol /
                      (rho_s * (1 - phi_j)))^(1/3)
+  # Colloid milling coupling: the primary particle size modulation (via v_tip)
+  # affects packing efficiency and final particle size. Smaller primaries from
+  # milling (higher v_tip) reduce voidage -> smaller final particles. Apply to Dp_j.
+  # Ratio: a_prim_mod / a_prim_ref. When a_prim_mod is smaller (higher v_tip),
+  # factor is <1 and reduces final size (correct direction). Strong coupling.
+  mill_size_factor <- (a_prim_mod / 1.0e-7)^0.75  # strong packing efficiency coupling
+  Dp_j <- Dp_j * mill_size_factor
+
   grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)
   cdfp <- Reduce(`+`, Map(function(w, m, s)
             w * pnorm((grp - log(m)) / log(s)), modes_w, Dp_j, modes_s))
