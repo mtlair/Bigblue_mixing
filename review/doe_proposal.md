@@ -32,15 +32,23 @@ Bounds narrowed to the **real operating window** from the validation data
 | **v_tip** (UP1 tip speed) | m/s | 6 | 20 | 16 | d50, tapped density, skin |
 | **C_solid_mass** (feed solids) | wt/wt | 0.15 | 0.30 | 0.25 | d50, porosity, tapped density, moisture |
 | **T_dryer_in** (UP4 inlet) | K | 410 | 435 | 425 | porosity, sphericity, moisture |
-| **Q_template** (template/colloid ratio) | – | 0.1 | 2.0 | 1.05 | porosity, moisture, tapped density |
-| **P_atom_air** (atomizing pressure) | psig | 3 | 11 | 7 | d50 (dominant atomizer knob) |
+| **ALR** (atomizing air-liquid ratio) | – | 0.9 | 1.8 | 1.35 | span/breadth, droplet size |
 
-→ A **2^5 fractional factorial (resolution V, 16 runs) + 3 center points**, or a
-face-centred CCD if curvature on porosity/d50 is expected. Responses: d50 & span
+→ A **2⁴ full factorial (16 runs) + 3 center points**. Responses: d50 & span
 (laser), **porosity (SEM, robust)**, **sphericity (SEM, robust)**, tapped density,
-residual moisture. This resolves the main effects and 2-factor interactions the
-Morris σ/μ* flags as non-linear (v_tip, C_solid_mass, ionic_strength all show
-σ ≳ μ*).
+residual moisture. Resolves all main effects + 2-factor interactions (v_tip and
+C_solid_mass both show Morris σ ≳ μ*, i.e. real interactions); add a face-centred
+axial set → CCD if porosity/d50 curvature needs a quadratic surface.
+
+**Changes from the raw Morris set:**
+- **ALR replaces P_atom_air.** ALR is the controllable atomization variable (air
+  flow / liquid rate); P_atom_air is not independently settable and co-varies with
+  it. ALR mainly moves the distribution **span** (model rank #3 for span) — the
+  median d50 is dominated by v_tip/solids once the feed is a ~40 % paste. Bounds
+  0.9–1.8 come from the measured `up4atom_scfm/up4_feed`.
+- **Q_template dropped** — no data and not a current operational variable. Its CQA
+  roles (porosity, moisture) are still carried by C_solid_mass and T_dryer_in, so
+  every response keeps a controllable driver.
 
 ### B. Formulation factors — a separate formulation DoE
 `C_monomer`, `C_plasticizer`, `C_binder`, `template_dose`, `Tg_polymer`.
