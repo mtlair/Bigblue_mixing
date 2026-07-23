@@ -260,10 +260,30 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   Pe <- kappa / (8 * D_diff)
 
   S_skin <- Pe * C_sol * (1 + 1 / stability)
-  S_crit <- 500 * (1 + 0.05 * Softness)
-  theta_skin <- S_skin / (S_skin + S_crit)
-  # Cross-module coupling: the mixer wet-skin fraction that survives
-  # atomization pre-seeds the shell (series combination of skin states)
+
+  # Péclet concentration route: softer (more plasticized) surface has lower
+  # viscous resistance to consolidation -> Softness LOWERS the threshold.
+  # Opposite sign from the old "shell stiffness inhibits" rationale, which
+  # conflated the falling-rate shell with the forming surface layer.
+  S_crit_pe     <- 500 / (1 + 0.05 * Softness)
+  theta_skin_pe <- S_skin / (S_skin + S_crit_pe)
+
+  # Surface fusion route: the constant-rate wet-bulb surface pins at ~100°C
+  # while free water is present. Plasticizer/monomer lower the polymer Tg (Fox
+  # equation); when Tg_plas drops below 100°C the surface is rubbery throughout
+  # the constant-rate period -> continuous coalescence. Strongest differentiator
+  # for high-Tg polymers where plasticizer determines whether fusion fires at all.
+  # T_particle (the falling-rate temperature) is retained for burst/boil/stick.
+  T_surface_cr  <- 373.15   # constant-rate wet-bulb surface temperature [K]
+  inv_Tg_plas   <- (1 - phi_solvent) / max(Tg_pol, 200) + phi_solvent / Tg_solv
+  Tg_plas       <- 1 / inv_Tg_plas
+  theta_skin_fus <- 1 / (1 + exp(-(T_surface_cr - Tg_plas) / 15))
+
+  # Parallel paths: series non-skin probabilities (either route independently fires)
+  # Weight 0.5 on fusion route avoids trivial saturation at nominal conditions
+  theta_skin <- 1 - (1 - theta_skin_pe) * (1 - 0.5 * theta_skin_fus)
+
+  # Cross-module coupling: mixer wet-skin seeds the dryer skin state
   theta_skin <- 1 - (1 - theta_seed) * (1 - theta_skin)
 
   D_f <- 1.8 + 0.7 * min((stability - 1) / 5, 1)
