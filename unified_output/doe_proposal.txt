@@ -1,0 +1,82 @@
+========================================================================
+DoE PROPOSAL - wired chain UP1->UP2->UP3->UP4  (Morris screen, r=30)
+Top factors per CQA (mu* = influence, sign of mu = direction), with the
+model factor range as the proposed experimental bound.
+========================================================================
+
+### up2_D_particle_um  : particle size d50 [um]
+  factor           module        mu*      sigma  direction range [min,max] unit
+  n_flow           up2           565      581.4  increase  [0.2, 0.67] -
+  ionic_strength   up1         449.9       1035  decrease  [0.01, 0.5] M
+  v_tip            up1         322.1      663.3  decrease  [0.5, 32] m/s
+  C_surfactant     up1         321.1      859.8  decrease  [5e-05, 0.015] wt/wt
+  C_solid_mass     up1         291.1      554.5  decrease  [0.1, 0.6] wt/wt
+  Delta_pH         up1         268.7      465.4  increase  [0, 5] pH
+
+### up2_phi_porosity_z : porosity  (SEM anchor ~0.37, ROBUST)
+  factor           module        mu*      sigma  direction range [min,max] unit
+  C_solid_mass     up1       0.07753    0.04363  increase  [0.1, 0.6] wt/wt
+  template_dose    up1       0.06636    0.03968  increase  [0.02, 1.1] -
+  T_dryer_in       up2       0.05373    0.02663  increase  [410, 440] K
+  Q_template       up1       0.04149    0.03421  decrease  [0.1, 2] -
+  C_plasticizer    up1       0.03852    0.03214  decrease  [0.005, 0.04] wt/wt
+  C_monomer        up1       0.03718    0.02976  decrease  [0.001, 0.03] wt/wt
+
+### up2_Omega_struct_z : sphericity(SEM anchor ~0.91, ROBUST)
+  factor           module        mu*      sigma  direction range [min,max] unit
+  T_dryer_in       up2       0.03226     0.0157  decrease  [410, 440] K
+  k_perm_plast     up2       0.02352    0.02256  increase  [5, 60] -
+  C_monomer        up1       0.01827    0.01488  increase  [0.001, 0.03] wt/wt
+  T_bp_solv        up2       0.01656    0.02244  increase  [300, 360] K
+  sigma            up2       0.01624   0.005041  increase  [0.03, 0.07] N/m
+  mdot_gas_dry     up2       0.01569    0.01236  decrease  [0.4, 0.62] kg/s
+
+### up2_rho_tapped     : tapped density [kg/m3]
+  factor           module        mu*      sigma  direction range [min,max] unit
+  v_tip            up1         216.2        296  increase  [0.5, 32] m/s
+  ionic_strength   up1         201.9      264.7  decrease  [0.01, 0.5] M
+  C_solid_mass     up1         182.5      228.1  decrease  [0.1, 0.6] wt/wt
+  Delta_pH         up1           175      250.6  increase  [0, 5] pH
+  Q_template       up1         112.3      168.1  increase  [0.1, 2] -
+  MW_surfactant    up1         107.8        202  increase  [200, 1e+04] g/mol
+
+### up2_Tg_product_K   : product Tg [K]
+  factor           module        mu*      sigma  direction range [min,max] unit
+  Tg_polymer       up2         80.27      7.988  increase  [280, 380] K
+  C_plasticizer    up1         26.31      6.726  decrease  [0.005, 0.04] wt/wt
+  C_monomer        up1         11.18      3.067  decrease  [0.001, 0.03] wt/wt
+  T_bp_solv        up2          3.13      4.982  decrease  [300, 360] K
+  T_dryer_in       up2         2.471      5.485  increase  [410, 440] K
+  Q_template       up1         2.103      5.053  decrease  [0.1, 2] -
+
+### up2_X_moisture     : residual moisture [-]
+  factor           module        mu*      sigma  direction range [min,max] unit
+  Q_template       up1     0.0004332   0.001179  decrease  [0.1, 2] -
+  C_solid_mass     up1     0.0004052  0.0009705  increase  [0.1, 0.6] wt/wt
+  k_perm_plast     up2     0.0001934   0.001059  decrease  [5, 60] -
+  C_plasticizer    up1      0.000181  0.0009916  decrease  [0.005, 0.04] wt/wt
+  n_flow           up2     0.0001709  0.0006655  increase  [0.2, 0.67] -
+  T_dryer_in       up2     0.0001485  0.0008136  decrease  [410, 440] K
+
+### up2_theta_skin_z   : skin/fusion (SEM DEFERRED - not repeatable)
+  factor           module        mu*      sigma  direction range [min,max] unit
+  mu_L             up2        0.2074     0.1091  increase  [0.0012, 0.056] Pa s
+  T_mix            up1       0.08896    0.07925  decrease  [290, 360] K
+  T_dryer_in       up2       0.04973    0.04642  increase  [410, 440] K
+  v_tip            up1       0.04579    0.07074  decrease  [0.5, 32] m/s
+  Delta_pH         up1       0.04108    0.06504  increase  [0, 5] pH
+  mdot_L           up2       0.02927    0.03076  decrease  [0.013, 0.02] kg/s
+
+------------------------------------------------------------------------
+RECOMMENDED DoE FACTOR SET (top-4 driver of >=2 CQAs), with bounds:
+------------------------------------------------------------------------
+  factor           module #CQAs    range [min,max] unit   nominal
+  C_solid_mass     up1    3        [0.1, 0.6] wt/wt      0.25
+  T_dryer_in       up2    3        [410, 440] K          425
+  v_tip            up1    3        [0.5, 32] m/s        16.2
+  C_monomer        up1    2        [0.001, 0.03] wt/wt      0.0155
+  C_plasticizer    up1    2        [0.005, 0.04] wt/wt      0.0225
+  Q_template       up1    2        [0.1, 2] -          1.05
+  T_bp_solv        up2    2        [300, 360] K          330
+  ionic_strength   up1    2        [0.01, 0.5] M          0.255
+  k_perm_plast     up2    2        [5, 60] -          32.5
