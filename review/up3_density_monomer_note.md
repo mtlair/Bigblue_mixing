@@ -34,22 +34,24 @@ For a gas void fraction α at stream pressure P and temperature T,
 | UP1 exit, retained (back-calc from UP3) | Boyle from cake holdup | ~4.5 % | 0.06–0.07 |
 | **UP3 cake, retained** | measured cake density | 7.6 % (up3_1) / ~14 % (hist) | **0.05–0.08** |
 
-Two things line up independently: the **input** side (sparge flow meter and the
-all-entrained upper bound) gives **~0.60 wt %**, and the **retained** side (UP1-exit
-back-calc *and* the UP3 cake density, two separate measurements) gives
-**~0.05–0.08 wt %**. So:
+**The gas is foaming air, not monomer** (confirmed: `up1_scfh` is an air sparge).
+So the numbers in the table above quantify *air*, not monomer — the ~0.60 wt %
+"input" is the foaming air, and the ~0.05–0.08 wt % "retained" is trapped air in
+the exit foam / UP3 cake. They stand as a useful **air** balance (≈85–90 % of the
+foaming air escapes before the product exits; up3_1: ~0.37 lb/hr in, ~0.03 lb/hr
+retained) but say nothing directly about monomer.
 
-- **Residual monomer held in the product ≈ 0.05–0.08 wt % of solids (~500–800 ppm).**
-- Monomer sparged/available ≈ 0.60 wt %; **~85–90 % escapes** before the product
-  exits, the rest is the trapped residual. (Mass basis for up3_1: ~0.37 lb/hr in,
-  ~0.03 lb/hr retained.)
+### Bottom line on residual monomer
+It **cannot be quantified from the current data.** Monomer is gaseous (MW ≈ 70), so:
+- it leaves **no liquid-density signature** — the feed check confirms zero dissolved
+  monomer (colloid+water fully explains 1118 kg/m³); and
+- it is **not** the measured void gas — that void is foaming air.
 
-### One assumption to confirm
-This treats the UP1 sparge / void gas as **monomer**. If `up1_scfh` is instead
-inert foaming air, the 0.60 wt % is air and monomer would have to be metered on a
-separate stream — in which case only the *retained* void mass (0.05–0.08 wt %, an
-upper bound, since some void may be air) is attributable to monomer. The gas
-identity of `up1_scfh` is the single open input.
+The most one can say is a loose upper bound: *if* any residual monomer shared the
+trapped-air voids, it would be ≤ the ~0.05–0.08 wt % air holdup. A real number
+needs data not in these columns:
+- a **monomer feed / off-gas flow** (then PV=nRT with MW 70 gives it directly), or
+- a **TGA / GC assay** on the product.
 
 ## What is now well-established: ρ_solid ≈ 1700 kg/m³
 

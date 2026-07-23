@@ -488,10 +488,15 @@ viscometry from near-identical compositions is expected, not a data-entry error.
 measurement**, not a formula error. To interpret it, the effective solid density
 must be derived from the UP1 feed measurement rather than assumed from pure polymer.
 Solving `1/ρ_feed = s/ρ_solid + (1−s)/ρ_water` at s = 0.25, ρ_feed = 1117.9 kg/m³
-gives **ρ_solid ≈ 1730 kg/m³** — consistent with mineral-loaded particles (not pure
-polymer at ~1200 kg/m³). The user-note that `up1_feed_rho` is lower than the
-skeleton + water prediction is attributed to residual monomer, which is consistent
-across all xlsx files.
+gives **ρ_solid ≈ 1730 kg/m³**. This is simply the **bare colloid density
+(1.70 g/cc, confirmed) — the colloid is polymer**, and 1700 is also the dried-
+product skeletal density used in the model (`unified/up1_mixer_module.R:234`).
+There is no mineral skeleton; an earlier draft that read 1730 as a mineral-loaded
+particle "diluted" by residual monomer was mistaken. The feed density is fully
+accounted for by colloid + water (predicted 1112 vs measured 1118 — no deficit),
+which is exactly what a **gaseous** monomer implies: residual monomer is not a
+dissolved liquid and leaves no density signature in the feed. (Residual monomer is
+addressed separately below; it cannot be inferred from these densities.)
 
 With ρ_solid = 1730 kg/m³, the gas-free density at 40.7 % solid is:
 
@@ -636,7 +641,21 @@ Solving the slurry-density equation from the UP1 feed measurement at 25 % solid:
         = 0.25 / (1/1117.9 − 0.75/1000) = 1730 kg/m³
 ```
 
-Consistent across all 4 conditions (1729–1742 kg/m³). This is higher than pure
-polymer (~1200 kg/m³), indicating mineral-loaded particles. It is lower than the
-pure mineral skeleton because residual monomer (lower density) reduces the effective
-particle density — the same pattern observed across all xlsx files.
+Consistent across all 4 conditions (1729–1742 kg/m³). **This is the bare colloid
+density (1.70 g/cc); the colloid is polymer, not a mineral-loaded particle**, and it
+matches the dried-product skeletal density used in the model. The earlier reading —
+"higher than pure polymer, lower than a mineral skeleton diluted by residual
+monomer" — was incorrect: there is no mineral phase, and the feed density is
+explained by colloid + water alone (predicted 1112 vs measured 1118).
+
+### Residual monomer — gaseous, not resolvable from these densities
+
+Residual monomer is **gaseous at room temperature (MW ≈ 70 g/mol)**, so it produces
+no liquid-density deficit and cannot be read off the feed density. It would have to
+be quantified as a gas (PV=nRT) or by direct assay (TGA / GC). The gas holdup seen
+in the streams is **foaming air** (`up1_scfh` is an air sparge), not monomer, so the
+UP1-exit and UP3-cake void fractions bound trapped *air*, not residual monomer — at
+most they set a loose upper bound on any monomer that might share those voids.
+Quantifying residual monomer therefore needs data not in the current columns: a
+monomer feed/off-gas flow, or a TGA/GC assay on the product. See
+`review/up3_density_monomer_note.md` for the full working.
