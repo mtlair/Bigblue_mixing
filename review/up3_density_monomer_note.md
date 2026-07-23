@@ -6,18 +6,55 @@ chain conditions).
 
 ## Short answer on residual monomer
 
-**Density data — even with the new UP3 rows — cannot quantify residual monomer.**
-Solving `1/ρ = s/ρ_solid + (1−s)/ρ_water` returns the *effective filled-particle
-skeletal density* ρ_solid, which already folds any residual monomer into a single
-number. Splitting it into mineral / polymer / monomer needs component densities
-(not in the repo) plus a composition assumption. Density-by-difference is
-**fundamentally degenerate**: a lighter solid and a gas void lower the measured
-density identically. The last session's "guess" cannot be promoted to a
-measurement from density alone.
+The **right comparison is on the UP1 colloid feed, not the UP3 cake.** The feed
+carries no sparged gas (gas is introduced *inside* UP1), so it is a clean
+three-component mix — colloid solid + water + monomer — with none of the
+solid-vs-gas degeneracy that plagues the cake. Referencing the measured feed
+density against the solids+water theoretical isolates monomer by volume balance:
 
-To actually pin it, an independent assay is required:
-- **He pycnometry** on dried, degassed powder → true skeletal ρ_solid (no gas, no water).
+```
+ρ_theo = 1 / (s/ρ_s + (1−s)/ρ_w)                       # solid + water only
+w_m    = (1/ρ_meas − 1/ρ_theo) / (1/ρ_m − 1/ρ_w)       # monomer mass frac of feed
+```
+
+I ran this over the 4 clean chain feeds and the historical set. The method is
+mathematically valid but **its answer is set almost entirely by two densities the
+repo does not specify** — the bare-colloid solid density ρ_s and the monomer
+density ρ_m — and by the measurement noise floor. Two hard limits:
+
+**1. The ρ_s lever is enormous.** Monomer holdup for the up3_1 feed (1117.9 kg/m³
+@ 25 % solid, ρ_m = 950):
+
+| ρ_s (kg/m³) | 1700 | 1900 | 2100 | 2400 | 2650 |
+|-------------|------|------|------|------|------|
+| w_m (wt %)  | −10  | +22  | +47  | +77  | +97  |
+
+A ±5–7 kg/m³ feed-density deficit, swung over this lever, gives anything from 0 %
+to ~100 % monomer. You cannot read monomer off feed density without ρ_s known to
+≈ ±1 %.
+
+**2. At the model's own ρ_s = 1700, there is no deficit — the sign is wrong for
+monomer.** Predicted feed density (solid@1700 + water@997) = 1112; measured =
+1117.9 → feed is **6–7 kg/m³ *denser*** than the two-component prediction. Monomer
+is lighter than water, so it would make the feed *lighter*, not heavier. Referenced
+to the dried-product skeletal density (1700), monomer holdup reads as ~zero (in
+fact slightly negative). A positive, physical monomer number requires assuming the
+bare colloid is denser than the dried product (ρ_s ≳ 1900) — plausible if drying
+adds closed porosity to the skeleton, but unquantified here.
+
+**3. Noise floor ≈ 7–15 wt % monomer.** 1 wt % monomer shifts feed density by only
+0.6–1.4 kg/m³ (for ρ_m = 950–900), while the historical feed-density scatter at
+25 % solid is σ ≈ 9 kg/m³. Even with ρ_s known exactly, only a *large* holdup would
+clear the noise.
+
+**Conclusion:** the feed-density comparison is the correct experiment and I did it,
+but the density signal is too small and too dependent on an unknown ρ_s to promote
+the "guess" to a number. Close it with an independent measurement:
+- **He pycnometry** on the *bare dried colloid* → ρ_s directly (kills the lever).
 - **GC / solvent-extraction or TGA** → residual monomer wt% directly.
+
+With bare-colloid ρ_s in hand, the `w_m` formula above turns the existing feed
+densities straight into monomer holdup per condition.
 
 ## What is now well-established: ρ_solid ≈ 1700 kg/m³
 
