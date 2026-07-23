@@ -4,57 +4,52 @@
 full 44-row historical set in `data/up1_2_3_solids_rho.xlsx` (not just the 4 clean
 chain conditions).
 
-## Short answer on residual monomer
+## Resolved: monomer is a gas — quantify it with PV=nRT, not a density deficit
 
-The **right comparison is on the UP1 colloid feed, not the UP3 cake.** The feed
-carries no sparged gas (gas is introduced *inside* UP1), so it is a clean
-three-component mix — colloid solid + water + monomer — with none of the
-solid-vs-gas degeneracy that plagues the cake. Referencing the measured feed
-density against the solids+water theoretical isolates monomer by volume balance:
+Two facts (confirmed by the process owner) settle the residual-monomer question:
 
-```
-ρ_theo = 1 / (s/ρ_s + (1−s)/ρ_w)                       # solid + water only
-w_m    = (1/ρ_meas − 1/ρ_theo) / (1/ρ_m − 1/ρ_w)       # monomer mass frac of feed
-```
+1. **Bare colloid density = 1.70 g/cc, and the colloid is polymer** (no mineral
+   loading). This equals the dried-product skeletal density already in the model
+   (`up1_mixer_module.R:234`). So the DATA_REVIEW narrative — "1730 is *below* a
+   pure mineral skeleton because residual monomer dilutes it" — is **wrong**: there
+   is no mineral skeleton and no dilution to infer. ρ_s = 1700 is just the colloid.
 
-I ran this over the 4 clean chain feeds and the historical set. The method is
-mathematically valid but **its answer is set almost entirely by two densities the
-repo does not specify** — the bare-colloid solid density ρ_s and the monomer
-density ρ_m — and by the measurement noise floor. Two hard limits:
+2. **Monomer is gaseous at room temperature (MW ≈ 70 g/mol).** It therefore never
+   appears as a *liquid* density deficit. This is exactly why the clean feed check
+   shows no deficit: predicted feed density (colloid@1700 + water@997) = 1112 vs
+   measured 1117.9 — the feed is if anything 6 kg/m³ *denser*, i.e. **zero
+   dissolved/liquid monomer**, consistent with a gas-phase monomer. My earlier
+   liquid-holdup formula was the wrong model; the correct tool is the ideal-gas law
+   applied to the measured **gas holdup**.
 
-**1. The ρ_s lever is enormous.** Monomer holdup for the up3_1 feed (1117.9 kg/m³
-@ 25 % solid, ρ_m = 950):
+### PV=nRT monomer holdup (MW = 70)
 
-| ρ_s (kg/m³) | 1700 | 1900 | 2100 | 2400 | 2650 |
-|-------------|------|------|------|------|------|
-| w_m (wt %)  | −10  | +22  | +47  | +77  | +97  |
+For a gas void fraction α at stream pressure P and temperature T,
+`n = P·V_gas/(R·T)` and monomer mass `= n·0.070 kg/mol`, expressed per unit solid:
 
-A ±5–7 kg/m³ feed-density deficit, swung over this lever, gives anything from 0 %
-to ~100 % monomer. You cannot read monomer off feed density without ρ_s known to
-≈ ±1 %.
+| Basis | Measurement | Gas frac | Monomer (wt % of solid) |
+|-------|-------------|----------|--------------------------|
+| **Sparge input** (up1_scfh as monomer) | flow meter | — | **0.59–0.60** |
+| UP1 exit, all-entrained (upper bound) | up1_scfh expanded to exit P,T | ~30 % | 0.59–0.60 |
+| UP1 exit, retained (back-calc from UP3) | Boyle from cake holdup | ~4.5 % | 0.06–0.07 |
+| **UP3 cake, retained** | measured cake density | 7.6 % (up3_1) / ~14 % (hist) | **0.05–0.08** |
 
-**2. At the model's own ρ_s = 1700, there is no deficit — the sign is wrong for
-monomer.** Predicted feed density (solid@1700 + water@997) = 1112; measured =
-1117.9 → feed is **6–7 kg/m³ *denser*** than the two-component prediction. Monomer
-is lighter than water, so it would make the feed *lighter*, not heavier. Referenced
-to the dried-product skeletal density (1700), monomer holdup reads as ~zero (in
-fact slightly negative). A positive, physical monomer number requires assuming the
-bare colloid is denser than the dried product (ρ_s ≳ 1900) — plausible if drying
-adds closed porosity to the skeleton, but unquantified here.
+Two things line up independently: the **input** side (sparge flow meter and the
+all-entrained upper bound) gives **~0.60 wt %**, and the **retained** side (UP1-exit
+back-calc *and* the UP3 cake density, two separate measurements) gives
+**~0.05–0.08 wt %**. So:
 
-**3. Noise floor ≈ 7–15 wt % monomer.** 1 wt % monomer shifts feed density by only
-0.6–1.4 kg/m³ (for ρ_m = 950–900), while the historical feed-density scatter at
-25 % solid is σ ≈ 9 kg/m³. Even with ρ_s known exactly, only a *large* holdup would
-clear the noise.
+- **Residual monomer held in the product ≈ 0.05–0.08 wt % of solids (~500–800 ppm).**
+- Monomer sparged/available ≈ 0.60 wt %; **~85–90 % escapes** before the product
+  exits, the rest is the trapped residual. (Mass basis for up3_1: ~0.37 lb/hr in,
+  ~0.03 lb/hr retained.)
 
-**Conclusion:** the feed-density comparison is the correct experiment and I did it,
-but the density signal is too small and too dependent on an unknown ρ_s to promote
-the "guess" to a number. Close it with an independent measurement:
-- **He pycnometry** on the *bare dried colloid* → ρ_s directly (kills the lever).
-- **GC / solvent-extraction or TGA** → residual monomer wt% directly.
-
-With bare-colloid ρ_s in hand, the `w_m` formula above turns the existing feed
-densities straight into monomer holdup per condition.
+### One assumption to confirm
+This treats the UP1 sparge / void gas as **monomer**. If `up1_scfh` is instead
+inert foaming air, the 0.60 wt % is air and monomer would have to be metered on a
+separate stream — in which case only the *retained* void mass (0.05–0.08 wt %, an
+upper bound, since some void may be air) is attributable to monomer. The gas
+identity of `up1_scfh` is the single open input.
 
 ## What is now well-established: ρ_solid ≈ 1700 kg/m³
 
