@@ -372,6 +372,121 @@ accordingly.
 
 ---
 
+## Part 7 — theta_skin closure revision: surface-fusion route
+
+### Problem with the original single-route closure
+The original theta_skin model used a single Péclet-concentration route:
+
+```
+S_crit <- 500 * (1 + 0.05 * Softness)
+theta_skin <- S_skin / (S_skin + S_crit)
+```
+
+`Softness = (1 + 5·C_binder)·exp(25·phi_solvent)` where `phi_solvent = C_monomer + C_plasticizer + w_core`.
+
+The sign of Softness in S_crit was wrong: higher Softness (more plasticizer) *raised* S_crit, making skin *harder* to form. In the Morris screen, C_monomer and C_plasticizer ranked 16–17 of 41 factors and drove theta_skin in the **wrong direction** (more plasticizer → less skin). Physically, plasticizer/monomer enable surface fusion by depressing the polymer Tg — they should drive *more* skin.
+
+Two mechanisms are now implemented in parallel:
+
+### Route 1: Péclet concentration (corrected sign)
+```
+S_crit_pe <- 500 / (1 + 0.05 * Softness)
+theta_skin_pe <- S_skin / (S_skin + S_crit_pe)
+```
+Dividing by Softness (was multiplying) reflects the correct physics: a more plasticized surface has *lower* viscous resistance to consolidation, so the threshold *falls* with Softness.
+
+### Route 2: Surface fusion anchored at the wet-bulb temperature
+During the **constant-rate drying period**, evaporative cooling holds the droplet surface at the wet-bulb temperature (~100 °C = 373 K), regardless of the dryer outlet temperature. If the plasticized polymer Tg drops below 100 °C, the surface is rubbery throughout this period and fuses continuously.
+
+```
+T_surface_cr <- 373.15   # constant-rate wet-bulb [K]
+inv_Tg_plas  <- (1 - phi_solvent) / Tg_polymer + phi_solvent / Tg_solv   # Fox eq.
+Tg_plas      <- 1 / inv_Tg_plas
+theta_skin_fus <- 1 / (1 + exp(-(T_surface_cr - Tg_plas) / 15))
+```
+
+The 15 K sigmoid width spans the critical region around 100 °C. This route is the primary differentiator for high-Tg_polymer conditions where plasticizer determines whether the surface stays rubbery through the constant-rate period.
+
+**Two-stage temperature separation:** `T_surface_cr` (100 °C, constant-rate, skin formation) is distinct from `T_particle = 0.85·T_out + 0.15·T_feed` (~80–85 °C, falling-rate) which is retained for burst, solvent boiling, sticking, and residual-solvent escape — all falling-rate phenomena.
+
+### Combined
+```
+theta_skin <- 1 - (1 - theta_skin_pe) * (1 - 0.5 * theta_skin_fus)
+```
+Both routes act in parallel (either independently forms skin); weight 0.5 on the fusion route avoids trivial saturation at nominal conditions (most process-relevant Tg_pol values are 40–80 K below T_surface_cr so theta_skin_fus ≈ 0.97 at nominal, saturation handled by the 0.5 weight).
+
+### Result: corrected factor directions and rankings
+
+From the re-run Morris screen (41 factors, r=30 trajectories, `template_type=4`):
+
+| Factor | Rank | μ* | Direction | Expected |
+|--------|------|----|-----------|---------|
+| C_monomer | 14 | 0.0254 | MORE skin | ✓ correct |
+| C_plasticizer | 16 | 0.0238 | MORE skin | ✓ correct |
+| Tg_polymer | 9 | 0.0627 | LESS skin | ✓ correct |
+| T_dryer_in | 4 | 0.1081 | MORE skin | ✓ correct |
+| T_mix | 3 | 0.1657 | LESS skin | ✓ (hotter feed → smaller ΔT driving kappa) |
+| mu_L | 1 | 0.2957 | MORE skin | ✓ (lower D_diff → higher Pe) |
+
+All signs are now physically consistent. C_monomer/C_plasticizer moved from rank 16–17 (wrong direction) to rank 14/16 (correct direction). The particle-size calibration metrics were **unchanged** by this fix — theta_skin feeds morphology, not the PSD.
+
+**Stale Morris cache removed and screen re-run** after the skin closure change.
+
+---
+
+## Part 8 — UP1→UP2→UP3→UP4 full-chain data
+
+Source: `data/up1_2_3_4_visc_sem.xlsx` — four conditions (`up3_1`–`up3_4`) that ran
+the **complete** UP1→UP2→UP3→UP4 chain (the direct visc.xlsx runs bypassed UP2/UP3).
+Data parsed and saved to `data/cond_up1234.csv` (process + PSD) and
+`data/up3_viscometry.csv` (post-UP3 flow curves). SEM sample cross-reference is on
+the `sem_sample_no_filename` sheet (sample numbers 114641–114644); images reside in
+the `SEM/` folder under the same naming convention.
+
+### Process summary (all 25 % solid UP1 feed, v_tip > 16 m/s → all UP1-control)
+
+| Cond | v_tip (m/s) | UP3 solid % | d50 dry (µm) | η post-UP3 @ 12.7 s⁻¹ (Pa·s) |
+|------|------------|------------|-------------|-------------------------------|
+| up3_1 | 16.44 | 40.7 | 10.20 | 12.0 |
+| up3_2 | 18.12 | 42.7 | 8.72 | 18.8 |
+| up3_3 | 18.11 | 40.6 | 9.07 | 12.0 |
+| up3_4 | 19.28 | 38.8 | 8.67 | 26.8 |
+
+UP4 inlet temperatures are similar to the direct-path runs (143 °C).
+
+### Key findings
+
+**UP3 concentrates from 25 % → 39–43 % solids.** UP2 adds water
+(`up2_h2o_lbhr` ≈ 41–49 lb/hr, diluting the slurry slightly); UP3 (decanting
+centrifuge) then concentrates the cake. The UP4 dryer therefore sees a **richer feed
+(~40 % solids)** than the UP1→UP4-direct path (25 %). The `dryer_airflow()` energy
+balance must be re-derived from the **post-UP3 solids** when routing the full chain.
+
+**Post-UP3 viscosity is 12–27 Pa·s at 12.7 s⁻¹**, versus 0.02–0.77 Pa·s post-UP1
+for the same solid at 25 %. The concentration step raises the viscosity by roughly
+50–100×. This will have significant impact on the UP4 atomizer model (`mu_L` drives
+droplet breakup directly), and it is correctly tracked — the UP1 exit viscosity
+closure feeds the dryer model, and concentrating to 40 % would shift it further.
+
+**Dry d50 (8.67–10.2 µm) is consistent with the UP1→UP4 direct set (8.8–15.3 µm)**
+and also in the UP1-control regime. The slight lower range here may reflect the
+higher post-UP3 solids (denser droplet → smaller dry particle at the same droplet
+size) or the higher v_tip (all ≥ 16 m/s, driving the aggregate toward the
+compacted end of the plateau).
+
+### Data quality flag: up3_1 and up3_3 viscometry are identical
+
+The flow curves on sheets `up3_1` and `up3_3` are **bit-for-bit identical** (20 data
+points, all matching). The two conditions have different UP3 centrifuge settings
+(drum_rpm 1754 vs 1687, scroll_rpm 1254 vs 858, g-force 430 vs 398) and different
+dry d50 (10.20 vs 9.07 µm), so identical post-UP3 viscosity would be unusual. Likely
+explanation: the `up3_3` flow curve was not measured and the `up3_1` data was copied
+into that sheet. **Treat up3_3 viscometry as unreliable** until the raw rheometer
+record is checked. The up3_3 PSD and process variables (d50, v_tip, UP3 operating
+conditions) appear normal and are used as-is.
+
+---
+
 ## Toward the goal — experimental ranges
 
 With the UP1 and UP4-atomizer closures calibrated and validated UP1→UP4-direct,
@@ -380,3 +495,8 @@ recalibrated factor windows (`n_flow`, `ALR`, atomizing pressure, `mdot_L`) now
 bracket the real process, and the Morris screen ranks which of them actually move
 each product property. Routing the calibration through UP2/UP3 is the following
 stage, once this direct calibration is accepted.
+
+The full-chain data (`up1_2_3_4_visc_sem.xlsx`) gives the first four-stage
+measurements; the next modelling step is to build a validation harness that routes
+UP1→UP2 (foam wash with water addition) →UP3 (decanting centrifuge, concentrating
+to ~40 %)→UP4 (dryer, re-derived air flow from post-UP3 solids).
