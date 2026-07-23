@@ -149,7 +149,11 @@ template_from_chemistry <- function(template, poly = POLY_HSP,
     else if (RED <  1.5) "poor"
     else                 "very_poor"
 
-  escapes <- isTRUE(s$volatile) && is.finite(s$bp_C) && s$bp_C < T_dry_C + 40
+  # escapes: bp-based check is authoritative; volatile=FALSE only used for
+  # species where evaporation is structurally impossible (DBP, paraffin, IPM).
+  # For any species with a finite bp, the T_dry comparison governs.
+  truly_nonvolatile <- identical(s$volatile, FALSE) && (is.na(s$bp_C) || s$bp_C > 280)
+  escapes <- !truly_nonvolatile && is.finite(s$bp_C) && s$bp_C < T_dry_C + 40
   w_disp  <- if (gas) TRUE else is_water_dispersible(s$water_sol_g100mL, s$logP)
 
   # RTF = core-absorbed fraction; continuous sigmoid on RED (RED=1 -> RTF=0.5)
