@@ -53,6 +53,40 @@ Each SEM metric is dimensionless and maps to one model morphology output
    and the other metrics are flat — a lead worth resolving once the SEM metrics
    are wired as calibration targets.
 
+## Surface porosity — % open space between spheres (`sem_porosity.py`)
+
+Per the reviewer's definition (114641_5kx annotation): **skin** = smooth, gap-free
+patches where beads have merged (darker, low local-range); **open pore** = the
+interstitial gap between distinct packing spheres (dark, bounded by bright caps,
+high local range). Pixels inside the particle body are classified by local
+intensity **range** (max−min over a bead-scale window) plus a darkness cut;
+overlays (`sem/overlay_*_5kx.png`, red = pore, blue = skin) confirm the split.
+
+The headline number is normalised to the **granular (bead-packed) region** so it
+is independent of how much smooth substrate/background is in frame (the 5k views
+differ — up3_1 is one large particle face, up3_2 is several granules on a stub):
+
+| cond | **open space between spheres** | (of whole surface) | skin | granular frac |
+|------|-------------------------------|--------------------|------|---------------|
+| up3_1 | **43.7 %** | 26.3 % | 11.1 % | 60.3 % |
+| up3_2 | **42.8 %** | 25.9 % | 14.4 % | 60.5 % |
+| up3_3 | **44.5 %** | 27.1 % | 10.6 % | 61.0 % |
+| up3_4 | **39.1 %** | 24.0 % | 15.0 % | 61.5 % |
+
+**Surface open-porosity ≈ 40–45 % (mean ~42.5 %)**, fairly flat across conditions;
+up3_4 is the most closed (39 %, highest skin 15 %), up3_3 the most open (44.5 %).
+
+**Vs the model:** `phi_porosity_z ≈ 0.08` is *bulk/structural* porosity; the SEM
+~42 % is the *2-D projected surface* void between the outer bead layer — a looser,
+projected quantity, so >> the bulk value by definition. The qualitative reading
+still matters: the surface is a very open (~42 %), lightly-fused (~12 % skin) bead
+packing, so the surface-fusion route `theta_skin_fus` should calibrate LOW and
+`phi_porosity` may under-represent a genuinely porous particle. Resolving bulk vs
+surface porosity needs a fractured/FIB cross-section (data request).
+
+Thresholds (`DARK_PCT`, `SMOOTH_PCT`) shift the absolute value a few %; the ~42 %
+level and the cross-condition ranking are the robust, DoE-usable outputs.
+
 ## Caveats
 - τ (smoothness threshold) and the flattening σ are tunable; **relative** ranking
   across conditions is robust, **absolute** θ_SEM needs a reference pair (a known
