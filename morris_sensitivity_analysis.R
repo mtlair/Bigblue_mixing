@@ -51,9 +51,10 @@
 #     hold-time ripening, effervescent exit, per-mode gas trapping) is
 #     retained unchanged and acts in parallel.
 #
-# NOTE: the v47 impeller dissipation closure (v_tip) was removed - it belongs
-# to an upstream unit operation; its history is carried by the feed bubble
-# size D_b and the hold-time coarsening model.
+# NOTE: v_tip does not feed UP4 directly. All colloid effects of tip speed
+# (three regimes: unchanged / aggregation onset / milling+attrition) are
+# resolved in UP1. The result flows downstream as D_primary_exit_um on the
+# stream; UP4 uses that size as-is via Module 0a.
 #
 # Module chain: Feed Properties -> Pressurized Hold -> Two-Phase
 # Conditioning -> Effervescent Stage -> Bi-Fluid Airblast Stage ->
@@ -95,18 +96,18 @@ fac <- function(name, min, max, log, unit, desc)
 
 factors <- rbind(
   #   name             min     max     log    unit     description
-  fac("ALR",           1.0,    10.0,   FALSE, "-",     "air-liquid mass ratio m_G/m_L"),
-  fac("P_system",      2.0e5,  7.0e5,  FALSE, "Pa",    "atomizing air supply pressure"),
+  fac("ALR",           0.9,    1.8,    FALSE, "-",     "air-liquid mass ratio m_G/m_L (measured up4atom_scfm/up4_feed, visc.xlsx: 0.90-1.78)"),
+  fac("P_system",      1.2e5,  1.8e5,  FALSE, "Pa",    "atomizing air supply pressure (measured max_up4atom_psig, visc.xlsx: 2.7-11.4 psig abs)"),
   fac("P_feed",        1.5e5,  1.0e6,  FALSE, "Pa",    "liquid feed line (hold) pressure"),
-  fac("mdot_L",        0.002,  0.020,  FALSE, "kg/s",  "liquid feed mass flow"),
+  fac("mdot_L",        0.013,  0.020,  FALSE, "kg/s",  "liquid feed mass flow (measured up4_feed, visc.xlsx: 107-154 lb/hr = 0.0135-0.0194 kg/s)"),
   fac("sigma",         0.030,  0.070,  FALSE, "N/m",   "liquid surface tension"),
   fac("mu_L",          0.0012, 0.0560, TRUE,  "Pa s",  "serum (continuous phase) viscosity"),
   fac("rho_L",         1000,   1300,   FALSE, "kg/m3", "liquid (slurry) density"),
   fac("alpha_g_0",     0.05,   0.60,   FALSE, "-",     "feed foam quality / entrained gas holdup"),
   fac("D_b",           2.0e-5, 2.0e-4, TRUE,  "m",     "feed bubble diameter (before shear)"),
   fac("C_solid_mass",  0.05,   0.40,   FALSE, "-",     "solid mass fraction in feed (wt/wt)"),
-  fac("T_system",      330,    470,    FALSE, "K",     "dryer gas INLET temperature"),
-  fac("mdot_gas_dry",  0.10,   1.00,   TRUE,  "kg/s",  "dryer gas mass flow rate"),
+  fac("T_system",      410,    440,    FALSE, "K",     "dryer gas INLET temperature (measured up4_Tin, visc.xlsx: ~425 K)"),
+  fac("mdot_gas_dry",  0.40,   0.62,   TRUE,  "kg/s",  "dryer gas mass flow (evaporative estimate to <=0.5% moisture, visc.xlsx: 0.40-0.62 kg/s)"),
   fac("Y_in",          0.001,  0.020,  FALSE, "kg/kg", "dryer gas inlet absolute humidity"),
   fac("T_feed",        280,    330,    FALSE, "K",     "feed / atomizing air temperature"),
   fac("t_hold",        5,      600,    TRUE,  "s",     "pressurized hold time before nozzle"),
@@ -117,7 +118,7 @@ factors <- rbind(
   fac("Delta_pH",      0.2,    4.0,    FALSE, "pH",    "delta pH vs isoelectric point"),
   fac("I_strength",    1.0e-3, 5.0e-1, TRUE,  "M",     "ionic strength (Debye screening driver)"),
   fac("Tg_polymer",    280,    380,    FALSE, "K",     "dry-polymer glass transition"),
-  fac("n_flow",        0.40,   1.00,   FALSE, "-",     "power-law shear-thinning flow index"),
+  fac("n_flow",        0.20,   0.67,   FALSE, "-",     "power-law shear-thinning flow index (measured post-UP1 envelope, visc.xlsx: 0.20-0.67, mean 0.44)"),
   fac("k_perm_mono",   5.0,    60.0,   FALSE, "-",     "monomer free-volume permeation coeff."),
   fac("k_perm_plast",  5.0,    60.0,   FALSE, "-",     "plasticizer free-volume permeation coeff."),
   fac("k_perm_bind",   2.0,    40.0,   FALSE, "-",     "binder pore-blocking coefficient"),
@@ -152,7 +153,9 @@ gamma_a  <- 1.4       # heat capacity ratio, air                [-]
 A_L      <- 1.0e-6    # liquid passage area                     [m2]
 A_G      <- 5.0e-6    # gas passage area                        [m2]
 D_h      <- 1.0e-3    # nozzle hydraulic diameter               [m]
-rho_s    <- 1400      # dry solid (polymer) density             [kg/m3]
+rho_s    <- 1700      # dry solid (polymer) skeletal density     [kg/m3]
+                      # (was 1400; reconciled to the true 1.70 g/cc skeletal
+                      #  density used by UP1 rho_polymer and the morphology recal)
 a_prim   <- 1.0e-7    # primary colloid particle radius         [m]
 kB       <- 1.380649e-23
 N_Av     <- 6.02214e23
@@ -161,7 +164,8 @@ A_molec  <- 0.5e-18   # surfactant molecule area capacity       [m2]
 HLB      <- 12        # surfactant HLB (foam stability driver)  [-]
 phi_m    <- 0.63      # Krieger-Dougherty max packing           [-]
 Tg_solv  <- 150       # solvent (monomer/plasticizer) Tg, Fox   [K]
-d_ratio  <- 0.10      # primary particle / aggregate size ratio [-]
+d_ratio  <- 0.10      # primary/aggregate size ratio: fallback constant [-]
+                      # (overridden inside spray_dry_model when D_agg_um is wired)
 C_cham   <- 0.80      # mixing chamber / air supply pressure    [-]
 k_rip0   <- 4.0e-15   # Ostwald ripening rate at 1 atm          [m3/s]
 cp_gas   <- 1005      # dryer gas heat capacity                 [J/kg K]
@@ -195,8 +199,29 @@ spray_dry_model <- function(x) {
   phi_e  <- x[["phi_emulsion"]]
   D_e    <- x[["D_template"]]
   T_bpS  <- x[["T_bp_solv"]]
+  ## --- Module 0a: Primary colloid radius (from UP1 three-regime closure) -----
+  # All v_tip effects on the colloid (milling, aggregation) complete in UP1.
+  # D_primary_exit_um carries the result: unchanged at low v_tip, attrite past
+  # the critical tip speed. UP4 uses it as the physical primary size without
+  # any v_tip awareness of its own.
+  # Prefer D_primary_phys_um (200 nm physical colloid base) over D_primary_exit_um
+  # (ODE-scaled, 1.25 µm base) for packing/surfactant/Pe calculations.
+  a_prim_mod <- if ("D_primary_phys_um" %in% names(x) && !is.na(x[["D_primary_phys_um"]]))
+                  max(0.01e-6, x[["D_primary_phys_um"]] * 1e-6 / 2)
+                else if ("D_primary_exit_um" %in% names(x) && !is.na(x[["D_primary_exit_um"]]))
+                  max(0.01e-6, x[["D_primary_exit_um"]] * 1e-6 / 2)
+                else a_prim     # fall back to module constant if stream not wired
 
-  ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
+  # Physical d_ratio: D_primary_exit / D_agg_phys, wired from UP1 stream.
+  # Calibration: D_agg ≈ 9.6 µm at v_tip = 8.5 m/s (just above critical 6.81 m/s).
+  # Falls back to module constant 0.10 when the stream field is absent.
+  d_ratio_stream <- if ("D_agg_um" %in% names(x) && !is.na(x[["D_agg_um"]]) &&
+                        x[["D_agg_um"]] > 0)
+                      min(max(a_prim_mod * 2e6 / x[["D_agg_um"]], 0.01), 1.0)
+                    else d_ratio
+  d_ratio <- d_ratio_stream
+
+  ## --- Module 0b: Formulation - Flory-Huggins free-volume swelling ---------
   # (v47 Sect. 4) residual solvent acts as theta-solvent proxy, softening the
   # matrix exponentially and independently of temperature
   phi_solvent <- C_mono + C_plas
@@ -217,23 +242,30 @@ spray_dry_model <- function(x) {
   rho_lm <- (1 - phi_e) * rho_L + phi_e * rho_solv  # liquid mixture density
   w_e    <- phi_e * rho_solv / rho_lm               # solvent mass fraction
 
-  ## --- Module 0b: Feed rheology (Krieger-Dougherty + power-law thinning) ---
+  ## --- Module 0c: Feed rheology (Krieger-Dougherty + power-law thinning) ---
   phi_s      <- C_sol * rho_L / rho_s             # solid phase volume fraction
   phi_disp   <- phi_s * (1 - phi_e) + phi_e       # solids + emulsion droplets
   mu_serum   <- mu_L * (1 + 10 * C_bind)          # binder thickening (K_fluid)
   mu_slurry0 <- mu_serum *
                 (1 - min(phi_disp, 0.60) / phi_m)^(-2.5 * phi_m)
+  # Override: when the UP1 mixer exit slurry viscosity is wired in, use it
+  # directly as the power-law reference, bypassing the serum-based KD build-up.
+  # mu_slurry_up1 is the full apparent slurry viscosity at the mixer exit shear
+  # rate (~100-1000 s⁻¹), so it already embeds suspension + floc effects.
+  if ("mu_slurry_up1" %in% names(x) && !is.na(x[["mu_slurry_up1"]])) {
+    mu_slurry0 <- x[["mu_slurry_up1"]]
+  }
   # power-law slurry: mu_app(g) = K g^(n-1), anchored so mu_slurry0 is the
   # measured apparent viscosity at the rheometer reference rate gamma_ref;
   # floored at the serum high-shear limit
   mu_app <- function(gdot)
     pmax(1e-3, mu_slurry0 * (gdot / gamma_ref)^(n_fl - 1))
 
-  ## --- Module 0c: Surfactant molar stoichiometry (v47 Sect. 5) -------------
+  ## --- Module 0d: Surfactant molar stoichiometry (v47 Sect. 5) -------------
   # monolayer capacity vs total interfacial demand: primary colloid surface
   # (3*phi_s/a per m3, the dominant sink) plus bubble surface (6*alpha/D_b)
   cap_area   <- (C_surf / MW_surf) * rho_L * N_Av * A_molec   # [m2/m3]
-  part_area  <- 3 * phi_s * (1 - phi_e) / a_prim              # [m2/m3]
+  part_area  <- 3 * phi_s * (1 - phi_e) / a_prim_mod          # [m2/m3]
   gas_area   <- 6 * alpha0 / D_b                              # [m2/m3]
   emu_area   <- 6 * phi_e / D_e                               # [m2/m3]
   theta_surf <- min(1, cap_area / (part_area + gas_area + emu_area))
@@ -241,7 +273,7 @@ spray_dry_model <- function(x) {
   # under-stabilized foam sheds entrained gas before the nozzle
   alpha_g    <- alpha0 * (0.3 + 0.7 * theta_surf)
 
-  ## --- Module 0d: Pressurized hold - coalescence / Ostwald ripening --------
+  ## --- Module 0e: Pressurized hold - coalescence / Ostwald ripening --------
   # LSW kinetics D^3 ~ t; Henry's-law gas solubility makes ripening faster
   # under the liquid-line pressure, surfactant coverage retards both
   k_rip <- k_rip0 * (P_F / P_atm) * (1 - 0.8 * theta_surf)
@@ -361,8 +393,8 @@ spray_dry_model <- function(x) {
   ## --- Module 6b: Drying kinetics -------------------------------------------
   # d2-law evaporation coefficient, scaled by outlet-state driving force
   kappa <- 5e-8 * pmax(T_out - T_feed, 1) / 100 * (1 - RH_out)  # [m2/s]
-  # Stokes-Einstein diffusivity of primary colloid particles
-  D_diff <- kB * T_feed / (6 * pi * mu_L * a_prim)              # [m2/s]
+  # Stokes-Einstein diffusivity of primary colloid particles (milling-affected)
+  D_diff <- kB * T_feed / (6 * pi * mu_L * a_prim_mod)          # [m2/s]
   Pe <- kappa / (8 * D_diff)                      # drying Peclet number
 
   # theta_skin,z : skin network fraction. Colloidal instability (low DLVO
@@ -386,6 +418,12 @@ spray_dry_model <- function(x) {
   tau_dry <- (modes_m^2 / kappa) * (1 + 20 * theta_skin / Perm_shell)
   X_j     <- exp(-t_res / tau_dry)                # residual water per mode
   X_moist <- sum(modes_w * X_j)                   # fraction of initial water
+  # Operational moisture reconciliation (mirror of up2_run_dryer): energy-sized
+  # air leaves <= w_moist_target (0.5%) in the non-hygroscopic powder, so cap
+  # X_moist at the value yielding the target powder moisture. Sweepable to ~1%.
+  w_moist_target <- if ("w_moist_target" %in% names(x)) x[["w_moist_target"]] else 0.005
+  X_moist <- min(X_moist, w_moist_target * C_sol /
+                          (max(1 - C_sol, 1e-6) * (1 - w_moist_target)))
 
   ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
   # in co-current drying particles approach the outlet gas temperature
@@ -416,7 +454,7 @@ spray_dry_model <- function(x) {
   phi_cake <- 0.45 + 0.19 * min((stability - 1) / 5, 1)
   sigma_y  <- sig_y0 * (phi_cake / 0.64)^4 * (1 + 2 / stability) /
               sqrt(Softness) * (1 - 0.85 * S_stick)
-  P_cap    <- 2 * sigma_eff / (0.3 * a_prim)      # meniscus capillary stress
+  P_cap    <- 2 * sigma_eff / (0.3 * a_prim_mod)  # meniscus capillary stress
   Pi_col   <- P_cap / max(sigma_y, 1e3)           # collapse severity number
   f_col    <- Pi_col^2 / (1 + Pi_col^2)           # 0 = locks open, 1 = yields
 
@@ -464,6 +502,44 @@ spray_dry_model <- function(x) {
   # per-mode particle diameters (solids balance) and mixture quantiles
   Dp_j <- modes_m * ((1 - a_trap_j) * (1 - phi_e) * rho_L * C_sol /
                      (rho_s * (1 - phi_j)))^(1/3)
+  # Colloid milling coupling: the physical primary size (a_prim_mod from the UP1
+  # three-regime closure) sets packing efficiency in the dried aggregate.
+  # Larger primaries (less milled) pack more loosely -> larger final particle.
+  # Reference: a_prim_ref_min = minimum radius at full milling = a_prim × (1-MILL_MAX)
+  #            = 100 nm × 0.30 = 30 nm. At this minimum, factor = 1.0 (baseline size).
+  # Exponent PSF_EXP calibrated: at 200 nm primary (v_tip=8.5 m/s, no milling),
+  # full chain (UP1->UP2 foam-wash->UP3->UP4) at 20% solid with C_AGG_CAL=0.0797,
+  # target UP4 d50 = 15.3 µm → PSF_EXP = 0.537 (factor = 3.333^0.537 = 1.926).
+  # (Prior value 0.588 was calibrated at 35% nominal solid, bypassing the foam-wash
+  #  column; 0.537 is the full-chain anchor at the 20% solid reference point.)
+  a_prim_ref_min <- a_prim * 0.30   # 3e-8 m: minimum primary radius (full milling)
+  PSF_EXP        <- 0.537           # calibrated: UP4 d50 = 15.3 µm at 8.5 m/s / 20% solid
+  packing_size_factor <- (a_prim_mod / a_prim_ref_min)^PSF_EXP
+  Dp_j <- Dp_j * packing_size_factor
+
+  # --- UP1 aggregate size-template regime (MUTED by default) ----------------
+  # Mirror of unified/up2_spray_dryer_module.R. Two dry-PSD control regimes seen
+  # in visc.xlsx: atomizer-control (dispersed feed -> droplet-shell sets size) vs
+  # UP1-control (a UP1 aggregate templates the particle, dry d50 ~ 1.2 * D_agg).
+  # This overlay lets the aggregate TEMPLATE the size; preserved for a future
+  # experiment but muted for now via `size_template` in [0,1] (0 = droplet-shell
+  # only, current calibration unchanged). Dispersed feeds (d_ratio -> 1) are
+  # unaffected at any setting since the template weight w_tmpl -> 0.
+  size_template <- if ("size_template" %in% names(x)) x[["size_template"]] else 0
+  if (size_template > 0 && "D_agg_um" %in% names(x) &&
+      is.finite(x[["D_agg_um"]]) && x[["D_agg_um"]] > 0) {
+    TEMPLATE_DENSIFY <- 1.20                              # dry/wet, UP1-control set
+    # Aggregation fraction vs the un-aggregated baseline D_primary_exit_um: -> 0
+    # in the atomizer-control regime (dispersed feed) so the droplet-shell stands.
+    D_pexit  <- if ("D_primary_exit_um" %in% names(x) && is.finite(x[["D_primary_exit_um"]]))
+                  x[["D_primary_exit_um"]] else x[["D_agg_um"]]
+    agg_frac <- max(0, 1 - min(D_pexit / x[["D_agg_um"]], 1))
+    w_tmpl    <- agg_frac * min(max(size_template, 0), 1)
+    Dp50_sh   <- exp(sum(modes_w * log(Dp_j)))           # shell distribution centre
+    Dp_target <- TEMPLATE_DENSIFY * x[["D_agg_um"]] * 1e-6
+    Dp_j      <- Dp_j * (Dp_target / Dp50_sh)^w_tmpl     # log-blend toward template
+  }
+
   grp  <- seq(log(0.05 * min(Dp_j)), log(10 * max(Dp_j)), length.out = 400)
   cdfp <- Reduce(`+`, Map(function(w, m, s)
             w * pnorm((grp - log(m)) / log(s)), modes_w, Dp_j, modes_s))
@@ -481,6 +557,33 @@ spray_dry_model <- function(x) {
              (1 - 0.15 * min(Softness / 25, 1)) *
              (1 - 2 * min(X_moist, 0.2))
   rho_tapped <- rho_env * max(f_pack, 0.05)
+
+  ## --- Particle-morphology recalibration (MUTED by default) -----------------
+  # Mirror of unified/up2_spray_dryer_module.R. Anchored to bulk 0.30 g/cc with
+  # skeletal 1.70 g/cc: compact UP1-control granule phi ~ 0.65 at packing 0.50
+  # (-> 0.30 g/cc), atomizer-control (dispersed) feed gets a central-void hollow
+  # bump (total void ~0.85, lower sphericity). Regime weight from D_primary_exit
+  # vs D_agg. `morphology_recal` in [0,1]; 0 = current closure, unchanged.
+  morphology_recal <- if ("morphology_recal" %in% names(x)) x[["morphology_recal"]] else 0
+  if (morphology_recal > 0 && "D_agg_um" %in% names(x) &&
+      is.finite(x[["D_agg_um"]]) && x[["D_agg_um"]] > 0) {
+    RHO_SKEL <- 1700; F_PACK <- 0.50
+    PHI_INTRA_BASE <- 0.65; HOLLOW_MAX <- 0.575
+    OMEGA_COMPACT <- 0.90; OMEGA_HOLLOW_DROP <- 0.35
+    AGG_REF <- 0.70
+    D_pexit_m  <- if ("D_primary_exit_um" %in% names(x) && is.finite(x[["D_primary_exit_um"]]))
+                    x[["D_primary_exit_um"]] else x[["D_agg_um"]]
+    agg_frac_m <- max(0, 1 - min(D_pexit_m / x[["D_agg_um"]], 1))
+    w_disp     <- max(0, 1 - min(agg_frac_m / AGG_REF, 1))
+    phi_hollow <- w_disp * HOLLOW_MAX
+    phi_recal  <- 1 - (1 - PHI_INTRA_BASE) * (1 - phi_hollow)
+    omega_recal<- OMEGA_COMPACT - w_disp * OMEGA_HOLLOW_DROP
+    tap_recal  <- RHO_SKEL * (1 - phi_recal) * F_PACK
+    k <- min(max(morphology_recal, 0), 1)
+    phi_porosity <- (1 - k) * phi_porosity + k * phi_recal
+    Omega_struct <- (1 - k) * Omega_struct + k * omega_recal
+    rho_tapped   <- (1 - k) * rho_tapped   + k * tap_recal
+  }
 
   c(d_droplet_um   = d50 * 1e6,
     d10_um         = d10 * 1e6,
