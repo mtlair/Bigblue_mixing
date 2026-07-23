@@ -61,43 +61,54 @@ solubility_db <- function() data.frame(
                        "ethyl_butyrate", "isoamyl_acetate", "amyl_acetate",
                        "hexyl_acetate", "dibutyl_sebacate",
                        "chlorobenzene", "xylene",
-                       "ethyl_levulinate", "butyl_levulinate"),
+                       "ethyl_levulinate", "butyl_levulinate",
+                       # additional candidates (user request)
+                       "butyl_butyrate", "octyl_acetate"),
   dD               = c(17.00,
                        15.5, 18.6, 15.8, 18.0, 14.9, 16.8, 15.5, 15.8,
                        17.8, 15.8,   NA, 17.2, 15.8, 17.8, 18.2, 16.5, 14.3,
-                       15.5, 15.3, 15.8, 15.8, 16.7, 19.0, 17.8, 14.6, 15.7),
+                       15.5, 15.3, 15.8, 15.8, 16.7, 19.0, 17.8, 14.6, 15.7,
+                       15.6, 15.8),
   dP               = c(12.10,
                        16.0,  1.0,  6.5,  1.4,  0.0,  0.0, 10.4,  8.8,
                         8.6,  0.0,   NA,  1.8,  3.7,  3.1,  6.3,  6.3,  3.7,
-                        5.6,  3.1,  3.3,  2.9,  4.5,  4.3,  1.0, 10.5,  9.7),
+                        5.6,  3.1,  3.3,  2.9,  4.5,  4.3,  1.0, 10.5,  9.7,
+                        2.9,  2.9),
   dH               = c(10.20,
                        42.3,  4.1,  5.7,  2.0,  0.0,  0.2,  7.0, 19.4,
                         4.0,  0.0,   NA,  4.3,  6.3,  5.7,  6.1, 12.0,  3.4,
-                        5.0,  7.0,  6.1,  5.9,  4.1,  2.0,  3.1,  7.0,  5.8),
+                        5.0,  7.0,  6.1,  5.9,  4.1,  2.0,  3.1,  7.0,  5.8,
+                        5.6,  5.1),
   Vm               = c(  NA,
                         18.0, 115, 106, 107, 131, 108,  74,  58.5,
                         266,  330,  55, 137, 132,  81,  64, 228, 294,
-                        132,  149, 148, 168, 340,  102, 124, 130, 158),
+                        132,  149, 148, 168, 340,  102, 124, 130, 158,
+                        165, 199),
   bp_C             = c(  NA,
                         100, 145, 100, 111,  69,  81,  56,  78,
                         340, 350, -57, 176, 126,  61,  40, 294, 192,
-                        121, 142, 149, 171, 345,  132, 139, 206, 238),
+                        121, 142, 149, 171, 345,  132, 139, 206, 238,
+                        166, 210),
   volatile         = c(  NA,
                        TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
                        FALSE,FALSE,TRUE, TRUE, TRUE, TRUE, TRUE,FALSE,FALSE,
-                       TRUE, TRUE, TRUE, TRUE,FALSE, TRUE, TRUE,FALSE,FALSE),
+                       TRUE, TRUE, TRUE, TRUE,FALSE, TRUE, TRUE,FALSE,FALSE,
+                       FALSE,FALSE),
   rho              = c(1700,
                        1000, 906, 940, 867, 655, 779, 784, 789,
                        1043, 850, 770, 841, 882,1479,1325,1135, 853,
-                        879, 872, 879, 870, 936,1106, 864, 994, 970),
+                        879, 872, 879, 870, 936,1106, 864, 994, 970,
+                        875, 865),
   water_sol_g100mL = c(  NA,
                        100.0, 0.03, 1.5, 0.05, 0.001, 0.006, 100.0, 100.0,
                        0.001, 0.001,  NA, 0.001,  0.7,   0.8,   2.0,   7.0, 0.001,
-                        0.55,  0.20,  0.17, 0.02, 0.001,  0.05, 0.014,   8.0,  1.5),
+                        0.55,  0.20,  0.17, 0.02, 0.001,  0.05, 0.014,   8.0,  1.5,
+                        0.04,  0.01),
   logP             = c(  NA,
                        -1.38, 2.95, 1.38, 2.73,  3.90,  3.44, -0.24, -0.31,
                         4.72,  7.00,  NA,  4.57,  1.78,  1.97,  1.25,  0.90,  6.00,
-                        1.68,  2.27,  2.30,  2.83,  5.27,  2.84,  3.15,  0.90,  1.80),
+                        1.68,  2.27,  2.30,  2.83,  5.27,  2.84,  3.15,  0.90,  1.80,
+                        2.83,  3.72),
   stringsAsFactors = FALSE)
 
 # --- Hansen RED relative to the polymer sphere --------------------------------
@@ -319,8 +330,8 @@ if (sys.nframe() == 0) {
   if (isTRUE(r_lim$template_type == 4L))
     cat(sprintf("  %-24s %5.2f %5.0f %5.2f %5.3f   137  [T_dry=140 C]\n",
                 "d-limonene*", r_lim$RED, 176, r_lim$logP, r_lim$RTF))
-  # amyl/hexyl at inlet T
-  for (t in c("amyl_acetate","hexyl_acetate")) {
+  # amyl/hexyl/butyl_butyrate at inlet T
+  for (t in c("amyl_acetate","hexyl_acetate","butyl_butyrate")) {
     r2 <- template_from_chemistry(t, T_dry_C=140)
     if (isTRUE(r2$template_type==4L)) {
       s <- db[db$species==t,]
@@ -329,6 +340,10 @@ if (sys.nframe() == 0) {
                   ifelse(is.na(s$Vm),"-",as.character(s$Vm))))
     }
   }
+  # octyl_acetate needs very high inlet T (bp=210); show for reference
+  r_oct <- template_from_chemistry("octyl_acetate", T_dry_C=170)
+  cat(sprintf("  %-24s %5.2f %5.0f %5.2f %5.3f %5s  [T_dry=170 C only]\n",
+              "octyl_acetate*", r_oct$RED, 210, r_oct$logP, r_oct$RTF, "199"))
 
   cat("\n--- Permanent plasticizers (good/theta + non-volatile + w-dispersible) ---\n")
   cat(sprintf("  %-24s %5s %5s %5s\n","template","RED","logP","RTF"))
