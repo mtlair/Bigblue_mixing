@@ -1,0 +1,75 @@
+=====================================================================
+FORMULATION DoE - monomer/plasticizer/binder/solvent (wired chain)
+Morris r=40; process setpoints held at nominal. mu*=influence,
+sign(mu)=direction. Dosable knobs get a proposed range; k_perm_* are
+intrinsic material properties (which additive chemistry matters).
+=====================================================================
+
+### up2_Tg_product_K     product Tg [K]
+   C_plasticizer  dose:plasticizer     mu*=24.52  decrease
+   C_monomer      dose:monomer         mu*=10.21  decrease
+   T_bp_solv      solvent(bp/type)     mu*=1.337  decrease
+   template_dose  dose:solvent(amount) mu*=1.149  decrease
+
+### up2_theta_skin_z     skin/fusion
+   C_plasticizer  dose:plasticizer     mu*=0.004739  increase
+   C_monomer      dose:monomer         mu*=0.003948  increase
+   C_binder       dose:binder          mu*=0.002527  increase
+   template_dose  dose:solvent(amount) mu*=0.0009456  increase
+
+### up2_phi_porosity_z   porosity
+   template_dose  dose:solvent(amount) mu*=0.04631  increase
+   C_plasticizer  dose:plasticizer     mu*=0.02723  decrease
+   k_perm_plast   material:plast perm  mu*=0.02505  decrease
+   k_perm_bind    material:binder perm mu*=0.02031  increase
+
+### up2_Omega_struct_z   sphericity
+   C_plasticizer  dose:plasticizer     mu*=0.01713  increase
+   k_perm_plast   material:plast perm  mu*=0.01559  increase
+   k_perm_bind    material:binder perm mu*=0.01225  decrease
+   k_perm_mono    material:monomer perm mu*=0.0115  increase
+
+### up2_Perm_shell_rel   shell permeability
+   k_perm_plast   material:plast perm  mu*=4.034  increase
+   C_binder       dose:binder          mu*=3.429  decrease
+   k_perm_bind    material:binder perm mu*=3.419  decrease
+   C_plasticizer  dose:plasticizer     mu*=3.216  increase
+
+### up2_D_pore_um        pore size [um]
+   C_plasticizer  dose:plasticizer     mu*=0.09196  decrease
+   k_perm_plast   material:plast perm  mu*=0.08089  decrease
+   C_monomer      dose:monomer         mu*=0.06825  decrease
+   k_perm_mono    material:monomer perm mu*=0.05991  decrease
+
+### up2_solv_retained    retained solvent
+   T_bp_solv      solvent(bp/type)     mu*=0.124  increase
+   template_dose  dose:solvent(amount) mu*=0.005648  decrease
+   C_plasticizer  dose:plasticizer     mu*=1.943e-05  increase
+   C_monomer      dose:monomer         mu*=1.857e-05  increase
+
+### up2_f_burst_solv     micro-explosion risk
+   T_bp_solv      solvent(bp/type)     mu*=0.2781  decrease
+   k_perm_plast   material:plast perm  mu*=0.1462  decrease
+   C_binder       dose:binder          mu*=0.1385  increase
+   k_perm_bind    material:binder perm mu*=0.1201  increase
+
+### up2_sigma_y_cake_MPa cake strength [MPa]
+   C_plasticizer  dose:plasticizer     mu*=0.1424  decrease
+   C_monomer      dose:monomer         mu*=0.114  decrease
+   C_binder       dose:binder          mu*=0.06607  decrease
+   template_dose  dose:solvent(amount) mu*=0.006007  decrease
+
+### up2_D_particle_um    d50 [um]
+   T_bp_solv      solvent(bp/type)     mu*=0.267  increase
+   template_dose  dose:solvent(amount) mu*=0.1103  decrease
+   C_plasticizer  dose:plasticizer     mu*=0.02594  decrease
+   k_perm_plast   material:plast perm  mu*=0.02391  decrease
+
+---------------------------------------------------------------------
+DOSABLE FORMULATION KNOBS - proposed DoE ranges:
+---------------------------------------------------------------------
+  C_monomer      dose:monomer         [0.001, 0.03]  nominal 0.0155   (top-3 for 4/10 CQAs)
+  C_plasticizer  dose:plasticizer     [0.005, 0.04]  nominal 0.0225   (top-3 for 8/10 CQAs)
+  C_binder       dose:binder          [0.01, 0.15]  nominal 0.08   (top-3 for 4/10 CQAs)
+  template_dose  dose:solvent(amount) [0.02, 1.1]  nominal 0.56   (top-3 for 3/10 CQAs)
+  T_bp_solv      solvent(bp/type)     [300, 360]  nominal 330   (top-3 for 4/10 CQAs)

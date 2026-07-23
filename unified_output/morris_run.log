@@ -1,0 +1,16 @@
+Wrote unified_output/nominal_chain_summary.txt 
+Morris screen: 41 factors, 30 trajectories -> 1260 chain runs...
+  1260/1260 runs valid; cached to unified_output/unified_morris_t4_r30.rds
+
+Top-5 chain drivers per key product property (mu*):
+  up2_D_particle_um      : P_atom_air[up2], tau_mix[up1], C_solid_mass[up1], sigma[up2], T_mix[up1]
+  up2_phi_porosity_z     : C_solid_mass[up1], template_dose[up1], Q_template[up1], T_dryer_in[up2], Q_colloid[up1]
+  up2_rho_tapped         : P_atom_air[up2], tau_mix[up1], template_dose[up1], C_solid_mass[up1], sigma[up2]
+  up2_Tg_product_K       : Tg_polymer[up2], C_solid_mass[up1], C_plasticizer[up1], Q_template[up1], Q_colloid[up1]
+  up2_X_moisture         : C_solid_mass[up1], Q_template[up1], Q_colloid[up1], k_perm_bind[up2], C_monomer[up1]
+  up2_f_burst_solv       : T_bp_solv[up2], T_dryer_in[up2], k_perm_plast[up2], mdot_gas_dry[up2], C_binder[up1]
+
+Wrote to unified_output :
+  nominal_chain_summary.txt / nominal_chain_outputs.csv
+  unified_morris_indices.csv
+  unified_morris_{process,surface,polymer}_variables.png

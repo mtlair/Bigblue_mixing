@@ -1,0 +1,261 @@
+<title>UP1/UP4 PSD + Viscosity Data Review</title>
+<style>
+  :root{ color-scheme:light;
+    --surface-1:#fcfcfb; --surface-2:#f4f3f0; --border:#e2e1dc;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#8a897f;
+    --s-blue:#2a78d6; --s-orange:#eb6834; --s-aqua:#1baf7a; --s-violet:#4a3aa7; --s-red:#e34948; --s-yellow:#eda100;
+    --grid:#ece9e4; --band:#eaf1fb; --bandline:#b7d3f6;
+  }
+  @media (prefers-color-scheme:dark){ :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --surface-1:#1a1a19; --surface-2:#232320; --border:#38372f;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8e82;
+    --s-blue:#3987e5; --s-orange:#d95926; --s-aqua:#199e70; --s-violet:#9085e9; --s-red:#e66767; --s-yellow:#c98500;
+    --grid:#2b2b27; --band:#182437; --bandline:#1c5cab;
+  }}
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --surface-1:#1a1a19; --surface-2:#232320; --border:#38372f;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8e82;
+    --s-blue:#3987e5; --s-orange:#d95926; --s-aqua:#199e70; --s-violet:#9085e9; --s-red:#e66767; --s-yellow:#c98500;
+    --grid:#2b2b27; --band:#182437; --bandline:#1c5cab;
+  }
+  *{box-sizing:border-box}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 64px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text-primary);background:var(--surface-1)}
+  h1{font-size:24px;font-weight:650;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--text-secondary);font-size:14px;margin:0 0 26px;line-height:1.5}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;
+    padding:20px 20px 14px;margin:0 0 22px}
+  .card h2{font-size:15px;font-weight:620;margin:0 0 2px;letter-spacing:-.005em}
+  .card p.desc{font-size:13px;color:var(--text-secondary);margin:0 0 14px;line-height:1.5}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:2px 0 12px;font-size:12.5px;color:var(--text-secondary)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:11px;height:11px;border-radius:3px;flex:none}
+  .swl{width:16px;height:2px;border-radius:2px;flex:none}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .axis{stroke:var(--border);stroke-width:1}
+  .grid{stroke:var(--grid);stroke-width:1}
+  .tick{fill:var(--text-muted);font-size:11px}
+  .albl{fill:var(--text-secondary);font-size:12px;font-weight:500}
+  .dlbl{fill:var(--text-secondary);font-size:10.5px}
+  .tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .08s;
+    background:var(--surface-1);border:1px solid var(--border);border-radius:8px;
+    padding:7px 9px;font-size:12px;color:var(--text-primary);box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:9;max-width:220px}
+  .tip b{font-weight:620}
+  .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:4px}
+  th,td{text-align:right;padding:5px 9px;border-bottom:1px solid var(--border)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--text-muted);font-weight:600}
+  .foot{font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5}
+  .pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid var(--border);color:var(--text-secondary)}
+</style>
+
+<div class="wrap">
+  <h1>UP1 / UP4 PSD &amp; viscosity data review</h1>
+  <p class="sub">Nine run conditions from <span class="kbd">visc.xlsx</span> — rotational-rheometer flow curves plus paired
+  post-UP1 wet (<span class="kbd">m</span>) and post-UP4 dry (<span class="kbd">p</span>) particle-size distributions.
+  This review checks the data and compares it against the mixer model's aggregation and viscosity closures.</p>
+
+  <div class="card">
+    <h2>1 · Aggregation onset — wet d50 vs tip speed</h2>
+    <p class="desc">Below ~6.8&nbsp;m/s the colloid never aggregates and stays at its 0.18&nbsp;µm primary bead — cond2, the
+    <b>atomizer-control</b> regime, where UP4 sets the product size. Above it (<b>UP1-control</b>), every condition jumps to a
+    flat <b>~10&nbsp;µm aggregate plateau</b> that barely moves with tip speed and never rolls back down. The old model's milling
+    onset would have shrunk d50 right at the highest point (cond11); the recalibration removes that.</p>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--s-violet)"></span>Atomizer-control (cond2)</span>
+      <span><span class="sw" style="background:var(--s-blue)"></span>UP1-control (aggregated)</span>
+      <span><span class="swl" style="background:var(--s-aqua)"></span>Recalibrated plateau (10.2&nbsp;µm)</span>
+      <span><span class="swl" style="background:var(--s-orange);height:0;border-top:2px dashed var(--s-orange)"></span>Old milling onset</span>
+    </div>
+    <svg id="c1" viewBox="0 0 640 360" role="img" aria-label="Wet d50 versus tip speed"></svg>
+  </div>
+
+  <div class="card">
+    <h2>2 · Flow curves — apparent viscosity vs shear rate (log–log)</h2>
+    <p class="desc">The feed is water-thin and nearly Newtonian (n≈0.9). Mixing turns it into a strongly shear-thinning floc
+    suspension (n≈0.44). At matched ~20% solids the post-UP1 curves fan across a <b>38× viscosity range</b> — cond8 is the high
+    outlier the model was previously anchored to; cond12 the low one.</p>
+    <div class="legend">
+      <span><span class="swl" style="background:var(--text-muted)"></span>UP1 feed (13/20/25%)</span>
+      <span><span class="swl" style="background:var(--s-blue)"></span>Post-UP1 (typical)</span>
+      <span><span class="swl" style="background:var(--s-orange)"></span>cond8 — highest η</span>
+      <span><span class="swl" style="background:var(--s-aqua)"></span>cond12 — lowest η</span>
+      <span><span class="swl" style="background:var(--s-violet)"></span>cond2 — dispersed</span>
+    </div>
+    <svg id="c2" viewBox="0 0 640 380" role="img" aria-label="Viscosity versus shear rate"></svg>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>3 · Low-shear viscosity calibration</h2>
+      <p class="desc">Measured η at 12.7&nbsp;s⁻¹ per condition (log scale) against the model's viscosity target. The prior
+      closure sat at the top of the cloud; the recalibration targets the geometric mean.</p>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--s-blue)"></span>Measured (per cond)</span>
+        <span><span class="swl" style="background:var(--s-orange);height:0;border-top:2px dashed var(--s-orange)"></span>Old model 0.85</span>
+        <span><span class="swl" style="background:var(--s-aqua)"></span>New model 0.20</span>
+      </div>
+      <svg id="c3" viewBox="0 0 400 340" role="img" aria-label="Low-shear viscosity per condition"></svg>
+    </div>
+
+    <div class="card">
+      <h2>4 · Two control regimes: wet → dry</h2>
+      <p class="desc"><b>Atomizer-control</b> (cond2): no UP1 aggregate, so the atomizer sets a droplet-shell — 108× inflation (0.18→19.9&nbsp;µm).
+      <b>UP1-control</b> (rest): the aggregate templates the particle, dry/wet ≈ 1.2, and dry d50 <i>falls</i> as UP1 shear rises.</p>
+      <table>
+        <thead><tr><th>cond</th><th>v_tip</th><th>wet d50</th><th>dry d50</th><th>dry/wet</th></tr></thead>
+        <tbody id="t4"></tbody>
+      </table>
+      <p class="foot">cond2 is the dispersed outlier; the eight aggregated feeds sit at wet 10.2&nbsp;µm, dry 12.3&nbsp;µm mean.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>5 · UP1→UP4-direct validation</h2>
+    <p class="desc">Replaying all 9 conditions UP1→UP4 <i>directly</i> (bypassing UP2/UP3, matching the data path) — geometric RMS ratio, 1.00 = perfect.</p>
+    <table>
+      <thead><tr><th>Quantity</th><th>RMS ratio</th><th>Read</th></tr></thead>
+      <tbody>
+        <tr><td>Wet d50 (UP1-control, 8)</td><td>1.07</td><td style="text-align:left">aggregation plateau reproduced to ~7%</td></tr>
+        <tr><td>Viscosity (UP1-control, 8)</td><td>2.78</td><td style="text-align:left">sits at geomean; 0.02–0.77 scatter irreducible</td></tr>
+        <tr><td>Dry d50, muted (8)</td><td>1.81</td><td style="text-align:left">droplet-shell alone over-predicts</td></tr>
+        <tr><td>Dry d50, size_template=1 (8)</td><td><b>1.25</b></td><td style="text-align:left">aggregate-template confirms UP1-control</td></tr>
+      </tbody>
+    </table>
+    <p class="foot">Harness: <span class="kbd">validate_up1_up4_direct.R</span>. Tested on R 4.3.3; muted default is bit-for-bit unchanged.</p>
+  </div>
+
+  <p class="foot"><b>UP1 recalibration</b> (<span class="kbd">unified/up1_mixer_module.R</span>):
+  AGG_FACTOR_CAL 48.7→50.0 · MILL_MARGIN 1.8→3.5 · floc exponent 1.67→1.29 · <span class="kbd">n_flow</span> range 0.40–1.00→0.20–0.67.
+  <b>Atomizer inputs grounded in the measured flows</b>: ALR 1.0–10.0→0.9–1.8 · air pressure 2.0–7.0→1.2–1.8×10⁵&nbsp;Pa · ṁ_L 0.002–0.020→0.013–0.020&nbsp;kg/s.
+  See <span class="kbd">DATA_REVIEW.md</span>.</p>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+const D = {"feeds": {"up1_feed_0.13": [[12.668, 0.002972], [20.078, 0.002976], [31.823, 0.002786], [50.434, 0.00236], [79.932, 0.002138], [126.686, 0.002014], [200.788, 0.001891], [318.224, 0.001821], [504.348, 0.001784], [799.352, 0.001769], [1266.87, 0.001779], [1889.54, 0.001896]], "up1_feed_0.2": [[12.671, 0.002651], [20.082, 0.002224], [31.828, 0.002189], [50.444, 0.002185], [79.947, 0.002017], [126.709, 0.001938], [200.82, 0.001879], [318.282, 0.001839], [504.433, 0.001798], [799.49, 0.001781], [1267.14, 0.001826], [1889.69, 0.001964]], "up1_feed_0.25": [[12.671, 0.002197], [20.081, 0.002081], [31.826, 0.002136], [50.44, 0.0021], [79.941, 0.002027], [126.701, 0.00196], [200.808, 0.001935], [318.249, 0.001862], [504.4, 0.001831], [799.401, 0.001817], [1266.97, 0.001861], [1889.49, 0.002001]]}, "conds": {"2": [[12.671, 0.00529], [20.082, 0.004384], [31.829, 0.00341], [50.446, 0.002698], [79.95, 0.00245], [126.712, 0.002193], [200.827, 0.002049], [318.289, 0.001942], [504.451, 0.001845], [799.519, 0.001767], [1267.15, 0.001757], [1889.74, 0.001852]], "4": [[12.67, 0.262797], [20.081, 0.165039], [31.825, 0.097734], [50.439, 0.078603], [79.941, 0.077106], [126.699, 0.061478], [200.803, 0.045993], [318.251, 0.033798], [504.393, 0.024964], [799.405, 0.018512], [1266.98, 0.013916], [1889.51, 0.011274]], "5": [[12.67, 0.191541], [20.08, 0.130288], [31.826, 0.108096], [50.44, 0.092846], [79.94, 0.103903], [126.699, 0.084679], [200.801, 0.061533], [318.25, 0.044418], [504.397, 0.032681], [799.421, 0.024469], [1266.97, 0.018846], [1889.48, 0.015521]], "8": [[12.67, 0.77019], [20.081, 0.506679], [31.826, 0.34418], [50.44, 0.229598], [79.941, 0.163728], [126.698, 0.112786], [200.807, 0.075864], [318.246, 0.051414], [504.409, 0.035563], [799.419, 0.025245], [1267.02, 0.018399], [1889.51, 0.014332]], "9": [[12.671, 0.169321], [20.081, 0.135972], [31.826, 0.097379], [50.441, 0.079747], [79.944, 0.066071], [126.701, 0.050202], [200.805, 0.037708], [318.256, 0.027355], [504.428, 0.020036], [799.436, 0.014992], [1267.04, 0.011604], [1889.55, 0.009683]], "11": [[12.67, 0.29853], [20.081, 0.122234], [31.825, 0.077367], [50.439, 0.061777], [79.938, 0.061161], [126.695, 0.05577], [200.799, 0.040557], [318.234, 0.028884], [504.366, 0.020709], [799.373, 0.014961], [1266.91, 0.011145], [1889.36, 0.008865]], "12": [[12.67, 0.019937], [20.081, 0.03455], [31.826, 0.053938], [50.441, 0.051446], [79.942, 0.04462], [126.695, 0.03244], [200.797, 0.025467], [318.243, 0.019384], [504.395, 0.014504], [799.428, 0.011066], [1266.98, 0.008657], [1889.46, 0.007189]], "14": [[12.67, 0.538157], [20.08, 0.425517], [31.825, 0.244305], [50.439, 0.187723], [79.941, 0.171782], [126.697, 0.138476], [200.802, 0.098024], [318.247, 0.067602], [504.383, 0.046664], [799.402, 0.032647], [1266.97, 0.023217], [1889.53, 0.017617]], "15": [[12.669, 0.128854], [20.08, 0.138856], [31.825, 0.121714], [50.437, 0.123008], [79.939, 0.126558], [126.692, 0.11067], [200.796, 0.08271], [318.225, 0.059568], [504.363, 0.042433], [799.353, 0.030304], [1266.91, 0.022134], [1889.36, 0.017477]]}, "psd": [{"cond": 2, "vtip": 4.37, "sol": 13.2, "wet": 0.183, "dry": 19.85, "visc12": 0.00529026}, {"cond": 4, "vtip": 10.57, "sol": 20.0, "wet": 10.19, "dry": 10.9, "visc12": 0.262797}, {"cond": 5, "vtip": 6.92, "sol": 19.6, "wet": 9.97, "dry": 14.6, "visc12": 0.191541}, {"cond": 8, "vtip": 8.48, "sol": 19.2, "wet": 9.6, "dry": 15.31, "visc12": 0.77019}, {"cond": 9, "vtip": 9.62, "sol": 19.6, "wet": 10.37, "dry": 11.12, "visc12": 0.169321}, {"cond": 11, "vtip": 12.4, "sol": 19.6, "wet": 12, "dry": 8.82, "visc12": 0.29853}, {"cond": 12, "vtip": 9.62, "sol": 19.0, "wet": 9.96, "dry": 11.87, "visc12": 0.0199372}, {"cond": 14, "vtip": 9.61, "sol": 25.0, "wet": 9.74, "dry": 11.82, "visc12": 0.538157}, {"cond": 15, "vtip": 7.41, "sol": 24.9, "wet": 9.71, "dry": 13.74, "visc12": 0.128854}]};
+const tip = document.getElementById('tip');
+function showTip(html,e){tip.innerHTML=html;tip.style.opacity=1;
+  let x=e.clientX+14,y=e.clientY+14;
+  if(x+230>innerWidth)x=e.clientX-230;
+  tip.style.left=x+'px';tip.style.top=y+'px';}
+function hideTip(){tip.style.opacity=0;}
+const NS='http://www.w3.org/2000/svg';
+function el(t,a){const n=document.createElementNS(NS,t);for(const k in a)n.setAttribute(k,a[k]);return n;}
+const cssv=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+
+// ---------- Panel 1: wet d50 vs v_tip ----------
+(function(){
+  const svg=document.getElementById('c1'),W=640,H=360,m={l:56,r:20,t:14,b:44};
+  const xw=W-m.l-m.r, yh=H-m.t-m.b;
+  const xmin=3.5,xmax=13;
+  const ymin=Math.log10(0.1),ymax=Math.log10(30);
+  const X=v=>m.l+(v-xmin)/(xmax-xmin)*xw;
+  const Y=v=>m.t+(1-(Math.log10(v)-ymin)/(ymax-ymin))*yh;
+  // plateau band 10.2, old 9.94
+  svg.appendChild(el('line',{x1:m.l,y1:Y(10.2),x2:m.l+xw,y2:Y(10.2),stroke:cssv('--s-aqua'),'stroke-width':2}));
+  // onset region shading
+  svg.appendChild(el('rect',{x:m.l,y:m.t,width:X(6.81)-m.l,height:yh,fill:cssv('--band'),opacity:.6}));
+  svg.appendChild(el('line',{x1:X(6.81),y1:m.t,x2:X(6.81),y2:m.t+yh,stroke:cssv('--bandline'),'stroke-width':1.5,'stroke-dasharray':'4 3'}));
+  const on=el('text',{x:X(6.81)+5,y:m.t+13,class:'dlbl'});on.textContent='onset ≈6.8 m/s';svg.appendChild(on);
+  // old milling onset ~12.3 (20% solid)
+  svg.appendChild(el('line',{x1:X(12.3),y1:m.t,x2:X(12.3),y2:m.t+yh,stroke:cssv('--s-orange'),'stroke-width':1.5,'stroke-dasharray':'4 4'}));
+  // grid + y ticks
+  [0.1,0.3,1,3,10,30].forEach(v=>{svg.appendChild(el('line',{x1:m.l,y1:Y(v),x2:m.l+xw,y2:Y(v),class:'grid'}));
+    const t=el('text',{x:m.l-9,y:Y(v)+4,class:'tick','text-anchor':'end'});t.textContent=v;svg.appendChild(t);});
+  for(let v=4;v<=13;v+=2){const t=el('text',{x:X(v),y:m.t+yh+20,class:'tick','text-anchor':'middle'});t.textContent=v;svg.appendChild(t);}
+  svg.appendChild(el('line',{x1:m.l,y1:m.t+yh,x2:m.l+xw,y2:m.t+yh,class:'axis'}));
+  svg.appendChild(el('line',{x1:m.l,y1:m.t,x2:m.l,y2:m.t+yh,class:'axis'}));
+  let ax=el('text',{x:m.l+xw/2,y:H-6,class:'albl','text-anchor':'middle'});ax.textContent='UP1 tip speed  v_tip  (m/s)';svg.appendChild(ax);
+  let ay=el('text',{x:16,y:m.t+yh/2,class:'albl','text-anchor':'middle',transform:`rotate(-90 16 ${m.t+yh/2})`});ay.textContent='wet d50  (µm)';svg.appendChild(ay);
+  D.psd.forEach(p=>{
+    const disp=p.cond===2;const col=disp?cssv('--s-violet'):cssv('--s-blue');
+    const c=el('circle',{cx:X(p.vtip),cy:Y(p.wet),r:6,fill:col,stroke:cssv('--surface-1'),'stroke-width':2});
+    c.style.cursor='pointer';
+    c.addEventListener('mousemove',e=>showTip(`<b>cond${p.cond}</b> · ${p.sol}% solid<br>v_tip ${p.vtip} m/s<br>wet d50 <b>${p.wet} µm</b>${disp?'<br><span style="color:'+cssv('--s-violet')+'">dispersed</span>':''}`,e));
+    c.addEventListener('mouseleave',hideTip);svg.appendChild(c);
+    const t=el('text',{x:X(p.vtip),y:Y(p.wet)-10,class:'dlbl','text-anchor':'middle'});t.textContent=p.cond;svg.appendChild(t);
+  });
+})();
+
+// ---------- Panel 2: flow curves log-log ----------
+(function(){
+  const svg=document.getElementById('c2'),W=640,H=380,m={l:60,r:20,t:14,b:46};
+  const xw=W-m.l-m.r,yh=H-m.t-m.b;
+  const xmin=Math.log10(10),xmax=Math.log10(2000);
+  const ymin=Math.log10(0.001),ymax=Math.log10(1);
+  const X=v=>m.l+(Math.log10(v)-xmin)/(xmax-xmin)*xw;
+  const Y=v=>m.t+(1-(Math.log10(v)-ymin)/(ymax-ymin))*yh;
+  [0.001,0.01,0.1,1].forEach(v=>{svg.appendChild(el('line',{x1:m.l,y1:Y(v),x2:m.l+xw,y2:Y(v),class:'grid'}));
+    const t=el('text',{x:m.l-9,y:Y(v)+4,class:'tick','text-anchor':'end'});t.textContent=v;svg.appendChild(t);});
+  [10,100,1000].forEach(v=>{svg.appendChild(el('line',{x1:X(v),y1:m.t,x2:X(v),y2:m.t+yh,class:'grid'}));
+    const t=el('text',{x:X(v),y:m.t+yh+20,class:'tick','text-anchor':'middle'});t.textContent=v;svg.appendChild(t);});
+  svg.appendChild(el('line',{x1:m.l,y1:m.t+yh,x2:m.l+xw,y2:m.t+yh,class:'axis'}));
+  svg.appendChild(el('line',{x1:m.l,y1:m.t,x2:m.l,y2:m.t+yh,class:'axis'}));
+  let ax=el('text',{x:m.l+xw/2,y:H-6,class:'albl','text-anchor':'middle'});ax.textContent='shear rate  γ̇  (s⁻¹)';svg.appendChild(ax);
+  let ay=el('text',{x:16,y:m.t+yh/2,class:'albl','text-anchor':'middle',transform:`rotate(-90 16 ${m.t+yh/2})`});ay.textContent='apparent viscosity  (Pa·s)';svg.appendChild(ay);
+  function line(pts,col,w,op,label,name){
+    let d=pts.map((p,i)=>(i?'L':'M')+X(p[0])+' '+Y(p[1])).join(' ');
+    const path=el('path',{d,fill:'none',stroke:col,'stroke-width':w,'stroke-linejoin':'round',opacity:op});
+    svg.appendChild(path);
+    // invisible hover hit
+    const hit=el('path',{d,fill:'none',stroke:'transparent','stroke-width':12});hit.style.cursor='pointer';
+    hit.addEventListener('mousemove',e=>showTip(`<b>${name}</b><br>η(12.7) ${pts[0][1].toFixed(3)} Pa·s<br>η(1890) ${pts[pts.length-1][1].toFixed(4)} Pa·s`,e));
+    hit.addEventListener('mouseleave',hideTip);svg.appendChild(hit);
+    if(label){const t=el('text',{x:X(pts[0][0])-4,y:Y(pts[0][1])+3,class:'dlbl','text-anchor':'end',fill:col});t.textContent=label;svg.appendChild(t);}
+  }
+  Object.entries(D.feeds).forEach(([k,v])=>line(v,cssv('--text-muted'),1.5,.55,null,'feed '+k.split('_').pop()));
+  Object.entries(D.conds).forEach(([k,v])=>{
+    if(k==='8'||k==='12'||k==='2')return;
+    line(v,cssv('--s-blue'),1.5,.5,null,'cond'+k);
+  });
+  line(D.conds['8'],cssv('--s-orange'),2.5,1,'cond8','cond8');
+  line(D.conds['12'],cssv('--s-aqua'),2.5,1,'cond12','cond12');
+  line(D.conds['2'],cssv('--s-violet'),2.5,1,'cond2','cond2');
+})();
+
+// ---------- Panel 3: viscosity calibration ----------
+(function(){
+  const svg=document.getElementById('c3'),W=400,H=340,m={l:56,r:16,t:14,b:60};
+  const xw=W-m.l-m.r,yh=H-m.t-m.b;
+  const rows=D.psd.filter(p=>p.cond!==2).slice().sort((a,b)=>a.visc12-b.visc12);
+  const ymin=Math.log10(0.01),ymax=Math.log10(1);
+  const Y=v=>m.t+(1-(Math.log10(v)-ymin)/(ymax-ymin))*yh;
+  const X=i=>m.l+(i+0.5)/rows.length*xw;
+  [0.01,0.03,0.1,0.3,1].forEach(v=>{svg.appendChild(el('line',{x1:m.l,y1:Y(v),x2:m.l+xw,y2:Y(v),class:'grid'}));
+    const t=el('text',{x:m.l-9,y:Y(v)+4,class:'tick','text-anchor':'end'});t.textContent=v;svg.appendChild(t);});
+  // old / new reference
+  svg.appendChild(el('line',{x1:m.l,y1:Y(0.855),x2:m.l+xw,y2:Y(0.855),stroke:cssv('--s-orange'),'stroke-width':2,'stroke-dasharray':'5 4'}));
+  svg.appendChild(el('line',{x1:m.l,y1:Y(0.201),x2:m.l+xw,y2:Y(0.201),stroke:cssv('--s-aqua'),'stroke-width':2}));
+  svg.appendChild(el('line',{x1:m.l,y1:m.t+yh,x2:m.l+xw,y2:m.t+yh,class:'axis'}));
+  svg.appendChild(el('line',{x1:m.l,y1:m.t,x2:m.l,y2:m.t+yh,class:'axis'}));
+  let ay=el('text',{x:15,y:m.t+yh/2,class:'albl','text-anchor':'middle',transform:`rotate(-90 15 ${m.t+yh/2})`});ay.textContent='η at 12.7 s⁻¹  (Pa·s)';svg.appendChild(ay);
+  rows.forEach((p,i)=>{
+    svg.appendChild(el('line',{x1:X(i),y1:Y(p.visc12),x2:X(i),y2:m.t+yh,stroke:cssv('--grid'),'stroke-width':1}));
+    const c=el('circle',{cx:X(i),cy:Y(p.visc12),r:5.5,fill:cssv('--s-blue'),stroke:cssv('--surface-1'),'stroke-width':2});
+    c.style.cursor='pointer';
+    c.addEventListener('mousemove',e=>showTip(`<b>cond${p.cond}</b><br>η ${p.visc12.toFixed(3)} Pa·s`,e));
+    c.addEventListener('mouseleave',hideTip);svg.appendChild(c);
+    const t=el('text',{x:X(i),y:m.t+yh+16,class:'tick','text-anchor':'middle'});t.textContent=p.cond;svg.appendChild(t);
+  });
+  let ax=el('text',{x:m.l+xw/2,y:H-6,class:'albl','text-anchor':'middle'});ax.textContent='condition (sorted by η)';svg.appendChild(ax);
+})();
+
+// ---------- Table 4 ----------
+(function(){
+  const tb=document.getElementById('t4');
+  D.psd.forEach(p=>{
+    const r=p.dry/p.wet;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>cond${p.cond}${p.cond===2?' <span class="pill">disp.</span>':''}</td><td>${p.vtip}</td><td>${p.wet}</td><td>${p.dry}</td><td>${r.toFixed(r>10?0:2)}×</td>`;
+    tb.appendChild(tr);
+  });
+})();
+</script>
