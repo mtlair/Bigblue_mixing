@@ -1,0 +1,201 @@
+"output","factor","kind","mu","mu.star","sigma"
+"up1_Mixing_Potential","C_monomer","dose:monomer",324.666011110835,324.666011110835,92.750677048072
+"up1_Mixing_Potential","C_plasticizer","dose:plasticizer",389.637477239099,389.637477239099,117.377662410203
+"up1_Mixing_Potential","C_binder","dose:binder",-280.785876307698,280.785876307698,109.736004854172
+"up1_Mixing_Potential","template_dose","dose:solvent(amount)",0,0,0
+"up1_Mixing_Potential","T_bp_solv","solvent(bp/type)",0,0,0
+"up1_Mixing_Potential","k_perm_mono","material:monomer perm",0,0,0
+"up1_Mixing_Potential","k_perm_plast","material:plast perm",0,0,0
+"up1_Mixing_Potential","k_perm_bind","material:binder perm",0,0,0
+"up1_Blended_Porosity","C_monomer","dose:monomer",5.86216590038949e-07,6.89239620845737e-06,9.39098801963818e-06
+"up1_Blended_Porosity","C_plasticizer","dose:plasticizer",-1.70613178548935e-06,8.16682630998739e-06,1.03719140296706e-05
+"up1_Blended_Porosity","C_binder","dose:binder",3.15276265567305e-06,8.44640869858038e-06,1.0460986729825e-05
+"up1_Blended_Porosity","template_dose","dose:solvent(amount)",0,0,0
+"up1_Blended_Porosity","T_bp_solv","solvent(bp/type)",0,0,0
+"up1_Blended_Porosity","k_perm_mono","material:monomer perm",0,0,0
+"up1_Blended_Porosity","k_perm_plast","material:plast perm",0,0,0
+"up1_Blended_Porosity","k_perm_bind","material:binder perm",0,0,0
+"up1_Blended_Size_um","C_monomer","dose:monomer",-2430.70196196797,2430.70196196797,238.917938655418
+"up1_Blended_Size_um","C_plasticizer","dose:plasticizer",-2587.72983483666,2587.72983483666,195.692852370794
+"up1_Blended_Size_um","C_binder","dose:binder",-1605.02939956918,1605.02939956918,184.178269300671
+"up1_Blended_Size_um","template_dose","dose:solvent(amount)",0,0,0
+"up1_Blended_Size_um","T_bp_solv","solvent(bp/type)",0,0,0
+"up1_Blended_Size_um","k_perm_mono","material:monomer perm",0,0,0
+"up1_Blended_Size_um","k_perm_plast","material:plast perm",0,0,0
+"up1_Blended_Size_um","k_perm_bind","material:binder perm",0,0,0
+"up1_Blended_WetSkin","C_monomer","dose:monomer",0.0007006238516113,0.0007006238516113,0.00035596801320258
+"up1_Blended_WetSkin","C_plasticizer","dose:plasticizer",0.000703598001171772,0.000703598001171772,0.00022161637217512
+"up1_Blended_WetSkin","C_binder","dose:binder",-2.10737131671902e-07,5.41136961504807e-07,8.60984988691233e-07
+"up1_Blended_WetSkin","template_dose","dose:solvent(amount)",0,0,0
+"up1_Blended_WetSkin","T_bp_solv","solvent(bp/type)",0,0,0
+"up1_Blended_WetSkin","k_perm_mono","material:monomer perm",0,0,0
+"up1_Blended_WetSkin","k_perm_plast","material:plast perm",0,0,0
+"up1_Blended_WetSkin","k_perm_bind","material:binder perm",0,0,0
+"up1_Template_Target_Score","C_monomer","dose:monomer",8.2572837456496e-17,7.90270626715994e-15,1.22249683874719e-14
+"up1_Template_Target_Score","C_plasticizer","dose:plasticizer",-7.28583859910259e-16,5.98410210272959e-15,8.48265169418422e-15
+"up1_Template_Target_Score","C_binder","dose:binder",1.99631977615411e-15,1.10793318963687e-14,1.50386896358184e-14
+"up1_Template_Target_Score","template_dose","dose:solvent(amount)",0.0370692540767329,0.0941621151245004,0.100711370734283
+"up1_Template_Target_Score","T_bp_solv","solvent(bp/type)",0,0,0
+"up1_Template_Target_Score","k_perm_mono","material:monomer perm",0,0,0
+"up1_Template_Target_Score","k_perm_plast","material:plast perm",0,0,0
+"up1_Template_Target_Score","k_perm_bind","material:binder perm",0,0,0
+"up1_Residual_Template_Fraction","C_monomer","dose:monomer",0.00648862020992494,0.00648862020992494,0.00396136454810149
+"up1_Residual_Template_Fraction","C_plasticizer","dose:plasticizer",0.00662852032907916,0.00662852032907916,0.00545031499597463
+"up1_Residual_Template_Fraction","C_binder","dose:binder",0,0,0
+"up1_Residual_Template_Fraction","template_dose","dose:solvent(amount)",0.0346524521235151,0.0346524521235151,0.00759384321612582
+"up1_Residual_Template_Fraction","T_bp_solv","solvent(bp/type)",0,0,0
+"up1_Residual_Template_Fraction","k_perm_mono","material:monomer perm",0,0,0
+"up1_Residual_Template_Fraction","k_perm_plast","material:plast perm",0,0,0
+"up1_Residual_Template_Fraction","k_perm_bind","material:binder perm",0,0,0
+"up2_d_droplet_um","C_monomer","dose:monomer",0.118370742327987,0.1247559476918,0.153575410342598
+"up2_d_droplet_um","C_plasticizer","dose:plasticizer",0.154824472888194,0.161010199857182,0.220918383053258
+"up2_d_droplet_um","C_binder","dose:binder",-0.00147195157817759,0.00420816444029786,0.00531467809077087
+"up2_d_droplet_um","template_dose","dose:solvent(amount)",-40.3421017227611,41.7506937303594,42.1555262304185
+"up2_d_droplet_um","T_bp_solv","solvent(bp/type)",77.8075711111878,77.8075711111878,52.9368497397346
+"up2_d_droplet_um","k_perm_mono","material:monomer perm",0,0,0
+"up2_d_droplet_um","k_perm_plast","material:plast perm",0,0,0
+"up2_d_droplet_um","k_perm_bind","material:binder perm",0,0,0
+"up2_d10_um","C_monomer","dose:monomer",0.0405810051571694,0.0421196392088988,0.0561332296972984
+"up2_d10_um","C_plasticizer","dose:plasticizer",0.0546526046266241,0.0561451516339972,0.081809738106521
+"up2_d10_um","C_binder","dose:binder",-0.000410318498574247,0.00119082686138117,0.0015120400901861
+"up2_d10_um","template_dose","dose:solvent(amount)",-13.1568585577968,13.4901663655152,13.4800336813225
+"up2_d10_um","T_bp_solv","solvent(bp/type)",24.320618734205,24.320618734205,16.9741897935355
+"up2_d10_um","k_perm_mono","material:monomer perm",0,0,0
+"up2_d10_um","k_perm_plast","material:plast perm",0,0,0
+"up2_d10_um","k_perm_bind","material:binder perm",0,0,0
+"up2_d90_um","C_monomer","dose:monomer",0.237369697732419,0.250344718161506,0.307145333611008
+"up2_d90_um","C_plasticizer","dose:plasticizer",0.310071956911644,0.322641090964945,0.441528566011639
+"up2_d90_um","C_binder","dose:binder",-0.0029761546892523,0.00850356517240627,0.0107373038226506
+"up2_d90_um","template_dose","dose:solvent(amount)",-81.0714548932617,83.935435817932,84.793609347513
+"up2_d90_um","T_bp_solv","solvent(bp/type)",156.630824168637,156.630824168637,106.462553412247
+"up2_d90_um","k_perm_mono","material:monomer perm",0,0,0
+"up2_d90_um","k_perm_plast","material:plast perm",0,0,0
+"up2_d90_um","k_perm_bind","material:binder perm",0,0,0
+"up2_d99_um","C_monomer","dose:monomer",0.378770047423414,0.399487089254123,0.490052992796762
+"up2_d99_um","C_plasticizer","dose:plasticizer",0.494751403210883,0.514820331052262,0.704438864887227
+"up2_d99_um","C_binder","dose:binder",-0.00475086492159704,0.0135739374300812,0.017139401135467
+"up2_d99_um","template_dose","dose:solvent(amount)",-129.377926619586,133.950932190644,135.323757538111
+"up2_d99_um","T_bp_solv","solvent(bp/type)",249.97945266382,249.97945266382,169.90441088669
+"up2_d99_um","k_perm_mono","material:monomer perm",0,0,0
+"up2_d99_um","k_perm_plast","material:plast perm",0,0,0
+"up2_d99_um","k_perm_bind","material:binder perm",0,0,0
+"up2_span","C_monomer","dose:monomer",-7.41424450099754e-05,7.43475133571536e-05,0.000135171908805258
+"up2_span","C_plasticizer","dose:plasticizer",-0.000111852712531987,0.000112068026541085,0.000201346955418122
+"up2_span","C_binder","dose:binder",3.28031789748051e-07,8.71088868897862e-07,1.07575396064862e-06
+"up2_span","template_dose","dose:solvent(amount)",0.0197855513128933,0.0198041071370045,0.0201441554910898
+"up2_span","T_bp_solv","solvent(bp/type)",-0.0304377549568971,0.0304377549568971,0.0249637565785943
+"up2_span","k_perm_mono","material:monomer perm",0,0,0
+"up2_span","k_perm_plast","material:plast perm",0,0,0
+"up2_span","k_perm_bind","material:binder perm",0,0,0
+"up2_BI_bimodal","C_monomer","dose:monomer",-9.81006659741939e-05,9.83864635348747e-05,0.00017551522677898
+"up2_BI_bimodal","C_plasticizer","dose:plasticizer",-0.000147275073673565,0.000147575162047562,0.000262001541359404
+"up2_BI_bimodal","C_binder","dose:binder",4.47209251315788e-07,1.19956902791896e-06,1.48586444206146e-06
+"up2_BI_bimodal","template_dose","dose:solvent(amount)",0.0265227094498951,0.0265485699273145,0.0268988058583848
+"up2_BI_bimodal","T_bp_solv","solvent(bp/type)",-0.0411395295380665,0.0411395295380665,0.033403545932696
+"up2_BI_bimodal","k_perm_mono","material:monomer perm",0,0,0
+"up2_BI_bimodal","k_perm_plast","material:plast perm",0,0,0
+"up2_BI_bimodal","k_perm_bind","material:binder perm",0,0,0
+"up2_D_particle_um","C_monomer","dose:monomer",-0.0182697651360849,0.0182697651360849,0.0100372230784407
+"up2_D_particle_um","C_plasticizer","dose:plasticizer",-0.0259432195571619,0.0259432195571619,0.0136091418279791
+"up2_D_particle_um","C_binder","dose:binder",0.0175451158682136,0.0175581999160408,0.0120559574360902
+"up2_D_particle_um","template_dose","dose:solvent(amount)",-0.104006956236427,0.110345952952507,0.143214634995915
+"up2_D_particle_um","T_bp_solv","solvent(bp/type)",0.267034495434465,0.267034495434465,0.163076718974887
+"up2_D_particle_um","k_perm_mono","material:monomer perm",-0.0179311253909373,0.0179311253909373,0.0107426700194075
+"up2_D_particle_um","k_perm_plast","material:plast perm",-0.0239143794302205,0.0239143794302205,0.0124796379946124
+"up2_D_particle_um","k_perm_bind","material:binder perm",0.0194392279157344,0.0194392279157344,0.00897984394174721
+"up2_Dp90_um","C_monomer","dose:monomer",-0.0373962761686621,0.0373962761686621,0.0202264061030908
+"up2_Dp90_um","C_plasticizer","dose:plasticizer",-0.0531861451079311,0.0531861451079311,0.0278246030890713
+"up2_Dp90_um","C_binder","dose:binder",0.0355924215998921,0.0356185559022669,0.0244385922659016
+"up2_Dp90_um","template_dose","dose:solvent(amount)",-0.126875283595273,0.180018757776712,0.248329831219761
+"up2_Dp90_um","T_bp_solv","solvent(bp/type)",0.411892498144804,0.411892498144804,0.254851998935579
+"up2_Dp90_um","k_perm_mono","material:monomer perm",-0.036364825801444,0.036364825801444,0.0217700285529423
+"up2_Dp90_um","k_perm_plast","material:plast perm",-0.0485055124126758,0.0485055124126758,0.0252940454362044
+"up2_Dp90_um","k_perm_bind","material:binder perm",0.0394230085761312,0.0394230085761312,0.0181996384770848
+"up2_theta_skin_z","C_monomer","dose:monomer",0.00394794983630847,0.00394794983630847,0.000791799883697905
+"up2_theta_skin_z","C_plasticizer","dose:plasticizer",0.00473862788528123,0.00473862788528123,0.000726156628075408
+"up2_theta_skin_z","C_binder","dose:binder",0.00252662075981471,0.00252662075981471,0.00068430085629178
+"up2_theta_skin_z","template_dose","dose:solvent(amount)",0.000945616260766861,0.000945616260766861,7.74313086332155e-05
+"up2_theta_skin_z","T_bp_solv","solvent(bp/type)",0,0,0
+"up2_theta_skin_z","k_perm_mono","material:monomer perm",0,0,0
+"up2_theta_skin_z","k_perm_plast","material:plast perm",0,0,0
+"up2_theta_skin_z","k_perm_bind","material:binder perm",0,0,0
+"up2_Omega_struct_z","C_monomer","dose:monomer",0.0108032544873869,0.0108488148236354,0.00516502247431252
+"up2_Omega_struct_z","C_plasticizer","dose:plasticizer",0.0171324739604616,0.0171324739604616,0.00858882730249307
+"up2_Omega_struct_z","C_binder","dose:binder",-0.00852655080116134,0.00871440713229169,0.00835931228611011
+"up2_Omega_struct_z","template_dose","dose:solvent(amount)",-0.00910810284531002,0.00918923246799269,0.0103855237408532
+"up2_Omega_struct_z","T_bp_solv","solvent(bp/type)",0.00833227277200105,0.00833227277200105,0.0119622919747264
+"up2_Omega_struct_z","k_perm_mono","material:monomer perm",0.0115040115437432,0.0115040115437432,0.00947270131690909
+"up2_Omega_struct_z","k_perm_plast","material:plast perm",0.0155883190368613,0.0155883190368613,0.0110264212754156
+"up2_Omega_struct_z","k_perm_bind","material:binder perm",-0.0122529272679481,0.0122529272679481,0.00945980682027606
+"up2_phi_porosity_z","C_monomer","dose:monomer",-0.0193140287595264,0.0193140287595264,0.0102424485621823
+"up2_phi_porosity_z","C_plasticizer","dose:plasticizer",-0.0272279247902201,0.0272279247902201,0.0139624126961935
+"up2_phi_porosity_z","C_binder","dose:binder",0.0182631171757754,0.0182766684877881,0.0122491672648832
+"up2_phi_porosity_z","template_dose","dose:solvent(amount)",0.0463149100794807,0.0463149100794807,0.0068038666044728
+"up2_phi_porosity_z","T_bp_solv","solvent(bp/type)",0.00418278468810147,0.00527711891787269,0.010148465568833
+"up2_phi_porosity_z","k_perm_mono","material:monomer perm",-0.0186693008935844,0.0186693008935844,0.0110177243672351
+"up2_phi_porosity_z","k_perm_plast","material:plast perm",-0.0250503095727877,0.0250503095727877,0.0130140269606558
+"up2_phi_porosity_z","k_perm_bind","material:binder perm",0.0203122702058553,0.0203122702058553,0.00930994888982035
+"up2_rho_tapped","C_monomer","dose:monomer",3.00551643351418,6.68394736698882,8.09865591167941
+"up2_rho_tapped","C_plasticizer","dose:plasticizer",6.35630347532104,9.69328251863247,10.2845708985964
+"up2_rho_tapped","C_binder","dose:binder",-20.2846181806828,20.2846181806828,8.43553465449928
+"up2_rho_tapped","template_dose","dose:solvent(amount)",-30.4982580684558,30.4982580684558,4.53977146570537
+"up2_rho_tapped","T_bp_solv","solvent(bp/type)",-0.397953855150337,2.20318655937162,4.03718318921032
+"up2_rho_tapped","k_perm_mono","material:monomer perm",13.7483392062269,13.7483392062269,7.84529728297604
+"up2_rho_tapped","k_perm_plast","material:plast perm",18.5418376817921,18.5418376817921,9.14143743489271
+"up2_rho_tapped","k_perm_bind","material:binder perm",-14.9910878500721,14.9910878500721,6.88330026643588
+"up2_Tg_product_K","C_monomer","dose:monomer",-10.2050180587211,10.2050180587211,1.22033685443449
+"up2_Tg_product_K","C_plasticizer","dose:plasticizer",-24.5190121479889,24.5190121479889,1.60461671761325
+"up2_Tg_product_K","C_binder","dose:binder",0,0,0
+"up2_Tg_product_K","template_dose","dose:solvent(amount)",-1.14918966342209,1.14918966342209,1.64781372745605
+"up2_Tg_product_K","T_bp_solv","solvent(bp/type)",-1.33706983140083,1.33706983140083,1.61062774581388
+"up2_Tg_product_K","k_perm_mono","material:monomer perm",0,0,0
+"up2_Tg_product_K","k_perm_plast","material:plast perm",0,0,0
+"up2_Tg_product_K","k_perm_bind","material:binder perm",0,0,0
+"up2_X_moisture","C_monomer","dose:monomer",0,0,0
+"up2_X_moisture","C_plasticizer","dose:plasticizer",0,0,0
+"up2_X_moisture","C_binder","dose:binder",0,0,0
+"up2_X_moisture","template_dose","dose:solvent(amount)",0,0,0
+"up2_X_moisture","T_bp_solv","solvent(bp/type)",0,0,0
+"up2_X_moisture","k_perm_mono","material:monomer perm",0,0,0
+"up2_X_moisture","k_perm_plast","material:plast perm",0,0,0
+"up2_X_moisture","k_perm_bind","material:binder perm",0,0,0
+"up2_Perm_shell_rel","C_monomer","dose:monomer",2.73825044409197,2.73825044409197,4.08217556596481
+"up2_Perm_shell_rel","C_plasticizer","dose:plasticizer",3.21643984848339,3.21643984848339,4.58754144837882
+"up2_Perm_shell_rel","C_binder","dose:binder",-3.42870195307061,3.42870195307061,4.20904783850295
+"up2_Perm_shell_rel","template_dose","dose:solvent(amount)",0.177339161561361,0.177339161561361,0.199712571358008
+"up2_Perm_shell_rel","T_bp_solv","solvent(bp/type)",0,0,0
+"up2_Perm_shell_rel","k_perm_mono","material:monomer perm",3.09454711406576,3.09454711406576,3.29620035824382
+"up2_Perm_shell_rel","k_perm_plast","material:plast perm",4.03413316345934,4.03413316345934,3.64205418346022
+"up2_Perm_shell_rel","k_perm_bind","material:binder perm",-3.4192763140652,3.4192763140652,5.00449031897186
+"up2_D_pore_um","C_monomer","dose:monomer",-0.0682515769907792,0.0682515769907792,0.032095657374288
+"up2_D_pore_um","C_plasticizer","dose:plasticizer",-0.0919626133939019,0.0919626133939019,0.0415218915949329
+"up2_D_pore_um","C_binder","dose:binder",0.0487600797832989,0.0537176433437442,0.0497364670978645
+"up2_D_pore_um","template_dose","dose:solvent(amount)",-0.00652497495620393,0.00652497495620393,0.00225849665454964
+"up2_D_pore_um","T_bp_solv","solvent(bp/type)",0.0528496241276156,0.0528496241276156,0.0655355968204354
+"up2_D_pore_um","k_perm_mono","material:monomer perm",-0.059358110450713,0.0599121958718225,0.0408956661395214
+"up2_D_pore_um","k_perm_plast","material:plast perm",-0.0808890799452563,0.0808890799452563,0.0546962203304032
+"up2_D_pore_um","k_perm_bind","material:binder perm",0.0554425542634556,0.0559419769844191,0.0399701639579104
+"up2_solv_retained","C_monomer","dose:monomer",1.8573449997801e-05,1.8573449997801e-05,3.62670447993218e-05
+"up2_solv_retained","C_plasticizer","dose:plasticizer",1.94293982348867e-05,1.94293982348867e-05,5.68911267715892e-05
+"up2_solv_retained","C_binder","dose:binder",0,0,0
+"up2_solv_retained","template_dose","dose:solvent(amount)",-0.00564835401970396,0.00564835401970396,0.00798881432716972
+"up2_solv_retained","T_bp_solv","solvent(bp/type)",0.123952194023242,0.123952194023242,0.118582600324304
+"up2_solv_retained","k_perm_mono","material:monomer perm",0,0,0
+"up2_solv_retained","k_perm_plast","material:plast perm",0,0,0
+"up2_solv_retained","k_perm_bind","material:binder perm",0,0,0
+"up2_f_burst_solv","C_monomer","dose:monomer",0.0127429875534223,0.0425718945993531,0.0695385425950116
+"up2_f_burst_solv","C_plasticizer","dose:plasticizer",-0.026168548561948,0.0622718600540354,0.0975279721434131
+"up2_f_burst_solv","C_binder","dose:binder",0.138480803824375,0.138480803824375,0.135937803565857
+"up2_f_burst_solv","template_dose","dose:solvent(amount)",0.00617146627482875,0.00760062990106154,0.0097591787001672
+"up2_f_burst_solv","T_bp_solv","solvent(bp/type)",-0.278146437278804,0.278146437278804,0.236834537630161
+"up2_f_burst_solv","k_perm_mono","material:monomer perm",-0.096314982840608,0.096314982840608,0.12142440563698
+"up2_f_burst_solv","k_perm_plast","material:plast perm",-0.146150771661596,0.146150771661596,0.165821659036789
+"up2_f_burst_solv","k_perm_bind","material:binder perm",0.120139888270706,0.120139888270706,0.131596163942666
+"up2_sigma_y_cake_MPa","C_monomer","dose:monomer",-0.113985232548898,0.113985232548898,0.0463099183647423
+"up2_sigma_y_cake_MPa","C_plasticizer","dose:plasticizer",-0.1424371650141,0.1424371650141,0.038523332459522
+"up2_sigma_y_cake_MPa","C_binder","dose:binder",-0.0660734487587624,0.0660734487587624,0.0239860439316779
+"up2_sigma_y_cake_MPa","template_dose","dose:solvent(amount)",-0.00600687304284695,0.00600687304284695,0.00328380646020108
+"up2_sigma_y_cake_MPa","T_bp_solv","solvent(bp/type)",-0.00139424232917394,0.00139424232917394,0.00265768607638356
+"up2_sigma_y_cake_MPa","k_perm_mono","material:monomer perm",0,0,0
+"up2_sigma_y_cake_MPa","k_perm_plast","material:plast perm",0,0,0
+"up2_sigma_y_cake_MPa","k_perm_bind","material:binder perm",0,0,0

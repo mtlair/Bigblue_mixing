@@ -32,7 +32,7 @@ Bounds narrowed to the **real operating window** from the validation data
 | **v_tip** (UP1 tip speed) | m/s | 6 | 20 | 16 | d50, tapped density, skin |
 | **C_solid_mass** (feed solids) | wt/wt | 0.15 | 0.30 | 0.25 | d50, porosity, tapped density, moisture |
 | **T_dryer_in** (UP4 inlet) | K | 410 | 435 | 425 | porosity, sphericity, moisture |
-| **ALR** (atomizing air-liquid ratio) | – | 0.9 | 1.8 | 1.35 | span/breadth, droplet size |
+| **ALR** (atomizing air-liquid ratio) | – | **0.1** | 1.8 | 0.6 | span/breadth, droplet size |
 
 → A **2⁴ full factorial (16 runs) + 3 center points**. Responses: d50 & span
 (laser), **porosity (SEM, robust)**, **sphericity (SEM, robust)**, tapped density,
@@ -41,19 +41,66 @@ C_solid_mass both show Morris σ ≳ μ*, i.e. real interactions); add a face-ce
 axial set → CCD if porosity/d50 curvature needs a quadratic surface.
 
 **Changes from the raw Morris set:**
-- **ALR replaces P_atom_air.** ALR is the controllable atomization variable (air
-  flow / liquid rate); P_atom_air is not independently settable and co-varies with
-  it. ALR mainly moves the distribution **span** (model rank #3 for span) — the
-  median d50 is dominated by v_tip/solids once the feed is a ~40 % paste. Bounds
-  0.9–1.8 come from the measured `up4atom_scfm/up4_feed`.
+- **ALR replaces P_atom_air**, and is the right choice because it is dimensionless
+  and **atomizer- and scale-agnostic** (air/liquid mass ratio) — the effect
+  transfers across nozzles and throughputs, unlike an absolute pressure. P_atom_air
+  is not independently settable and co-varies with ALR anyway.
+- **ALR range extended DOWN to 0.1** (from the measured 0.9–1.8) to probe the
+  low-atomization region where droplet size and span change fastest. 0.05 can be
+  added as an extra low axial point. **Caveat:** the atomization closure was
+  calibrated at ALR 0.9–1.8, so model predictions below ~0.9 are extrapolation —
+  which is exactly why it is worth an experimental point rather than a model claim.
+  ALR mainly moves the distribution **span** (model rank #3) — median d50 is
+  dominated by v_tip/solids once the feed is a ~40 % paste.
 - **Q_template dropped** — no data and not a current operational variable. Its CQA
-  roles (porosity, moisture) are still carried by C_solid_mass and T_dryer_in, so
-  every response keeps a controllable driver.
+  roles (porosity, moisture) are still carried by C_solid_mass and T_dryer_in.
 
-### B. Formulation factors — a separate formulation DoE
-`C_monomer`, `C_plasticizer`, `C_binder`, `template_dose`, `Tg_polymer`.
-These drive **Tg** (Tg_polymer dominant; plasticizer/monomer soften) and modulate
-porosity/sphericity. Hold the process box at its center while varying these.
+**Why this set is a solid basis (not just model ranking):** every factor is (a) a
+real operator setpoint, (b) top-ranked for ≥1 CQA in the wired screen, and (c)
+bounded by *measured* operating data — v_tip 4.4–19.3 m/s and C_solid_mass 13–25 %
+(`cond_process.csv`), T_dryer_in ≈143 °C and ALR 0.9–1.8 (`cond_up1234.csv`). The
+chain that ranks them is validated to product d50 RMS 1.10. So the effects are
+anchored to hardware you can set and to data, not to free model parameters.
+
+### B. Formulation / surface-chemistry DoE — the higher-value study
+Focused Morris (r=40, wired chain, process held at nominal) over the
+monomer / plasticizer / binder / solvent design space
+(`doe_formulation_morris.R` → `doe_formulation_proposal.txt`). This is where the
+**morphology and structure** CQAs live, and one factor dominates:
+
+**C_plasticizer is the master formulation lever — top-3 for 8 of 10 CQAs.**
+It sets the softness/free-volume axis and pulls almost everything:
+
+| CQA | dominant formulation driver(s) | direction |
+|-----|-------------------------------|-----------|
+| product Tg | **C_plasticizer**, C_monomer | both soften (↓Tg) |
+| porosity | template_dose (solvent amount) ↑, **C_plasticizer** ↓ | more solvent → more pores |
+| sphericity | **C_plasticizer** ↑ | plasticized → rounder |
+| shell permeability | k_perm_plast ↑, C_binder ↓, **C_plasticizer** ↑ | plasticizer opens the shell |
+| pore size | **C_plasticizer** ↓, C_monomer ↓ | |
+| retained solvent | **T_bp_solv** ↑ | higher-bp solvent stays in |
+| micro-explosion risk | **T_bp_solv** ↓, C_binder ↑ | high-bp solvent → less burst |
+| cake strength | **C_plasticizer** ↓, C_monomer ↓, C_binder ↓ | softeners weaken the cake |
+| skin/fusion | **C_plasticizer**, C_monomer, C_binder ↑ | all promote fusion |
+
+**Recommended formulation DoE — dosable knobs (proposed ranges):**
+
+| factor | role | DoE low | DoE high | nominal | drives |
+|--------|------|---------|----------|---------|--------|
+| **C_plasticizer** | plasticizer conc. | 0.005 | 0.04 | 0.0225 | Tg, sphericity, porosity, pore, strength, permeability, skin (8/10) |
+| **C_monomer** | monomer conc. | 0.001 | 0.03 | 0.0155 | Tg, pore size, strength, skin (4/10) |
+| **C_binder** | binder conc. | 0.01 | 0.15 | 0.08 | permeability, burst, strength, skin (4/10) |
+| **T_bp_solv** | solvent choice (bp) | 300 K | 360 K | 330 | solvent retention, burst, d50 (4/10) |
+| **template_dose** | solvent amount | 0.02 | 1.1 | 0.56 | porosity, d50 (3/10) |
+
+→ Two clean axes: **plasticizer+monomer** = softness/Tg/strength; **binder** =
+permeability/burst; **solvent amount + type** = porosity/retention/burst. A
+**2⁵⁻¹ resolution-V (16 runs) + centers** resolves these with C_plasticizer as the
+expected dominant main effect. Hold the process box (section A) at center.
+`k_perm_mono/plast/bind` rank high but are each additive's intrinsic shell-
+permeation property — they tell you *which additive chemistry* the response keys
+on (plasticizer permeation dominates), not a knob to set; screen candidate
+chemistries against them rather than dialing them.
 
 ### C. Intrinsic/material — characterize, don't set
 `n_flow`, `mu_L` (slurry rheology), `k_perm_plast`, `T_bp_solv`, `σ`, `ionic_strength`,
