@@ -648,14 +648,26 @@ matches the dried-product skeletal density used in the model. The earlier readin
 monomer" — was incorrect: there is no mineral phase, and the feed density is
 explained by colloid + water alone (predicted 1112 vs measured 1118).
 
-### Residual monomer — gaseous, not resolvable from these densities
+### Residual monomer — free-gas estimate from the upstream feed density
 
-Residual monomer is **gaseous at room temperature (MW ≈ 70 g/mol)**, so it produces
-no liquid-density deficit and cannot be read off the feed density. It would have to
-be quantified as a gas (PV=nRT) or by direct assay (TGA / GC). The gas holdup seen
-in the streams is **foaming air** (`up1_scfh` is an air sparge), not monomer, so the
-UP1-exit and UP3-cake void fractions bound trapped *air*, not residual monomer — at
-most they set a loose upper bound on any monomer that might share those voids.
-Quantifying residual monomer therefore needs data not in the current columns: a
-monomer feed/off-gas flow, or a TGA/GC assay on the product. See
-`review/up3_density_monomer_note.md` for the full working.
+`up1_rho` is measured on the stream **entering** UP1 (colloid + gaseous monomer +
+water), *upstream* of the foaming air (`up1_scfh`, an air sparge added inside UP1).
+Monomer is **gaseous at room temperature (MW ≈ 70 g/mol)**, so as free gas it lowers
+`up1_rho` below the colloid(1700) + water baseline; the deficit converts to monomer
+mass by the ideal-gas law:
+
+```
+ρ_theo = 1/(s/1700 + (1−s)/ρ_w);  ρ_gas = P·MW/(R·T) ≈ 2.86 kg/m³ (1 atm, 25 °C)
+x_mono = (1/ρ_meas − 1/ρ_theo) / (1/ρ_gas − 1/ρ_w)
+```
+
+Result: the deficit is ~zero — `up1_rho` (1117.9–1119.1) sits a few kg/m³ *above*
+colloid+water (1112) — so **free gaseous monomer is < ~30 ppm, effectively none.**
+The bound is tight because gas is ~350× lighter than water: **1 kg/m³ of deficit =
+2.3 ppm monomer**, so 100 ppm would drop `up1_rho` by ~43 kg/m³, which is not seen.
+The residual uncertainty is the baseline (water density at feed T, dissolved
+surfactant, exact solid fraction), which flips the sign over ±5 kg/m³ — pin it with
+a measured monomer-free feed density to get a signed number. Note this bounds only
+*free-gas* monomer; molecularly **dissolved** monomer occupies liquid-like volume,
+leaves no PV=nRT signature, and needs TGA/GC. The downstream void gas is **foaming
+air**, not monomer. Full working in `review/up3_density_monomer_note.md`.

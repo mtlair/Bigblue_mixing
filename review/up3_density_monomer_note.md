@@ -4,54 +4,61 @@
 full 44-row historical set in `data/up1_2_3_solids_rho.xlsx` (not just the 4 clean
 chain conditions).
 
-## Resolved: monomer is a gas — quantify it with PV=nRT, not a density deficit
+## Monomer: free-gas holdup in the *upstream feed*, via PV=nRT
 
-Two facts (confirmed by the process owner) settle the residual-monomer question:
+**Process topology (confirmed).** `up1_rho` is measured on the stream *entering*
+UP1 — colloid + gaseous monomer + liquid (mostly water) — **upstream of the foaming
+air** (`up1_scfh` is an air sparge added inside UP1, and is *not* in `up1_rho`).
+Two confirmed facts frame the estimate:
 
-1. **Bare colloid density = 1.70 g/cc, and the colloid is polymer** (no mineral
-   loading). This equals the dried-product skeletal density already in the model
-   (`up1_mixer_module.R:234`). So the DATA_REVIEW narrative — "1730 is *below* a
-   pure mineral skeleton because residual monomer dilutes it" — is **wrong**: there
-   is no mineral skeleton and no dilution to infer. ρ_s = 1700 is just the colloid.
+1. **Bare colloid = 1.70 g/cc, polymer** (no mineral loading); equals the dried-
+   product skeletal density in the model (`up1_mixer_module.R:234`). So the old
+   DATA_REVIEW story — "1730 sits below a mineral skeleton diluted by monomer" — is
+   wrong; ρ_s = 1700 is just the colloid.
+2. **Monomer is gaseous at room T (MW ≈ 70).** As free gas in the feed it occupies
+   gas-phase volume, so it lowers `up1_rho` below the colloid+water baseline. That
+   deficit → moles → mass by the ideal-gas law is the correct "guess":
 
-2. **Monomer is gaseous at room temperature (MW ≈ 70 g/mol).** It therefore never
-   appears as a *liquid* density deficit. This is exactly why the clean feed check
-   shows no deficit: predicted feed density (colloid@1700 + water@997) = 1112 vs
-   measured 1117.9 — the feed is if anything 6 kg/m³ *denser*, i.e. **zero
-   dissolved/liquid monomer**, consistent with a gas-phase monomer. My earlier
-   liquid-holdup formula was the wrong model; the correct tool is the ideal-gas law
-   applied to the measured **gas holdup**.
+```
+ρ_theo   = 1/(s/ρ_s + (1−s)/ρ_w)            # colloid(1700) + water, no gas
+ρ_gas    = P·MW/(R·T)                        # ≈ 2.86 kg/m³ at 1 atm, 25 °C
+x_mono   = (1/ρ_meas − 1/ρ_theo)/(1/ρ_gas − 1/ρ_w)   # mass frac of feed
+```
 
-### PV=nRT monomer holdup (MW = 70)
+### Result: free gaseous monomer in the feed is **< ~30 ppm (effectively none)**
 
-For a gas void fraction α at stream pressure P and temperature T,
-`n = P·V_gas/(R·T)` and monomer mass `= n·0.070 kg/mol`, expressed per unit solid:
+| cond | up1_rho | colloid+water | free monomer |
+|------|---------|---------------|--------------|
+| up3_1 | 1117.9 | 1112.0 | **−14 ppm** |
+| up3_2–4 | 1119.1 | 1112.0 | **−16 ppm** |
+| historical (n=28) | 1085–1122 | 1112 | median −14, range −23…+64 ppm |
 
-| Basis | Measurement | Gas frac | Monomer (wt % of solid) |
-|-------|-------------|----------|--------------------------|
-| **Sparge input** (up1_scfh as monomer) | flow meter | — | **0.59–0.60** |
-| UP1 exit, all-entrained (upper bound) | up1_scfh expanded to exit P,T | ~30 % | 0.59–0.60 |
-| UP1 exit, retained (back-calc from UP3) | Boyle from cake holdup | ~4.5 % | 0.06–0.07 |
-| **UP3 cake, retained** | measured cake density | 7.6 % (up3_1) / ~14 % (hist) | **0.05–0.08** |
+The deficit is ~zero (in fact `up1_rho` sits a few kg/m³ *above* colloid+water), so
+the implied free monomer is nil to slightly negative.
 
-**The gas is foaming air, not monomer** (confirmed: `up1_scfh` is an air sparge).
-So the numbers in the table above quantify *air*, not monomer — the ~0.60 wt %
-"input" is the foaming air, and the ~0.05–0.08 wt % "retained" is trapped air in
-the exit foam / UP3 cake. They stand as a useful **air** balance (≈85–90 % of the
-foaming air escapes before the product exits; up3_1: ~0.37 lb/hr in, ~0.03 lb/hr
-retained) but say nothing directly about monomer.
+**Why the bound is so tight — the hypersensitivity.** Monomer gas is ~350× lighter
+than water, so **1 kg/m³ of density deficit = only 2.3 ppm of free monomer** (1 atm,
+25 °C; 4.6 ppm at 2 atm). Equivalently, **100 ppm of free gaseous monomer would drop
+`up1_rho` by ~43 kg/m³** (1118 → 1075). Nothing remotely like that is seen — the feed
+density hugs the gas-free colloid+water line — so free gaseous monomer is bounded to
+a few tens of ppm at most.
 
-### Bottom line on residual monomer
-It **cannot be quantified from the current data.** Monomer is gaseous (MW ≈ 70), so:
-- it leaves **no liquid-density signature** — the feed check confirms zero dissolved
-  monomer (colloid+water fully explains 1118 kg/m³); and
-- it is **not** the measured void gas — that void is foaming air.
+**The one caveat is the baseline, not the method.** Because the real deficit is only
+single-digit kg/m³, the sign flips with a ±5 kg/m³ move in the assumed colloid+water
+baseline (water density at true feed T, dissolved surfactant/solids, exact solid
+fraction). To turn the bound into a signed number, pin the baseline with a *measured*
+monomer-free feed density on the same rig (or the feed T + liquid-phase density).
 
-The most one can say is a loose upper bound: *if* any residual monomer shared the
-trapped-air voids, it would be ≤ the ~0.05–0.08 wt % air holdup. A real number
-needs data not in these columns:
-- a **monomer feed / off-gas flow** (then PV=nRT with MW 70 gives it directly), or
-- a **TGA / GC assay** on the product.
+**What this does *not* catch:** monomer that is molecularly **dissolved** in the
+water/polymer occupies liquid-like volume, not gas volume, so it leaves no PV=nRT
+signature and is invisible to density at any realistic level (needs TGA / GC). The
+PV=nRT feed method bounds only the *free-gas* fraction.
+
+### Aside — the foaming-air balance (not monomer)
+For completeness, applying the same ideal-gas conversion to the **foaming air**
+(`up1_scfh`, added inside UP1) and the downstream void fractions: ~0.60 wt % of
+solids goes in as air, ~0.05–0.08 wt % is retained as trapped air in the exit foam /
+UP3 cake (≈85–90 % escapes). This is an *air* balance and is unrelated to monomer.
 
 ## What is now well-established: ρ_solid ≈ 1700 kg/m³
 
