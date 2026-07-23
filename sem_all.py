@@ -47,6 +47,25 @@ def scales(img):
     lin = max(ar ** 0.5, 0.4)         # linear ratio (for window/distance px)
     return ar, lin
 
+def isolate_particles(img):
+    """Particle vs non-particle (stub/background). Particle = raised (bright,
+    large-scale) AND/OR textured; stub = darker + flatter. Keeps fused particles
+    (bright even when smooth) and excludes the smooth substrate between grains."""
+    ar, lin = scales(img)
+    s = max(8, int(12 * lin)); w = max(3, int(5 * lin))
+    B = ndi.gaussian_filter(img, s)
+    rng = ndi.maximum_filter(img, w) - ndi.minimum_filter(img, w)
+    T = ndi.gaussian_filter(rng, s)
+    def nrm(a):
+        lo, hi = np.percentile(a, 2), np.percentile(a, 98)
+        return np.clip((a - lo) / max(hi - lo, 1e-6), 0, 1)
+    m = (0.5 * nrm(B) + 0.5 * nrm(T)) > filters.threshold_otsu(0.5 * nrm(B) + 0.5 * nrm(T))
+    m = ndi.binary_fill_holes(ndi.binary_closing(m, iterations=max(1, int(2 * lin))))
+    m = morphology.remove_small_objects(m, int(4000 * ar))
+    m = morphology.remove_small_objects(ndi.binary_opening(m, iterations=max(1, int(lin))),
+                                        int(4000 * ar))
+    return m if m.sum() > 0.1 * img.size else np.ones_like(img, bool)
+
 # ---- sphericity (whole particles, 500x) -------------------------------------
 def sphericity(img):
     ar, lin = scales(img)
@@ -73,20 +92,9 @@ def surface(img, overlay=None):
     sig = max(8, 18 * lin); win = max(3, int(round(5 * lin)))
     flat = img - ndi.gaussian_filter(img, sig)
     rng = ndi.maximum_filter(img, win) - ndi.minimum_filter(img, win)
-    # bright foreground (particle + possibly smooth substrate)
-    bright = ndi.gaussian_filter(img, max(6, int(12 * lin))) > filters.threshold_otsu(img) * 0.55
-    bright = ndi.binary_fill_holes(morphology.remove_small_objects(bright, int(3000 * ar)))
-    # SUBSTRATE = large flat region connected to the image border (stub between
-    # particles); exclude it so it is not mis-counted as on-particle skin.
-    smooth0 = (rng / max(img.std(), 1)) < TAU_NORM
-    lbl, _ = ndi.label(smooth0)
-    bids = np.unique(np.concatenate([lbl[0], lbl[-1], lbl[:, 0], lbl[:, -1]]))
-    bids = bids[bids > 0]
-    substrate = morphology.remove_small_objects(np.isin(lbl, bids), int(0.04 * img.size))
-    body = bright & ~substrate
-    body = morphology.remove_small_objects(body, int(3000 * ar))
-    if body.sum() < 0.12 * img.size:
-        body = bright if bright.sum() > 0.12 * img.size else np.ones_like(img, bool)
+    # PARTICLE-FIRST: isolate the particle body (excludes the stub/background),
+    # then measure skin/porosity only inside it.
+    body = isolate_particles(img)
     fb = flat[body]; med = np.median(fb)
     body_sigma = max(img[body].std(), 1)
     bright_cut = fb.mean() + BRIGHT_K * fb.std()
