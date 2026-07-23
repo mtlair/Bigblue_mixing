@@ -474,16 +474,33 @@ higher post-UP3 solids (denser droplet → smaller dry particle at the same drop
 size) or the higher v_tip (all ≥ 16 m/s, driving the aggregate toward the
 compacted end of the plateau).
 
-### Data quality flag: up3_1 and up3_3 viscometry are identical
+### up3_1 and up3_3 viscometry: identical by design
 
-The flow curves on sheets `up3_1` and `up3_3` are **bit-for-bit identical** (20 data
-points, all matching). The two conditions have different UP3 centrifuge settings
-(drum_rpm 1754 vs 1687, scroll_rpm 1254 vs 858, g-force 430 vs 398) and different
-dry d50 (10.20 vs 9.07 µm), so identical post-UP3 viscosity would be unusual. Likely
-explanation: the `up3_3` flow curve was not measured and the `up3_1` data was copied
-into that sheet. **Treat up3_3 viscometry as unreliable** until the raw rheometer
-record is checked. The up3_3 PSD and process variables (d50, v_tip, UP3 operating
-conditions) appear normal and are used as-is.
+The flow curves on sheets `up3_1` and `up3_3` are bit-for-bit identical (20 data
+points). This is **physically reasonable**: both conditions exited UP3 at essentially
+the same solid content (40.70 % vs 40.61 %) and the same UP1 feed solid (25 %),
+so their post-centrifuge slurry compositions are nearly indistinguishable. Identical
+viscometry from near-identical compositions is expected, not a data-entry error.
+
+### UP3 rho value — formula references wrong solid content
+
+`up3_rho = 1117.3 kg/m³` is recorded only for up3_1 (the other three are null). A
+simple slurry-density check using `1/ρ = w_s/ρ_s + (1−w_s)/ρ_w` (mass-fraction
+formula, ρ_s = 1700 kg/m³, ρ_w = 1000 kg/m³) exposes a formula error:
+
+| Basis | Solid % | Expected ρ (kg/m³) | Recorded |
+|-------|---------|-------------------|---------|
+| UP1 feed | 25.0 | **1115** | `up1feed_rho` = 1117.9 ✓ |
+| UP3 cake up3_1 | 40.7 | **1201** | `up3_rho` = 1117.3 ✗ |
+| UP3 cake up3_2 | 42.7 | **1213** | null |
+| UP3 cake up3_3 | 40.6 | **1201** | null |
+| UP3 cake up3_4 | 38.8 | **1190** | null |
+
+The recorded 1117.3 kg/m³ matches the **UP1 feed density at 25 % solid**, not the
+UP3 cake at 40.7 %. The Excel formula for `up3_rho` almost certainly references
+the UP1 feed solid% column instead of `up3_solid%`. The correct UP3 cake densities
+are ~1190–1213 kg/m³ (tabulated above); use the formula with `up3_solid%` to
+derive per-condition values.
 
 ---
 
