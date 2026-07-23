@@ -43,6 +43,7 @@
 # =============================================================================
 
 up2_constants <- function() list(
+  R_GAS    = 8.314,     # universal gas constant                  [J/mol K]
   P_atm    = 1.013e5,   # ambient pressure                        [Pa]
   R_air    = 287,       # gas constant, air                       [J/kg K]
   gamma_a  = 1.4,       # heat capacity ratio, air                [-]
@@ -70,6 +71,7 @@ up2_output_names <- c("d_droplet_um", "d10_um", "d90_um", "d99_um", "span",
                       "Omega_struct_z", "phi_porosity_z", "rho_tapped",
                       "Tg_product_K", "X_moisture", "Perm_shell_rel",
                       "D_pore_um", "solv_retained", "f_burst_solv",
+                      "f_cr_solv", "f_esc_solv",
                       "sigma_y_cake_MPa")
 
 up2_run_dryer <- function(feed, x, cst = up2_constants()) {
@@ -125,7 +127,7 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   k_rip0 <- cst$k_rip0; cp_gas <- cst$cp_gas; h_fg <- cst$h_fg
   gamma_ref <- cst$gamma_ref; t_res <- cst$t_res; Tg_water <- cst$Tg_water
   sig_y0 <- cst$sig_y0; rho_solv <- cst$rho_solv; h_fg_solv <- cst$h_fg_solv
-  k_emu0 <- cst$k_emu0
+  k_emu0 <- cst$k_emu0; R_GAS <- cst$R_GAS
 
   ## --- Module 0a: Formulation - Flory-Huggins free-volume swelling ---------
   # Core-absorbed template (w_core, from UP1's RTF) adds to the residual
@@ -304,10 +306,31 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   X_moist_cap <- w_moist_target * C_sol / (max(1 - C_sol, 1e-6) * (1 - w_moist_target))
   X_moist <- min(X_moist, X_moist_cap)
 
+  ## --- Module 6c (Raoult): constant-rate partial-pressure evaporation ------
+  # During the constant-rate drying period (near dryer inlet) template droplets
+  # evaporate by partial-pressure driving force even when T_droplet < T_bp.
+  # Droplet surface temperature during constant-rate is approximated as:
+  #   T_wb_cr = T_out - 0.8*(T_in - T_out)   [co-current: hot/dry near inlet]
+  # Vapour pressure via Clausius-Clapeyron with Trouton's rule (dH_vap = 88*T_bp):
+  #   p_cr = P_atm * exp( (dH_vap/R) * (1/T_bp - 1/T_wb_cr) )
+  # Escape fraction during constant-rate window (exponential approach to saturation):
+  #   f_cr = 1 - exp( -C_cr * (p_cr/P_atm) * Perm_shell )
+  # C_cr = 5.0 sets the scale so that BA (p_cr/P_atm~0.075 at T_wb~321K) gives
+  # ~35-40% escape and BB (~0.020 at T_wb~321K) gives ~12%, consistent with the
+  # 3.6x vapour-pressure ratio between BA and BB at wet-bulb conditions.
+  T_wb_cr <- T_out - 0.8 * pmax(T_in - T_out, 0)
+  dHvap_J <- 88.0 * T_bpS                          # Trouton estimate [J/mol]
+  p_cr    <- pmin(P_atm, P_atm * exp(dHvap_J / R_GAS * (1/T_bpS - 1/T_wb_cr)))
+  f_cr    <- if (phi_e > 1e-4) max(0, min(1, 1 - exp(-5.0 * (p_cr / P_atm) * Perm_shell)))
+             else 0.0
+
   ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
   T_particle <- 0.85 * T_out + 0.15 * T_feed
   S_bs   <- 1 / (1 + exp(-(T_particle - T_bpS) / 8))
-  R_solv <- 1 - S_bs
+  # Combined sequential escape: constant-rate partial-pressure first, then
+  # falling-rate boiling of whatever remains.
+  f_esc  <- f_cr + (1 - f_cr) * S_bs
+  R_solv <- 1 - f_esc
 
   # Residual solvent load now includes the core-absorbed template: it only
   # escapes above its boiling point (same R_solv gate as the free emulsion)
@@ -331,10 +354,16 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   ## --- Module 7c: Per-mode porosity, sphericity, particle distribution -----
   f_trap_s <- theta_skin / (theta_skin + Perm_shell)
   dP_vap   <- P_atm * pmax(exp(0.025 * (T_particle - T_bpS)) - 1, 0)
+  # Burst only from falling-rate trapped vapour (S_bs gate); constant-rate
+  # evaporation (f_cr) exits freely before the shell seals.
   Pi_b     <- dP_vap * f_trap_s * S_bs / max(sigma_y, 1e3)
   f_burst  <- Pi_b^2 / (1 + Pi_b^2)
-  B_infl   <- 1.5 * f_trap_s * (1 - f_burst)
-  phi_templ <- min(0.6, phi_e * S_bs * (1 + B_infl) * (1 - 0.5 * f_burst))
+  # Shell inflation scaled by (1 - f_cr): template that escaped in constant-rate
+  # period never reaches the sealed-shell stage and does not contribute to inflation.
+  B_infl   <- 1.5 * f_trap_s * (1 - f_burst) * (1 - f_cr)
+  # phi_templ: total escaped template (f_esc) creates pores; post-escape inflation
+  # and burst logic as before.
+  phi_templ <- min(0.6, phi_e * f_esc * (1 + B_infl) * (1 - 0.5 * f_burst))
   D_pore    <- D_e_h * (1 + B_infl)^(1/3)
 
   a_trap_j <- alpha_e / (1 + D_b_e / modes_m) * (0.5 + 0.5 * theta_surf)
@@ -463,5 +492,7 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
     D_pore_um      = D_pore * 1e6,
     solv_retained  = R_solv,
     f_burst_solv   = f_burst,
+    f_cr_solv      = f_cr,
+    f_esc_solv     = f_esc,
     sigma_y_cake_MPa = sigma_y / 1e6)
 }

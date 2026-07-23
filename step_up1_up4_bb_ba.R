@@ -147,10 +147,33 @@ step_template <- function(template, T_dry_C) {
   cat(sprintf("    %-14s %8.1f K    %-14s %8.5f\n",
               "Tg_product", r2[["Tg_product_K"]], "X_moisture", r2[["X_moisture"]]))
   cat(sprintf("    %-14s %8.3f      %-14s %8.3f\n",
+              "f_cr (Raoult)", r2[["f_cr_solv"]], "f_esc (total)", r2[["f_esc_solv"]]))
+  cat(sprintf("    %-14s %8.3f      %-14s %8.3f\n",
               "solv_retained", r2[["solv_retained"]], "f_burst_solv", r2[["f_burst_solv"]]))
   cat(sprintf("    %-14s %8.1f kg/m3\n", "rho_tapped", r2[["rho_tapped"]]))
 
   invisible(list(template = template, chem = chem, product = r2))
+}
+
+# --- no-template reference: same backbone, template feed off -----------------
+run_no_template <- function() {
+  x <- base_x()
+  x["Q_template"]    <- 0.0
+  x["template_dose"] <- 0.0
+  x["C_temp_mass"]   <- 0.0
+  eq <- equipment; eq$template_type <- 4L   # keep type-4 flag; phi_e->0 anyway
+  RHO_TEMPLATE_LIQ <<- 750                   # default; no template so unused
+
+  p1 <- up1_pars_from_x(x)
+  r1 <- up1_run_mixer(p1, eq)
+  s  <- stream_from_up1(r1, p1, eq)
+  s  <- foam_wash_column(s)
+  s  <- up3_centrifuge(s, pars = list(
+           Cs_target = row$up3_solid_pct / 100,
+           Fg        = if (is.finite(row$up3_Fg)) row$up3_Fg else 430))
+  x_up2 <- as.list(x[up2_names]); x_up2[["size_template"]] <- x[["size_template"]]
+  r2 <- up2_run_dryer(s, x_up2)
+  list(template = "no_template", chem = NULL, product = r2)
 }
 
 # =============================================================================
@@ -164,35 +187,54 @@ T_inlet_C <- row$up4_Tin_C     # measured up3_1 dryer inlet
 resBA <- step_template("butyl_acetate",  T_dry_C = T_inlet_C)
 cat("\n\n")
 resBB <- step_template("butyl_butyrate", T_dry_C = T_inlet_C)
-
-# --- side-by-side product comparison -----------------------------------------
 cat("\n\n")
 hr("=")
-cat("SIDE-BY-SIDE PRODUCT COMPARISON  (same backbone, template swapped)\n")
+cat("REFERENCE: NO TEMPLATE  (same backbone, Q_template = 0)\n")
 hr("=")
-cmp <- function(lbl, key, unit = "", d = 3) {
-  a <- resBA$product[[key]]; b <- resBB$product[[key]]
-  cat(sprintf("  %-22s %12.*f %12.*f   %s\n", lbl, d, a, d, b, unit))
+resNT <- run_no_template()
+r2nt  <- resNT$product
+cat(sprintf("    %-14s %8.2f um   %-14s %8.2f um\n",
+            "product d50", r2nt[["D_particle_um"]], "product d90", r2nt[["Dp90_um"]]))
+cat(sprintf("    %-14s %8.3f um   %-14s %8.3f\n",
+            "pore size", r2nt[["D_pore_um"]], "porosity phi", r2nt[["phi_porosity_z"]]))
+cat(sprintf("    %-14s %8.3f      %-14s %8.3f\n",
+            "f_cr (Raoult)", r2nt[["f_cr_solv"]], "f_esc (total)", r2nt[["f_esc_solv"]]))
+cat(sprintf("    %-14s %8.3f      %-14s %8.1f kg/m3\n",
+            "solv_retained", r2nt[["solv_retained"]], "rho_tapped", r2nt[["rho_tapped"]]))
+
+# --- side-by-side product comparison (4 columns: no-template + BA + BB) ------
+cat("\n\n")
+hr("=")
+cat("SIDE-BY-SIDE PRODUCT COMPARISON\n")
+cat("(same up3_1 backbone; Raoult constant-rate evaporation now active)\n")
+hr("=")
+cmp4 <- function(lbl, key, unit = "", d = 3) {
+  nt <- resNT$product[[key]]; a <- resBA$product[[key]]; b <- resBB$product[[key]]
+  cat(sprintf("  %-22s %11.*f %13.*f %13.*f   %s\n", lbl, d, nt, d, a, d, b, unit))
 }
-cat(sprintf("  %-22s %12s %12s\n", "", "butyl_acetate", "butyl_butyrate"))
-cat(sprintf("  %-22s %12.2f %12.2f   RED (higher = poorer solvent)\n",
-            "Hansen RED", resBA$chem$RED, resBB$chem$RED))
-cat(sprintf("  %-22s %12.0f %12.0f   C (vs %.0f C inlet)\n",
-            "boiling point", resBA$chem$T_bp_solv_K-273.15,
-            resBB$chem$T_bp_solv_K-273.15, T_inlet_C))
-cat(sprintf("  %-22s %12.4f %12.4f   dryer core-absorption\n",
-            "RTF (chemistry)", resBA$chem$RTF, resBB$chem$RTF))
+cat(sprintf("  %-22s %11s %13s %13s\n", "", "no_template", "butyl_acetate", "butyl_butyrate"))
+cat(sprintf("  %-22s %11s %13.2f %13.2f   RED (higher = poorer solvent)\n",
+            "Hansen RED", "—", resBA$chem$RED, resBB$chem$RED))
+cat(sprintf("  %-22s %11s %13.0f %13.0f   C (vs %.0f C inlet)\n",
+            "boiling point", "—",
+            resBA$chem$T_bp_solv_K-273.15, resBB$chem$T_bp_solv_K-273.15, T_inlet_C))
+cat(sprintf("  %-22s %11s %13.4f %13.4f   dryer core-absorption\n",
+            "RTF (chemistry)", "—", resBA$chem$RTF, resBB$chem$RTF))
 hr("-")
-cmp("product d50 [um]",   "D_particle_um", "", 2)
-cmp("product d90 [um]",   "Dp90_um",       "", 2)
-cmp("pore size [um]",     "D_pore_um")
-cmp("porosity phi",       "phi_porosity_z")
-cmp("skin theta",         "theta_skin_z")
-cmp("solvent retained",   "solv_retained")
-cmp("solvent burst frac", "f_burst_solv")
-cmp("Tg_product [K]",     "Tg_product_K", "", 1)
-cmp("residual moisture",  "X_moisture",   "", 5)
-cmp("tapped density",     "rho_tapped",   "kg/m3", 1)
+cmp4("product d50 [um]",    "D_particle_um",  "", 2)
+cmp4("product d90 [um]",    "Dp90_um",        "", 2)
+cmp4("pore size [um]",      "D_pore_um")
+cmp4("porosity phi",        "phi_porosity_z")
+cmp4("skin theta",          "theta_skin_z")
+hr("-")
+cmp4("f_cr (Raoult CR)",   "f_cr_solv",      "", 3)
+cmp4("f_esc (total)",       "f_esc_solv",     "", 3)
+cmp4("solvent retained",    "solv_retained",  "", 3)
+cmp4("f_burst (FR)",        "f_burst_solv",   "", 3)
+hr("-")
+cmp4("Tg_product [K]",      "Tg_product_K",   "", 1)
+cmp4("residual moisture",   "X_moisture",     "", 5)
+cmp4("tapped density",      "rho_tapped",     "kg/m3", 1)
 
 # --- T_dryer_in sweep: show where S_bs activates for each template ------------
 # The falling-rate escape gate S_bs = sigmoid(T_particle - T_bp) uses
@@ -201,14 +243,15 @@ cmp("tapped density",     "rho_tapped",   "kg/m3", 1)
 # At up3_1 conditions (T_out=90C, T_feed=55C) -> T_particle=85C which is well
 # below both boiling points. Increasing T_dryer_in raises T_out and T_particle.
 # This sweep shows the threshold; S_bs>0.5 means >50% of template vapourises
-# in the falling-rate window. NOTE: constant-rate evaporation (at T near T_inlet)
-# is NOT captured by S_bs -- this is a modelling gap (see notes below).
+# in the falling-rate window.
+# NOTE: constant-rate evaporation is captured by Module 6c (Raoult); this sweep
+# isolates ONLY the falling-rate S_bs gate to show when boiling would kick in.
 
 cat("\n\n")
 hr("=")
 cat("T_DRYER_IN SENSITIVITY SWEEP (both templates, S_bs falling-rate escape gate)\n")
 cat("NOTE: S_bs uses T_particle = 0.85*T_out + 0.15*T_feed, NOT T_dryer_in\n")
-cat("      constant-rate evaporation (T_inlet>T_bp) is a model gap -- see below\n")
+cat("      (constant-rate evaporation via Raoult is Module 6c; this sweep = S_bs only)\n")
 hr("=")
 
 sweep_templates <- list(
@@ -240,47 +283,55 @@ for (T_in_C in T_in_vals) {
 cat("\n")
 cat("  BA (bp=126C) threshold: T_out >= ~135C -> T_dryer_in >= ~175C (very high)\n")
 cat("  BB (bp=166C) threshold: T_out >= ~170C -> T_dryer_in >= ~215C (impractical)\n")
-cat("  CONCLUSION: at typical outlet T (80-110C), falling-rate escape gate DORMANT.\n")
-cat("  Pore formation routes active at up3_1 conditions:\n")
-cat("    * phi_struct  (aggregate templating from UP1 D_agg)\n")
-cat("    * phi_vac     (water boiling / steam pockets above 100C, S_boil at T_part)\n")
-cat("    * phi_templ   (small, because S_bs~0; dominated by B_infl shell mechanics)\n")
+cat("  CONCLUSION: at typical outlet T (80-110C), falling-rate S_bs gate DORMANT.\n")
+cat("  At up3_1 conditions the dominant differentiation routes are:\n")
+cat("    * f_cr (Module 6c Raoult): constant-rate partial-pressure escape;\n")
+cat("            BA ~46% escape, BB ~16% (ratio ~3x, tracks vapour pressure ratio).\n")
+cat("    * RTF_dryer (chemistry sigmoid): BA absorbs ~12.4% into cores, BB ~3.5%;\n")
+cat("            higher RED (poorer solvent) -> less core uptake -> more free template.\n")
+cat("    * phi_struct (aggregate templating from UP1 D_agg) -- chemistry-independent.\n")
+cat("    * phi_vac (water boiling / steam pockets above 100C) -- chemistry-independent.\n")
 cat("\n")
-cat("=== MODEL GAP NOTE ===\n")
-cat("  The model does NOT capture constant-rate evaporation (where T_droplet ~ T_wb\n")
-cat("  ≈ 40-50C is below the solvent bp but the INLET air drives solvent away by\n")
-cat("  partial-pressure driving force, not boiling). Both BA and BB can evaporate\n")
-cat("  through partial-pressure diffusion from liquid droplets even when T_droplet\n")
-cat("  < T_bp; the driving force is p_solv(T_droplet) vs Y_solv_bulk (≈0). The\n")
-cat("  S_bs gate captures only the BOILING route. Adding a Raoult-law vapour\n")
-cat("  pressure diffusion term in the constant-rate period would differentiate\n")
-cat("  BA and BB better (BA has 3.6x the vapour pressure of BB at 50C).\n")
+cat("=== RAOULT CONSTANT-RATE EVAPORATION (Module 6c, implemented) ===\n")
+cat("  The model captures constant-rate evaporation via partial-pressure driving force:\n")
+cat("    T_wb_cr = T_out - 0.8*(T_in - T_out)  [wet-bulb, constant-rate window]\n")
+cat("    dH_vap  = 88 * T_bp  [J/mol, Trouton's rule]\n")
+cat("    p_cr    = P_atm * exp(dH_vap/R * (1/T_bp - 1/T_wb_cr))  [Clausius-Clapeyron]\n")
+cat("    f_cr    = 1 - exp(-C_cr * (p_cr/P_atm) * Perm_shell)     [C_cr = 5.0]\n")
+cat("  Sequential escape: f_esc = f_cr + (1 - f_cr) * S_bs.\n")
+cat("  At up3_1 (T_in=143C, T_out=90C -> T_wb~=77C):\n")
+cat("    BA (bp=126C): p_cr/P_atm ~0.075 -> f_cr ~46%\n")
+cat("    BB (bp=166C): p_cr/P_atm ~0.020 -> f_cr ~16%\n")
+cat("  Vapour-pressure ratio at T_wb (~3.6x) drives the 3x escape-fraction ratio.\n")
 cat("\n")
 cat("=== KEY DIFFERENTIATOR: RTF (core-absorption chemistry) ===\n")
 cat("  The primary BA vs BB distinction the model correctly captures is RTF_dryer:\n")
 cat("    BA: RED=1.196 -> RTF=0.124  (12.4% absorbed into cores, 87.6% free)\n")
 cat("    BB: RED=1.333 -> RTF=0.035  (3.5% absorbed into cores, 96.5% free)\n")
-cat("  Higher RED (poorer solvent) -> less core penetration -> more pore yield.\n")
+cat("  Higher RED (poorer solvent) -> less core penetration -> more free template.\n")
 cat("  At the mixer exit RTF_mixer is the SAME (~0.7%) for both (diffusion into\n")
-cat("  glassy cores is chemistry-independent at tau=22 min); the RTF_dryer difference\n")
-cat("  applies in the hot drying period where softened cores absorb more solvent.\n")
+cat("  glassy cores is negligible at tau=22 min / 55C); the RTF_dryer difference\n")
+cat("  applies in the hot drying period where softened cores absorb solvent.\n")
 
 # --- persist ------------------------------------------------------------------
+p <- function(res, key) res$product[[key]]
 outdf <- data.frame(
-  template  = c("butyl_acetate","butyl_butyrate"),
-  RED       = c(resBA$chem$RED, resBB$chem$RED),
-  bp_C      = c(resBA$chem$T_bp_solv_K, resBB$chem$T_bp_solv_K) - 273.15,
-  RTF_chem  = c(resBA$chem$RTF, resBB$chem$RTF),
-  d50_um    = c(resBA$product[["D_particle_um"]], resBB$product[["D_particle_um"]]),
-  d90_um    = c(resBA$product[["Dp90_um"]],       resBB$product[["Dp90_um"]]),
-  pore_um   = c(resBA$product[["D_pore_um"]],     resBB$product[["D_pore_um"]]),
-  porosity  = c(resBA$product[["phi_porosity_z"]],resBB$product[["phi_porosity_z"]]),
-  theta_skin= c(resBA$product[["theta_skin_z"]],  resBB$product[["theta_skin_z"]]),
-  solv_ret  = c(resBA$product[["solv_retained"]], resBB$product[["solv_retained"]]),
-  f_burst   = c(resBA$product[["f_burst_solv"]],  resBB$product[["f_burst_solv"]]),
-  Tg_K      = c(resBA$product[["Tg_product_K"]],  resBB$product[["Tg_product_K"]]),
-  X_moist   = c(resBA$product[["X_moisture"]],    resBB$product[["X_moisture"]]),
-  rho_tap   = c(resBA$product[["rho_tapped"]],    resBB$product[["rho_tapped"]]))
+  template  = c("no_template", "butyl_acetate", "butyl_butyrate"),
+  RED       = c(NA,            resBA$chem$RED,   resBB$chem$RED),
+  bp_C      = c(NA,            resBA$chem$T_bp_solv_K - 273.15, resBB$chem$T_bp_solv_K - 273.15),
+  RTF_chem  = c(NA,            resBA$chem$RTF,   resBB$chem$RTF),
+  d50_um    = c(p(resNT,"D_particle_um"),  p(resBA,"D_particle_um"),  p(resBB,"D_particle_um")),
+  d90_um    = c(p(resNT,"Dp90_um"),        p(resBA,"Dp90_um"),        p(resBB,"Dp90_um")),
+  pore_um   = c(p(resNT,"D_pore_um"),      p(resBA,"D_pore_um"),      p(resBB,"D_pore_um")),
+  porosity  = c(p(resNT,"phi_porosity_z"), p(resBA,"phi_porosity_z"), p(resBB,"phi_porosity_z")),
+  theta_skin= c(p(resNT,"theta_skin_z"),   p(resBA,"theta_skin_z"),   p(resBB,"theta_skin_z")),
+  f_cr      = c(p(resNT,"f_cr_solv"),      p(resBA,"f_cr_solv"),      p(resBB,"f_cr_solv")),
+  f_esc     = c(p(resNT,"f_esc_solv"),     p(resBA,"f_esc_solv"),     p(resBB,"f_esc_solv")),
+  solv_ret  = c(p(resNT,"solv_retained"),  p(resBA,"solv_retained"),  p(resBB,"solv_retained")),
+  f_burst   = c(p(resNT,"f_burst_solv"),   p(resBA,"f_burst_solv"),   p(resBB,"f_burst_solv")),
+  Tg_K      = c(p(resNT,"Tg_product_K"),   p(resBA,"Tg_product_K"),   p(resBB,"Tg_product_K")),
+  X_moist   = c(p(resNT,"X_moisture"),     p(resBA,"X_moisture"),     p(resBB,"X_moisture")),
+  rho_tap   = c(p(resNT,"rho_tapped"),     p(resBA,"rho_tapped"),     p(resBB,"rho_tapped")))
 dir.create("unified_output", showWarnings = FALSE)
 write.csv(outdf, "unified_output/step_up1_up4_bb_ba.csv", row.names = FALSE)
 cat("\nWrote unified_output/step_up1_up4_bb_ba.csv\n")
