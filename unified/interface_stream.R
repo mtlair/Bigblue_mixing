@@ -131,18 +131,26 @@ stream_from_up1 <- function(up1_res, pars, equipment) {
 # Contract: f(stream, pars = list()) -> stream (same fields, possibly updated).
 # -----------------------------------------------------------------------------
 
-# Intermediate stage 1 (e.g. transfer line / feed pump):
-# would set stream$P_Pa (pump discharge), stream$D_b_m (line-shear bubble
-# size), and could coarsen/shear the emulsion (stream$D_template_um).
+# Intermediate stage 1 = UP2 FOAM-WASH COLUMN (foam_wash_module.R).
+# Wired opt-in: set options(unified.wire_up2 = TRUE) and source foam_wash_module.R.
+# Default (unset) keeps the identity placeholder so the calibrated UP1->UP4-direct
+# Morris screen is unchanged; enable it for the full UP1->UP2->UP3->UP4 chain
+# (the DoE screen must rerun Morris with both stages enabled).
 intermediate_stage_1 <- function(stream, pars = list()) {
-  stream
+  if (isTRUE(getOption("unified.wire_up2", FALSE)) && exists("foam_wash_column"))
+    foam_wash_column(stream, pars)
+  else stream
 }
 
-# Intermediate stage 2 (e.g. hold tank / pre-heater / degasser):
-# would update stream$T_K, stream$alpha_g (venting), stream$D_b_m and
-# stream$D_template_um (Ostwald ripening over the hold time).
+# Intermediate stage 2 = UP3 DECANTING CENTRIFUGE (up3_centrifuge_module.R).
+# Wired opt-in: set options(unified.wire_up3 = TRUE) and source up3_centrifuge_module.R.
+# Concentrates the washed foam to the cake solids (~40%), updates gas-free density,
+# trapped-gas floor and (calibrated) paste viscosity. See module header for the
+# viscosity caveat.
 intermediate_stage_2 <- function(stream, pars = list()) {
-  stream
+  if (isTRUE(getOption("unified.wire_up3", FALSE)) && exists("up3_centrifuge"))
+    up3_centrifuge(stream, pars)
+  else stream
 }
 
 print_stream <- function(stream, label = "stream") {
