@@ -482,25 +482,37 @@ the same solid content (40.70 % vs 40.61 %) and the same UP1 feed solid (25 %),
 so their post-centrifuge slurry compositions are nearly indistinguishable. Identical
 viscometry from near-identical compositions is expected, not a data-entry error.
 
-### UP3 rho value — formula references wrong solid content
+### UP3 rho — real measurement; residual trapped gas explains low density
 
-`up3_rho = 1117.3 kg/m³` is recorded only for up3_1 (the other three are null). A
-simple slurry-density check using `1/ρ = w_s/ρ_s + (1−w_s)/ρ_w` (mass-fraction
-formula, ρ_s = 1700 kg/m³, ρ_w = 1000 kg/m³) exposes a formula error:
+`up3_rho = 1117.3 kg/m³` (recorded only for up3_1) is a **physical sample
+measurement**, not a formula error. To interpret it, the effective solid density
+must be derived from the UP1 feed measurement rather than assumed from pure polymer.
+Solving `1/ρ_feed = s/ρ_solid + (1−s)/ρ_water` at s = 0.25, ρ_feed = 1117.9 kg/m³
+gives **ρ_solid ≈ 1730 kg/m³** — consistent with mineral-loaded particles (not pure
+polymer at ~1200 kg/m³). The user-note that `up1_feed_rho` is lower than the
+skeleton + water prediction is attributed to residual monomer, which is consistent
+across all xlsx files.
 
-| Basis | Solid % | Expected ρ (kg/m³) | Recorded |
-|-------|---------|-------------------|---------|
-| UP1 feed | 25.0 | **1115** | `up1feed_rho` = 1117.9 ✓ |
-| UP3 cake up3_1 | 40.7 | **1201** | `up3_rho` = 1117.3 ✗ |
-| UP3 cake up3_2 | 42.7 | **1213** | null |
-| UP3 cake up3_3 | 40.6 | **1201** | null |
-| UP3 cake up3_4 | 38.8 | **1190** | null |
+With ρ_solid = 1730 kg/m³, the gas-free density at 40.7 % solid is:
 
-The recorded 1117.3 kg/m³ matches the **UP1 feed density at 25 % solid**, not the
-UP3 cake at 40.7 %. The Excel formula for `up3_rho` almost certainly references
-the UP1 feed solid% column instead of `up3_solid%`. The correct UP3 cake densities
-are ~1190–1213 kg/m³ (tabulated above); use the formula with `up3_solid%` to
-derive per-condition values.
+```
+ρ_no_gas = 1 / (0.407/1730 + 0.593/1000) = 1209 kg/m³
+```
+
+The measured 1117.3 kg/m³ is lower by 91.7 kg/m³. Attributing the deficit to
+residual gas trapped in the centrifuge cake:
+
+```
+α_gas = (ρ_no_gas − ρ_meas) / (ρ_no_gas − ρ_air)
+      = (1209 − 1117.3) / (1209 − 1.2) ≈ 7.6 %
+```
+
+This **7.6 % residual gas** is physically expected: UP1 sparges air into the slurry
+(alpha_g ≈ 30 % volumetric in the foam at exit, see Part 9); centrifugation at
+~430 g removes most gas but cannot drive it to zero. UP3 runs at atmospheric
+pressure so no gas expands on exit. The 7.6 % is a real trapped-gas fraction, not
+a formula error. UP3 measurements for up3_2–up3_4 are null (single representative
+measurement taken for up3_1 only).
 
 ---
 
@@ -517,3 +529,114 @@ The full-chain data (`up1_2_3_4_visc_sem.xlsx`) gives the first four-stage
 measurements; the next modelling step is to build a validation harness that routes
 UP1→UP2 (foam wash with water addition) →UP3 (decanting centrifuge, concentrating
 to ~40 %)→UP4 (dryer, re-derived air flow from post-UP3 solids).
+
+---
+
+## Part 9 — New data columns and derived mass-balance quantities
+
+Source: updated `data/up1_2_3_4_visc_sem.xlsx` and new `data/up1_2_3_solids_rho.xlsx`.
+All derived results written to `data/cond_up1234.csv`.
+
+### New columns added to up1_2_3_4_visc_sem.xlsx
+
+| Column | Units | Description |
+|--------|-------|-------------|
+| `up4_dry_air_scfm` | SCFM | Dry air flow through UP4 dryer |
+| `up2_liq_out_lbhr` | lb/hr | Cleaning liquid leaving UP2 (= 0 for all 4 chain runs) |
+| `up3_reject_solid%` | % | Solid content of UP3 centrate reject (measured for up3_1 only) |
+| `up3_reject_lbhr` | lb/hr | UP3 reject stream flow (measured for up3_1 only) |
+
+New file `data/up1_2_3_solids_rho.xlsx` (Sheet1): historical runs with up3_rho
+(in g/cm³) and up3_reject_solid% across the wider run set.
+
+### UP1 exit density
+
+UP1 is a gas-sparged foam mixer. Exit density was calculated two ways:
+
+**Method A — all sparge gas entrained (upper bound):**
+Ideal-gas expansion of the sparge flow (up1_scfh in SCFH) from standard
+conditions to UP1 exit (up1_exit_temp, up1_psig):
+
+```
+n_gas  = P_std × V_std / (R × T_std)
+V_exit = n_gas × R × T_exit / P_exit
+ρ_exit = mdot_liq / (V_liq + V_exit)
+```
+
+**Method B — 7 % gas holdup at exit (from UP3 back-calculation):**
+The measured UP3 cake density implies 7.6 % residual gas after centrifugation.
+Back-expanding to UP1 exit pressure (Boyle's law):
+`α_g_exit ≈ 0.076 × P_atm / P_exit`
+
+| Cond | P_exit (bar) | T_exit (°C) | ρ_exit Method A (kg/m³) | α_g Method A | ρ_exit Method B (kg/m³) |
+|------|-------------|------------|------------------------|-------------|------------------------|
+| up3_1 | 1.44 | 54.9 | 772 | 30.9 % | 1063 |
+| up3_2 | 1.55 | 69.2 | 778 | 30.4 % | 1068 |
+| up3_3 | 1.62 | 69.8 | 790 | 29.4 % | 1070 |
+| up3_4 | 1.51 | 72.7 | 770 | 31.2 % | 1067 |
+
+Method A (30 % gas) represents the case where all sparged gas remains entrained;
+in practice most bubbles rise out of the mixer headspace before the product exits.
+Method B (4.4–4.9 % at operating pressure, expanding to 7 % at 1 atm) is more
+consistent with the UP3 cake measurement and reflects the actual trapped-bubble
+fraction. The model uses Method B for downstream feed-state calculations.
+
+### UP3 mass balance and UP2 water routing
+
+The UP3 reject for up3_1 (97.2 lb/hr at 0.284 % solid) combined with the cake
+(152.8 lb/hr at 40.7 %) closes against the **UP1 output alone** (249.84 lb/hr):
+
+```
+249.84 ≈ 152.8 + 97.2 = 250.0 lb/hr  ✓ (0.16 lb/hr rounding)
+```
+
+If the UP2 wash water (49.27 lb/hr) were included in the UP3 feed, the mass balance
+would be short by exactly 49.1 lb/hr. This confirms that **UP2 wash water exits UP2
+as a separate effluent** and does not proceed to UP3. UP2 is a counter-current foam
+wash: fresh water is fed to remove impurities from the foam surface and exits as a
+dilute wash effluent; the cleaned foam (same volume as the UP1 output) continues to
+UP3.
+
+### UP4 feed rate
+
+**Primary estimate (mass balance):** solid from UP1 divided by UP3 cake solid
+fraction, with a small rejection correction for up3_1 (0.276 lb/hr solid in reject):
+
+| Cond | UP1 solid (lb/hr) | UP3 solid% | UP4 feed/cake (lb/hr) |
+|------|------------------|-----------|----------------------|
+| up3_1 | 62.46 (−0.28 reject) | 40.7 | **152.8** |
+| up3_2 | 52.63 | 42.7 | **123.3** |
+| up3_3 | 52.68 | 40.6 | **129.7** |
+| up3_4 | 52.44 | 38.8 | **135.2** |
+
+**Secondary estimate (heat duty):** air enthalpy `Q = ṁ_air × cp × ΔT` divided by
+evaporation enthalpy (water 25 °C → steam at 90 °C, Δh = 2555 kJ/kg):
+
+| Cond | ṁ_air (g/s) | Q (kW) | UP4 feed heat-duty (lb/hr) | Thermal efficiency |
+|------|-----------|--------|---------------------------|-------------------|
+| up3_1 | 848 | 45.6 | 234.9 | 0.650 |
+| up3_2 | 824 | 44.5 | 236.4 | 0.522 |
+| up3_3 | 772 | 41.4 | 212.8 | 0.610 |
+| up3_4 | 728 | 39.2 | 195.7 | 0.691 |
+
+The heat-duty estimate exceeds the mass-balance estimate by 1.5–1.9×. For up3_1
+(the best-closed condition) the implied dryer thermal efficiency is **65 %**,
+plausible for a small pilot spray dryer with wall losses and air bypass. The
+efficiency varies across conditions (52–69 %), likely because up4_dry_air_scfm
+was set at a fixed high value regardless of feed throughput. **The mass-balance
+estimate is the primary basis for the UP4 feed rate; the heat-duty estimate
+provides an independent check but is not used directly.**
+
+### Summary of effective particle solid density
+
+Solving the slurry-density equation from the UP1 feed measurement at 25 % solid:
+
+```
+ρ_solid = s / (1/ρ_feed − (1−s)/ρ_water)
+        = 0.25 / (1/1117.9 − 0.75/1000) = 1730 kg/m³
+```
+
+Consistent across all 4 conditions (1729–1742 kg/m³). This is higher than pure
+polymer (~1200 kg/m³), indicating mineral-loaded particles. It is lower than the
+pure mineral skeleton because residual monomer (lower density) reduces the effective
+particle density — the same pattern observed across all xlsx files.
