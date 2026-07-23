@@ -109,9 +109,11 @@ def surface(img, overlay=None):
     pore = granular & (flat < dark_cut) & (~skin)
     A, G = body.sum(), max(granular.sum(), 1)
     if overlay is not None:
-        rgb = np.dstack([img, img, img]).astype(np.uint8)
-        rgb[pore] = [220, 40, 40]; rgb[skin] = [40, 90, 230]
-        Image.fromarray(rgb).save(overlay)
+        base = np.dstack([img, img, img]).astype(float)
+        A = 0.5   # overlay alpha -> underlying texture stays visible
+        for mask, col in ((pore, (220, 40, 40)), (skin, (40, 90, 230))):
+            base[mask] = (1 - A) * base[mask] + A * np.array(col)
+        Image.fromarray(np.clip(base, 0, 255).astype(np.uint8)).save(overlay)
     return dict(porosity_gran=pore.sum() / G, porosity_surf=pore.sum() / A,
                 skin=skin.sum() / A, granular=G / A)
 
