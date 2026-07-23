@@ -118,6 +118,8 @@ stream_from_up1 <- function(up1_res, pars, equipment) {
     D_template_um  = p$D_template,
     RTF            = RTF,
     w_core         = w_core,
+    # dissolved gas carried to the atomizer (nucleates at nozzle, not in transfer line)
+    C_gas_diss = ex$C_gas_diss_exit,
     # diagnostics
     Softness_exit  = unname(out[["Swelling_Softness_exit"]]),
     Bond_Strength  = unname(out[["Bond_Strength"]]),

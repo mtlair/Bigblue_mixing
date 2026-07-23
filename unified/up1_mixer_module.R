@@ -554,7 +554,11 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
                  D_agg_phys_um      = D_agg_phys_um,       # physically calibrated aggregate d50 [µm]
                  D_primary_phys_um  = D_primary_phys_um,   # physical colloid bead (200 nm base)
                  v_tip_crit         = v_tip_crit,           # critical tip speed [m/s]
-                 v_tip_ratio        = v_tip_ratio)          # regime indicator (>1 = milling)
+                 v_tip_ratio        = v_tip_ratio,          # regime indicator (>1 = milling)
+                 # Dissolved gas at mixer exit — stays dissolved under transfer-line
+                 # pressure (no Ostwald ripening), nucleates at atomizer nozzle drop.
+                 C_gas_diss_exit    = Fraction_A * max(final_state$C_gas_A, 0) +
+                                      Fraction_B * max(final_state$C_gas_B, 0))
 
   list(outputs = outputs, extras = extras)
 }

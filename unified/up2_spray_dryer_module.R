@@ -72,7 +72,8 @@ up2_output_names <- c("d_droplet_um", "d10_um", "d90_um", "d99_um", "span",
                       "Tg_product_K", "X_moisture", "Perm_shell_rel",
                       "D_pore_um", "solv_retained", "f_burst_solv",
                       "f_cr_solv", "f_esc_solv",
-                      "sigma_y_cake_MPa")
+                      "sigma_y_cake_MPa",
+                      "alpha_g_nucl", "D_b_nucl_um")
 
 up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   x <- as.list(x)
@@ -171,6 +172,44 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   D_b_h <- (D_b^3 + k_rip * t_hold)^(1/3)         # coarsened bubble size
   k_emu <- k_emu0 * (1 - 0.9 * theta_surf)
   D_e_h <- (max(D_e, 1e-8)^3 + k_emu * t_hold)^(1/3)  # coarsened template size
+
+  ## --- Module 0f: Dissolved-gas nucleation at the atomizer -----------------
+  # Dissolved gas stays dissolved in the pressurised transfer line (no gas/water
+  # interface → zero Ostwald ripening, unlike pre-sparged free bubbles). It
+  # nucleates heterogeneously at the polymer-water interface when feed pressure
+  # drops at the nozzle. UP1 aggregates (D_agg ~10 µm) are already formed at
+  # this point, so bubbles nucleate INTO aggregate pore space — already in
+  # position for pore retention. Local skin softening only (surface layer):
+  # gaseous alkyl monomer (bp < RT) partitions to the particle surface but
+  # cannot accumulate in glassy bulk cores → does NOT raise w_core or Softness.
+  r_exp_0f <- max(P_F / P_atm, 1)
+  C_gas_diss <- if (!is.null(feed$C_gas_diss) && is.finite(feed$C_gas_diss))
+                  pmax(0, feed$C_gas_diss) else 0.0
+
+  alpha_g_nucl <- 0.0
+  D_b_nucl     <- D_b_h   # default: no nucleation event, carry existing size
+
+  if (C_gas_diss > 1e-4) {
+    # Henry's law: fraction of dissolved gas released = 1 - 1/r_exp
+    alpha_g_nucl <- min(C_gas_diss * (1 - 1 / r_exp_0f), 0.25)
+    # Nucleated bubble size: Laplace balance at heterogeneous nucleation site
+    # (contact-angle cavity at particle surface sets a smaller effective radius)
+    dP_flash   <- max(P_F - P_atm, 1e3)              # pressure drop [Pa]
+    D_b_nucl   <- min(max(4 * sigma / dP_flash, 1e-7), 20e-6)  # 0.1–20 µm
+    # Volume-weighted merge: nucleated bubbles join any pre-existing free gas
+    a_pre  <- alpha_g
+    a_tot  <- min(a_pre + alpha_g_nucl, 0.90)
+    D_b_h  <- if (a_tot > 1e-8)
+                ((a_pre * D_b_h^3 + alpha_g_nucl * D_b_nucl^3) / a_tot)^(1/3)
+              else D_b_h
+    alpha_g <- a_tot
+    # Local skin softening: dissolved gas partitions to particle surface layer
+    # (~10–50 nm) only — tracked via theta_seed, not Softness or w_core.
+    k_part_gas   <- if (!is.null(x[["k_part_gas"]])) x[["k_part_gas"]] else 0.05
+    phi_skin_gas <- min(C_gas_diss * k_part_gas, 0.10)
+    skin_gas_frac <- phi_skin_gas / (phi_skin_gas + 0.03)
+    theta_seed   <- 1 - (1 - theta_seed) * (1 - 0.4 * skin_gas_frac)
+  }
 
   ## --- Module 0e: DLVO electrostatics --------------------------------------
   E_rep     <- dpH * (1 / (1 + 10 * I_str)) * (1 - theta_surf)
@@ -494,5 +533,7 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
     f_burst_solv   = f_burst,
     f_cr_solv      = f_cr,
     f_esc_solv     = f_esc,
-    sigma_y_cake_MPa = sigma_y / 1e6)
+    sigma_y_cake_MPa = sigma_y / 1e6,
+    alpha_g_nucl   = alpha_g_nucl,
+    D_b_nucl_um    = D_b_nucl * 1e6)
 }
