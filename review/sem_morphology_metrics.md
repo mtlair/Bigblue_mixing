@@ -93,43 +93,51 @@ The same extraction was run over every SEM sample except 114645 (16 samples: the
 114641–644 = up3_1..4 product series, DFP-23-0011, plus the earlier DFP-22-0057
 campaign 109384 / 110041–049 / 110494–495). Auto-cropping and scale-aware
 thresholds handle both export sizes (947×725 and 710×543) and both mag-naming
-conventions; skin uses an **absolute** normalised local-range cut (not a
-percentile) so fusion is comparable across samples.
+conventions.
 
-| sample | cond | Ω_SEM | aspect | porosity (between spheres) | skin* |
-|--------|------|-------|--------|----------------------------|-------|
-| 114641 | up3_1 | 0.906 | 0.75 | 37.4 % | 6 % |
-| 114642 | up3_2 | 0.921 | 0.81 | 38.2 % | 9 % |
-| 114643 | up3_3 | 0.915 | 0.81 | 36.8 % | 5 % |
-| 114644 | up3_4 | 0.912 | 0.80 | 37.4 % | 11 % |
-| 109384 | — | 0.896 | 0.75 | 32.2 % | 3 % |
-| 110041 | — | 0.857 | 0.70 | 36.6 % | 13 % |
-| 110042 | — | 0.857 | 0.71 | 35.6 % | 3 % |
-| 110043 | — | 0.871 | 0.73 | 35.2 % | 5 % |
-| 110044 | — | 0.857 | 0.70 | 37.9 % | 7 % |
-| 110045 | — | 0.840 | 0.70 | 37.0 % | 11 % |
-| 110046 | — | 0.870 | 0.72 | 37.4 % | 35 %* |
-| 110047 | — | 0.841 | 0.70 | 39.7 % | 6 % |
-| 110048 | — | 0.859 | 0.70 | 37.5 % | 5 % |
-| 110049 | — | 0.840 | 0.68 | 34.3 % | 3 % |
-| 110494 | — | 0.862 | 0.71 | 35.9 % | 4 % |
-| 110495 | — | 0.870 | 0.72 | 38.9 % | 30 %* |
+**Particle-first segmentation.** Each frame is first split into particle vs
+non-particle: the particle is the raised region — **bright (large-scale) AND/OR
+textured** — while the stub/background is darker and flatter (measured on 110046:
+particle intensity 132 / local-range 55 vs stub 83 / 14). Skin and porosity are
+then measured *only inside the isolated particle*, so the smooth stub between
+grains is no longer mis-counted as skin, and this keeps genuinely **fused**
+particles (bright even when smooth). Skin uses an absolute normalised local-range
+cut so fusion is comparable across samples. Overlays `sem/overlay_X*.png`
+(red = open pore, blue = skin) confirm the split on both granular and fused faces.
+
+| sample | cond | Ω_SEM | aspect | porosity (open space between spheres) | skin |
+|--------|------|-------|--------|---------------------------------------|------|
+| 114641 | up3_1 | 0.906 | 0.75 | 37.2 % | 5.7 % |
+| 114642 | up3_2 | 0.921 | 0.81 | 37.7 % | 7.8 % |
+| 114643 | up3_3 | 0.915 | 0.81 | 36.5 % | 2.3 % |
+| 114644 | up3_4 | 0.912 | 0.80 | 36.9 % | 15.8 % |
+| 109384 | — | 0.896 | 0.75 | 32.2 % | 3.2 % |
+| 110041 | — | 0.857 | 0.70 | 37.0 % | 18.8 % |
+| 110042 | — | 0.857 | 0.71 | 35.3 % | 4.0 % |
+| 110043 | — | 0.871 | 0.73 | 35.1 % | 1.4 % |
+| 110044 | — | 0.857 | 0.70 | 38.0 % | 14.7 % |
+| 110045 | — | 0.840 | 0.70 | 36.4 % | 14.9 % |
+| 110046 | — | 0.870 | 0.72 | 36.9 % | 12.1 % |
+| 110047 | — | 0.841 | 0.70 | 39.8 % | 9.1 % |
+| 110048 | — | 0.859 | 0.70 | 37.4 % | 11.2 % |
+| 110049 | — | 0.840 | 0.68 | 34.0 % | 1.9 % |
+| 110494 | — | 0.862 | 0.71 | 35.8 % | 7.1 % |
+| 110495 | — | 0.870 | 0.72 | 38.1 % | 14.8 % |
 
 **Robust cross-sample findings:**
 - **Porosity (open space between spheres) is remarkably consistent: 34–40 %,
   mean ≈ 37 %**, across both campaigns. Wherever the surface is a resolved bead
   packing, ~37 % of it is open interstitial gap — an intrinsic property of the
-  primary-particle packing, essentially independent of run conditions.
+  primary-particle packing, essentially independent of run conditions. (This is
+  the particle-isolated value; the earlier per-sample section reads ~44 % only
+  because it used a looser darkness cut — `sem_all.py` supersedes it.)
+- **Skin/fusion now discriminates: 1.4–18.8 %.** Granular faces (110043 1.4 %,
+  110049 1.9 %, 114643 2.3 %) vs fused faces (110041 18.8 %, up3_4 15.8 %,
+  110044/110045/110495 ≈ 15 %). The earlier substrate artefacts are resolved
+  (110046 35 %→12 %, 110495 30 %→15 %). Fusion is the real cross-sample
+  morphology lever and the target for calibrating `theta_skin_fus`.
 - **Sphericity** splits by campaign: the up3_1..4 products (Ω ≈ 0.91) are rounder
   than the DFP-22 series (Ω ≈ 0.86). Aspect ratio tracks (0.80 vs 0.71).
-
-**\*Skin is only reliable on single-particle frames.** At 5k× many of the
-710×543 images show several granules on a smooth stub; the flat substrate is
-hard to separate from genuine on-particle merged skin and inflates the number
-(110046, 110495 are substrate artefacts — their particles are actually granular;
-see `sem/overlay_X110046.png`). Trust skin only where one particle fills the
-frame (114641/114643 ≈ 5–6 %, 110041 ≈ 13 %). A clean fusion metric needs
-single-particle framing or a manual ROI — flagged as the one open item.
 
 ## Caveats
 - τ (smoothness threshold) and the flattening σ are tunable; **relative** ranking
