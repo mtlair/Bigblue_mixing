@@ -360,32 +360,38 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   tau_dry <- (modes_m^2 / kappa) * (1 + 20 * theta_skin / Perm_shell)
   X_j     <- exp(-t_res / tau_dry)
   X_moist <- sum(modes_w * X_j)
-  # Operational moisture reconciliation: the dryer air is energy-sized to leave
-  # <= w_moist_target (0.5%) moisture in the powder, and the product is not
-  # hygroscopic, so the final moisture cannot exceed the target regardless of the
-  # per-mode drying kinetics. Cap X_moist (fraction of FEED water retained) at the
-  # value that yields the target POWDER moisture w_wat at this solids loading:
-  #   w_wat = X_moist(1-Csol)/(X_moist(1-Csol)+Csol)  ->  X_cap = t*Csol/((1-Csol)(1-t)).
-  # Default 0.005; a future study can sweep w_moist_target up to ~0.01 (1%).
-  w_moist_target <- if (!is.null(x[["w_moist_target"]])) x[["w_moist_target"]] else 0.005
-  X_moist_cap <- w_moist_target * C_sol / (max(1 - C_sol, 1e-6) * (1 - w_moist_target))
-  X_moist <- min(X_moist, X_moist_cap)
+  # Outlet-RH equilibrium: residual moisture equilibrates with the outlet gas.
+  # By definition, the particle surface is at 100 % RH of the OUTLET gas
+  # temperature (T_out, Y_out), so the equilibrium powder moisture is set by
+  # RH_out — not by a fixed operational target.  For a non-hygroscopic product
+  # the sorption isotherm is approximately linear at low RH:
+  #   w_wat_eq = k_sorb * RH_out
+  # k_sorb is the saturation moisture mass-fraction (RH=1); default 0.05 (5 %).
+  # At nominal RH_out ~ 5-10 % this gives w_wat_eq ~ 0.25-0.5 %, consistent
+  # with the historically observed sub-0.5 % values at nominal conditions.
+  # Convert to X_equil (fraction of feed water retained):
+  #   X = w_wat * C_sol / ((1 - C_sol) * (1 - w_wat))
+  k_sorb   <- if (!is.null(x[["k_sorb"]])) x[["k_sorb"]] else 0.05
+  w_wat_eq <- k_sorb * RH_out
+  X_equil  <- w_wat_eq * C_sol /
+               max((1 - C_sol) * max(1 - w_wat_eq, 1e-6), 1e-9)
+  X_moist  <- min(X_moist, X_equil)
 
   ## --- Module 6c (Raoult): constant-rate partial-pressure evaporation ------
-  # During the constant-rate drying period (near dryer inlet) template droplets
-  # evaporate by partial-pressure driving force even when T_droplet < T_bp.
-  # Droplet surface temperature during constant-rate is approximated as:
-  #   T_wb_cr = T_out - 0.8*(T_in - T_out)   [co-current: hot/dry near inlet]
+  # During the constant-rate drying period template droplets evaporate by
+  # partial-pressure driving force even when T_droplet < T_bp.  The droplet
+  # surface temperature during constant-rate equals the ADIABATIC-SATURATION
+  # temperature T_as: the temperature at which the outlet gas (T_out, Y_out)
+  # becomes saturated under adiabatic humidification:
+  #   cp_gas*(T_out - T_as) = h_fg*(Y_sat(T_as) - Y_out)
+  #   Y_sat(T) = 0.622*p_sat(T)/(P_atm - p_sat(T))
+  # F(T) = cp_gas*(T_out - T) - h_fg*(Y_sat(T) - Y_out) is strictly decreasing
+  # in T, so bisection converges in < 15 iterations from a 100 K bracket.
   # Vapour pressure via Clausius-Clapeyron with Trouton's rule (dH_vap = 88*T_bp):
-  #   p_cr = P_atm * exp( (dH_vap/R) * (1/T_bp - 1/T_wb_cr) )
-  # Escape fraction during constant-rate window (exponential approach to saturation):
-  #   f_cr = 1 - exp( -C_cr * (p_cr/P_atm) * Perm_shell )
-  # C_cr = 5.0 sets the scale so that BA (p_cr/P_atm~0.075 at T_wb~321K) gives
-  # ~35-40% escape and BB (~0.020 at T_wb~321K) gives ~12%, consistent with the
-  # 3.6x vapour-pressure ratio between BA and BB at wet-bulb conditions.
+  #   p_cr = P_atm * exp( (dH_vap/R) * (1/T_bp - 1/T_as) )
   # Constant-rate escape is driven by the SURFACE partial pressure of template
   # solvent minus the partial pressure already carried by the drying gas:
-  #     dp = a1 * p_sat_solv(T_wb) - p_solv_gas
+  #     dp = a1 * p_sat_solv(T_as) - p_solv_gas
   # a1 is the Flory-Huggins solvent activity, a1 = phi*exp((1-phi)+chi*(1-phi)^2):
   #   * free droplets (phase-separated poor solvent, phi ~ 1) -> a1 ~ 1: escape
   #     as pure solvent and template the pores;
@@ -393,7 +399,29 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   #     polymer, the more strongly the LOWER chi (good solvent). Evaluated as the
   #     core dries (phi falls from phi_c0 toward zero) so the chi effect grows
   #     through the constant-rate period (composition-evolving activity).
-  T_wb_cr <- T_out - 0.8 * pmax(T_in - T_out, 0)
+  {
+    T_lb <- max(T_feed, 260.0); T_ub <- T_out
+    ps_lb <- 610.94 * exp(17.625 * (T_lb - 273.15) / (T_lb - 273.15 + 243.04))
+    ps_lb <- min(ps_lb, P_atm * 0.9999)
+    Ys_lb <- 0.622 * ps_lb / (P_atm - ps_lb)
+    F_lb  <- cp_gas * (T_out - T_lb) - h_fg * max(Ys_lb - Y_out, 0)
+    if (F_lb <= 0) {
+      T_as <- T_lb
+    } else {
+      T_as <- T_lb    # will be overwritten by bisection
+      for (.iter in seq_len(60)) {
+        T_as  <- 0.5 * (T_lb + T_ub)
+        ps_m  <- 610.94 * exp(17.625 * (T_as - 273.15) / (T_as - 273.15 + 243.04))
+        ps_m  <- min(ps_m, P_atm * 0.9999)
+        Ys_m  <- 0.622 * ps_m / (P_atm - ps_m)
+        F_m   <- cp_gas * (T_out - T_as) - h_fg * max(Ys_m - Y_out, 0)
+        if (F_m > 0) T_lb <- T_as else T_ub <- T_as
+        if ((T_ub - T_lb) < 0.02) break
+      }
+      T_as <- 0.5 * (T_lb + T_ub)
+    }
+    T_wb_cr <- max(T_feed, min(T_as, T_out))
+  }
   dHvap_J <- 88.0 * T_bpS                          # Trouton estimate [J/mol]
   p_sat_s <- pmin(P_atm, P_atm * exp(dHvap_J / R_GAS * (1/T_bpS - 1/T_wb_cr)))
 

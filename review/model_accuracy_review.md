@@ -268,7 +268,90 @@ cyclohexane / n-hexane → clean (up2 `f_esc` 0.92–0.998), acetate esters → 
 boolean returned `TRUE` for all of them. up2's `f_esc` remains authoritative;
 this is a design-time screen.
 
-## 4. Bottom line
+## 4. Dryer surface-temperature and moisture-equilibrium physics (added this branch)
+
+Two closely related errors were found in the dryer's treatment of the particle
+surface conditions:
+
+### 4a. Ad-hoc wet-bulb proxy gave sub-freezing droplet-surface temperatures
+
+The constant-rate particle-surface temperature `T_wb_cr` (used to evaluate
+template-solvent vapour pressure and Flory–Huggins activity during the
+constant-rate drying window) was set to:
+
+```r
+T_wb_cr <- T_out - 0.8 * pmax(T_in - T_out, 0)
+```
+
+For `T_in = 500 K`, `T_out = 360 K` this gives `T_wb_cr = 248 K = −25 °C` — a
+physically impossible sub-freezing droplet-surface temperature during hot-gas
+spray drying. The formula has the sign of the `T_in − T_out` term backward; it
+sub-tracts an extra cooling step instead of placing the wet-bulb between inlet
+and outlet. As a consequence, template-solvent vapour pressure at `T_wb_cr` was
+essentially zero, making `f_cr ≈ 0` regardless of solvent boiling point or
+solvency — the constant-rate escape path was effectively disabled.
+
+**Fix applied** (this branch): the droplet surface temperature during
+constant-rate drying is now the **adiabatic-saturation temperature** `T_as` of
+the outlet gas — the temperature at which the outlet gas `(T_out, Y_out)` would
+become saturated under adiabatic humidification:
+
+```
+cp_gas*(T_out − T_as) = h_fg*(Y_sat(T_as) − Y_out)
+Y_sat(T) = 0.622·p_sat(T) / (P_atm − p_sat(T))
+```
+
+`F(T) = cp_gas*(T_out−T) − h_fg*(Y_sat(T)−Y_out)` is strictly decreasing in `T`,
+so a bisection on `[max(T_feed, 260 K), T_out]` converges in ≤ 15 iterations to
+0.02 K. For nominal conditions (`T_out = 360 K`, `Y_out = 0.02` → `RH_out ≈ 5 %`)
+the solve yields `T_as ≈ 310 K (37 °C)` — a physically correct wet-bulb
+temperature for 87 °C, 5 % RH outlet air.
+
+At `T_wb_cr ≈ 310 K`, butyl acrylate (`T_bp = 418 K`) has
+`p_sat / P_atm ≈ 0.025`, giving `f_cr_free ≈ 12 %` — a meaningful constant-rate
+escape fraction, consistent with the 3.6× vapour-pressure ratio between BA and
+BB that the module comments reference. The `chi_t` re-evaluation at the now-
+correct wet-bulb also improves: `T_wb_cr` is hotter than the old proxy
+(310 K > 248 K), so the enthalpic χ correction is larger for poor solvents
+at this stage.
+
+### 4b. Fixed 0.5 % moisture cap violated the outlet-humidity physics
+
+The product moisture was capped at a fixed operational target:
+
+```r
+X_moist <- min(X_moist, w_moist_target * C_sol /
+               ((1 − C_sol) * (1 − w_moist_target)))   # w_moist_target = 0.005
+```
+
+This hard-codes a 0.5 % moisture ceiling regardless of the actual outlet gas
+humidity `RH_out`. Physically, a non-hygroscopic particle in equilibrium with
+the outlet gas has moisture set by `RH_out` alone (the particle surface is at
+100 % RH at `T_out` by definition of the constant-rate endpoint). Sweeping
+`T_dryer_in` or `mdot_gas_dry` changes `RH_out` but could not change the
+modelled moisture, creating a flat response surface for moisture vs. dryer
+operating conditions.
+
+**Fix applied** (this branch): the fixed cap is replaced by an outlet-RH
+equilibrium using a linear sorption isotherm for non-hygroscopic product:
+
+```r
+w_wat_eq = k_sorb * RH_out          # k_sorb default 0.05 (5 % at RH = 1)
+X_equil  = w_wat_eq * C_sol /
+           ((1 − C_sol) * (1 − w_wat_eq))
+X_moist  = min(X_moist, X_equil)
+```
+
+`k_sorb = 0.05` (tunable via `x[["k_sorb"]]`) gives `w_wat_eq ≈ 0.25–0.50 %`
+at nominal `RH_out ≈ 5–10 %`, consistent with the historically observed
+sub-0.5 % powder moisture values. Product moisture now correctly tracks dryer
+performance: a lean, hot dryer (low `RH_out`) → very low moisture; an
+overloaded dryer (high `RH_out`) → higher moisture. Hygroscopic products can
+increase `k_sorb` or substitute a full BET isotherm.
+
+---
+
+## 5. Bottom line
 
 - The **transport/thermo backbone** (atomization, drying, DLVO aggregation,
   Tg/Fox, KD rheology, Raoult/Clausius–Clapeyron escape) is technically sound
@@ -286,6 +369,13 @@ this is a design-time screen.
 - One **reproducibility bug** (stale Morris cache) was found and fixed.
 - `feed_monomer_estimate.R` now emits a labeled NOTE for negative free-monomer
   rows so the result is not mistaken for a concentration.
+- **Dryer surface temperature** (Section 4a): the ad-hoc `T_wb_cr` proxy was
+  giving −25 °C, disabling the constant-rate escape path. Replaced with a
+  bisection solve for the true adiabatic-saturation temperature (~37 °C at
+  nominal conditions), restoring physically meaningful `f_cr` values.
+- **Product moisture** (Section 4b): the fixed 0.5 % operational cap was
+  replaced with an outlet-RH equilibrium (`w_wat_eq = k_sorb·RH_out`,
+  `k_sorb = 0.05`). Product moisture now responds correctly to dryer loading.
 
 After fixes, nominal outputs: `D_b_nucl_um = 8.5 µm`, `alpha_g_nucl = 0.319`
 (governed by Henry's law and `K_alpha_gas`, not a hard cap). All 16 R scripts
