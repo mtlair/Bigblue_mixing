@@ -8,7 +8,7 @@
 
 ## Overview
 
-This session completed a comprehensive technical accuracy review of the spray-drying (now atomizer-drying) unified process model, addressing four items from a wishlist and identifying six quantitative defects across dissolved-gas nucleation, Flory–Huggins solvency coupling, and dryer surface-condition physics.
+This session completed a comprehensive technical accuracy review of the atomizer-drying unified process model, addressing four items from a wishlist and identifying six quantitative defects across dissolved-gas nucleation, Flory–Huggins solvency coupling, and dryer surface-condition physics.
 
 **All fixes verified**: model runs cleanly; chain validation metrics (wired d50/d90 RMS ratio ~1.1) remain within tolerance.
 
@@ -62,13 +62,13 @@ This session completed a comprehensive technical accuracy review of the spray-dr
 
 ## Terminology Update
 
-**✓ Complete**: "spray dryer" → "atomizer dryer" across all:
-- File names: `up2_spray_dryer_module.R` → `up2_atomizer_dryer_module.R`
+**✓ Complete**: "Spray" → "Atomizer" terminology updated across:
+- File names: `up2_atomizer_dryer_module.R` (renamed)
 - Code: variable names, function names, comments
 - Documentation: markdown files, handoff notes
-- Generated outputs: `nominal_chain_summary.txt`, Morris plots, etc.
+- Generated outputs: `nominal_chain_summary.txt`, Morris plots
 
-Reflects exact unit operation (effervescent-airblast atomizer, not generic "spray").
+Terminology reflects exact unit operation (effervescent-airblast atomizer, not generic "spray").
 
 ---
 
