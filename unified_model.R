@@ -258,9 +258,20 @@ elementary_effects <- function(design, Y, k, r) {
 
 cache_file <- file.path(out_dir, sprintf("unified_morris_t%d_r%d.rds",
                                          TEMPLATE_TYPE, r_traj))
-if (file.exists(cache_file)) {
+cached <- if (file.exists(cache_file)) readRDS(cache_file) else NULL
+# Invalidate a stale cache whose output schema no longer matches the current
+# module (e.g. after up2_output_names grew with Module 0f): the cache key only
+# encodes TEMPLATE_TYPE and r_traj, not the output columns, so guard on the
+# recorded factor count (k) and output width before trusting it.
+if (!is.null(cached) &&
+    (ncol(cached$Y) != n_out || nrow(cached$design$X) != r_traj * (k + 1) ||
+     ncol(cached$design$X) != k)) {
+  cat("Cached Morris runs in", cache_file,
+      "are stale (schema changed); recomputing.\n")
+  cached <- NULL
+}
+if (!is.null(cached)) {
   cat("Loading cached Morris runs from", cache_file, "\n")
-  cached <- readRDS(cache_file)
   design <- cached$design; Y <- cached$Y
 } else {
   design <- morris_oat_design(k, r_traj, levels, delta)
