@@ -410,8 +410,14 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   p_head  <- max(0, P_atm - p_v)                   # headroom left after steam (p_v)
   p_solv_gas <- min(p_solv0, p_head, p_sat_s)
 
-  chi_t <- if (!is.null(feed$chi_template) && is.finite(feed$chi_template))
-             feed$chi_template else 0.5
+  # chi is temperature-dependent (enthalpic part ~ 1/T): evaluate the input
+  # chi_template (quoted at T_CHI_REF) at the constant-rate wet-bulb surface,
+  # which is hotter than the mixer -> a poor solvent becomes somewhat less poor
+  # as it dries. Entropic part chi_S ~ 0.34 is ~T-independent.
+  chi_ref <- if (!is.null(feed$chi_template) && is.finite(feed$chi_template))
+               feed$chi_template else 0.5
+  CHI_S <- 0.34; T_CHI_REF <- 298.15
+  chi_t <- CHI_S + (chi_ref - CHI_S) * (T_CHI_REF / max(T_wb_cr, 1.0))
 
   ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
   T_particle <- 0.85 * T_out + 0.15 * T_feed

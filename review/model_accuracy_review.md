@@ -246,6 +246,28 @@ Morris confirms χ as a first-class driver with physically-correct signs:
 μ*=0.174 on RTF (χ↑ → RTF↓), μ*=0.124 on `f_cr` (χ↑ → more escape), negative μ on
 `solv_retained` (poor solvent retains less), positive μ on porosity (more pores).
 
+**χ is temperature-dependent** (follow-up). The enthalpic part of χ scales as 1/T
+(`χ = χ_S + V_m(Δδ)²/RT`, already the form in `chi_from_hansen`), but the initial
+wiring carried one constant χ through the whole chain. Fixed so the input
+`chi_template` (quoted at `T_CHI_REF = 298.15 K`, entropic floor `χ_S = 0.34`) is
+re-evaluated at the *local* temperature: at the **mixer** temperature in
+`up1_mixer_module.R` where the absorption equilibrium (RTF) is set, and at the
+**constant-rate wet-bulb** surface in `up2_spray_dryer_module.R` where the escape
+activity acts. Physically: a poor solvent becomes somewhat less poor when warm,
+so the mixer (warm) absorbs a little more while the constant-rate surface (cool
+wet-bulb) keeps a poor solvent poor during escape.
+
+**Classifier reconciled with the dryer** (`theta_solvent_chi.R`). The screening
+`escapes` flag used `bp < T_dry+40` on the *inlet* gas temperature, which
+over-promised ~10× versus the dryer's own `f_esc` for high-boiling solvents (the
+constant-rate droplet sits near the ~45 °C wet-bulb, not the hot inlet). Replaced
+with a reduced-vapour-pressure score at the wet-bulb plus a falling-rate boil
+check, graded `clean / partial / retained`. It now tracks the dryer: chloroform /
+cyclohexane / n-hexane → clean (up2 `f_esc` 0.92–0.998), acetate esters → partial
+(0.30–0.35), d-limonene / hexyl acetate → retained (0.06–0.15) — where the old
+boolean returned `TRUE` for all of them. up2's `f_esc` remains authoritative;
+this is a design-time screen.
+
 ## 4. Bottom line
 
 - The **transport/thermo backbone** (atomization, drying, DLVO aggregation,

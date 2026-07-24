@@ -149,11 +149,28 @@ template_from_chemistry <- function(template, poly = POLY_HSP,
     else if (RED <  1.5) "poor"
     else                 "very_poor"
 
-  # escapes: bp-based check is authoritative; volatile=FALSE only used for
-  # species where evaporation is structurally impossible (DBP, paraffin, IPM).
-  # For any species with a finite bp, the T_dry comparison governs.
+  # escapes: reconciled with the up2 dryer's constant-rate + falling-rate physics.
+  # volatile=FALSE only used for species where evaporation is structurally
+  # impossible (DBP, paraffin, IPM).
   truly_nonvolatile <- identical(s$volatile, FALSE) && (is.na(s$bp_C) || s$bp_C > 280)
-  escapes <- !truly_nonvolatile && is.finite(s$bp_C) && s$bp_C < T_dry_C + 40
+  # The constant-rate droplet surface sits near the WET-BULB (~adiabatic
+  # saturation, ~45 C for aqueous drying) -- NOT the hot inlet gas. The old
+  # `bp < T_dry+40` boolean used the inlet T and over-promised ~10x for
+  # high-boiling solvents (e.g. d-limonene bp 176: old flag TRUE, but up2 gives
+  # f_esc = 0.06). Here we score the reduced vapour pressure at the wet-bulb
+  # (constant-rate escape) OR a falling-rate boil check (particle reaches
+  # ~T_dry-40), mirroring up2's f_cr + S_bs. up2's f_esc remains authoritative;
+  # this is a screening estimate.
+  T_WB_C <- 45                                         # constant-rate wet-bulb [C]
+  p_r_wb <- if (is.finite(s$bp_C)) {
+              T_bp_K <- s$bp_C + 273.15
+              min(1, exp(88 * T_bp_K / R_GAS * (1/T_bp_K - 1/(T_WB_C + 273.15))))
+            } else 0
+  boils  <- is.finite(s$bp_C) && s$bp_C < (T_dry_C - 40)     # falling-rate boiling
+  escape_index <- max(p_r_wb, if (boils) 1 else 0)
+  escape_class <- if (escape_index >= 0.10) "clean"
+                  else if (escape_index >= 0.05) "partial" else "retained"
+  escapes <- !truly_nonvolatile && (escape_index >= 0.10)
   w_disp  <- if (gas) TRUE else is_water_dispersible(s$water_sol_g100mL, s$logP)
 
   # RTF = core-absorbed fraction; continuous sigmoid on RED (RED=1 -> RTF=0.5)
@@ -183,6 +200,8 @@ template_from_chemistry <- function(template, poly = POLY_HSP,
        solvency          = solvency,
        water_dispersible = w_disp,
        escapes           = escapes,
+       escape_index      = escape_index,
+       escape_class      = escape_class,
        regime            = regime,
        template_type     = ttype,
        RTF               = RTF,

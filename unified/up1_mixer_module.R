@@ -524,7 +524,13 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
   # free interstitial droplet (low RTF -> clean pore template). The theta point
   # chi = 0.5 splits 50/50. f_diff then gates this equilibrium by the kinetic
   # completeness of absorption within the mixer residence time.
-  chi_t  <- if (!is.null(p$chi_template) && is.finite(p$chi_template)) p$chi_template else 0.5
+  # chi is temperature-dependent: the enthalpic part scales as 1/T (regular-
+  # solution / Hildebrand), so the input chi_template (quoted at T_CHI_REF) is
+  # re-evaluated at the MIXER temperature, where the absorption equilibrium is
+  # set. Entropic part chi_S ~ 0.34 is ~T-independent.
+  chi_ref <- if (!is.null(p$chi_template) && is.finite(p$chi_template)) p$chi_template else 0.5
+  CHI_S <- 0.34; T_CHI_REF <- 298.15
+  chi_t  <- CHI_S + (chi_ref - CHI_S) * (T_CHI_REF / max(p$T_system, 1.0))
   RTF_eq <- 1.0 / (1.0 + exp((chi_t - 0.5) / 0.30))
   Residual_Template_Fraction <- switch(as.character(t_type),
     "1" = 0.0,
