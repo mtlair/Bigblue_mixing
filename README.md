@@ -51,7 +51,7 @@ fifteen outputs:
 | Spray droplet size | `Dv50` |
 | Distribution tails | `d10`, `d90`, `d99`, span, bimodality index |
 | Final particle size | `Dp50`, `Dp90` (per-mode particle distribution) |
-| Particle skin formation | `theta_skin,z` |
+| Particle surface_fusion formation | `theta_skin,z` |
 | Particle sphericity | `Omega_struct,z` |
 | Particle porosity | `phi_porosity,z` (mass-weighted across modes) |
 | Powder tapped density | `rho_tapped` (bulk analogue of `rho_colloid,out` / `SG_out`) |

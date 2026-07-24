@@ -12,7 +12,7 @@
 #   * Surfactant molar stoichiometry: theta_surf from C_surfactant, MW and
 #     A_molecule vs colloid + bubble surface area
 #   * DLVO electrostatics: E_repulsion = dpH * Debye screening * (1-theta_surf),
-#     gating aggregation (skin onset) and fractal openness (D_f -> porosity)
+#     gating aggregation (surface_fusion onset) and fractal openness (D_f -> porosity)
 #   * Krieger-Dougherty crowding viscosity from feed solids (phi_s)
 #
 # Spray-specific extensions beyond the v47 reactor spec:
@@ -34,7 +34,7 @@
 #     relative humidity, which drive the drying Peclet number and the
 #     sticky-point state (replaces the former independent RH_gas knob)
 #   * Shell permeability closure: residual monomer and plasticizer open
-#     free-volume diffusion pathways through the forming skin (permeability
+#     free-volume diffusion pathways through the forming surface_fusion (permeability
 #     rises exponentially with solvent load) while binder films plug
 #     inter-particle pores; the relative permeability gates the falling-rate
 #     drying resistance and the vapor entrapment (vacuole inflation /
@@ -46,7 +46,7 @@
 #     escape is solubility-limited. Once the particle crosses the solvent
 #     boiling point the fate splits three ways: clean D_e-sized templated
 #     pores (permeable shell), balloon inflation (vapor trapped under the
-#     skin), or micro-explosion bursting (Clausius-Clapeyron overpressure
+#     surface_fusion), or micro-explosion bursting (Clausius-Clapeyron overpressure
 #     beats the cake yield stress). The sparged-gas foam chain (holdup,
 #     hold-time ripening, effervescent exit, per-mode gas trapping) is
 #     retained unchanged and acts in parallel.
@@ -62,7 +62,7 @@
 #
 # Outputs screened (nomenclature-sheet symbols where they exist):
 #   1. D_particle     - final (dry) particle size                    [um]
-#   2. theta_skin_z   - skin network fraction (skin formation)       [-]
+#   2. theta_skin_z   - surface_fusion network fraction (surface_fusion formation)       [-]
 #   3. Omega_struct_z - structural memory / sphericity state         [-]
 #   4. phi_porosity_z - total porosity (void fraction state)         [-]
 #   5. rho_tapped     - powder tapped density (bulk analogue of
@@ -397,7 +397,7 @@ atomizer_dry_model <- function(x) {
   D_diff <- kB * T_feed / (6 * pi * mu_L * a_prim_mod)          # [m2/s]
   Pe <- kappa / (8 * D_diff)                      # drying Peclet number
 
-  # theta_skin,z : skin network fraction. Colloidal instability (low DLVO
+  # theta_skin,z : surface_fusion network fraction. Colloidal instability (low DLVO
   # stability) accelerates shell aggregation; Flory-Huggins softness delays
   # rigid lock-in (soft particles film-form instead of jamming)
   S_skin <- Pe * C_sol * (1 + 1 / stability)
@@ -410,8 +410,8 @@ atomizer_dry_model <- function(x) {
   phi_struct <- 0.30 * theta_skin * (1 - d_ratio^(3 - D_f))
 
   ## --- Module 6c: Per-mode drying & residual moisture ----------------------
-  # d2-law drying time per droplet mode, retarded by the skin (falling-rate
-  # period); the skin resistance scales inversely with the shell
+  # d2-law drying time per droplet mode, retarded by the surface_fusion (falling-rate
+  # period); the surface_fusion resistance scales inversely with the shell
   # permeability - plasticized/swollen shells stay open to vapor transport
   # while binder-blocked shells choke it; the coarse tail can leave the
   # tower wet
@@ -459,7 +459,7 @@ atomizer_dry_model <- function(x) {
   f_col    <- Pi_col^2 / (1 + Pi_col^2)           # 0 = locks open, 1 = yields
 
   ## --- Module 7c: Per-mode porosity, sphericity, particle distribution -----
-  # Template-solvent fate: vapor generated under the skin must permeate the
+  # Template-solvent fate: vapor generated under the surface_fusion must permeate the
   # shell (same f_trap resistance as water); the Clausius-Clapeyron
   # overpressure of the superheated solvent plays against the cake yield
   # stress - a strong shell balloons (inflated pores), a weak one bursts
@@ -476,7 +476,7 @@ atomizer_dry_model <- function(x) {
   # gas retention per droplet mode (coarse droplets keep more bubbles)
   a_trap_j <- alpha_e / (1 + D_b_e / modes_m) * (0.5 + 0.5 * theta_surf)
   phi_str_eff <- phi_struct * (1 - 0.7 * f_col)   # yielding crushes pores
-  # vapor entrapment: water evaporating beneath a formed skin must permeate
+  # vapor entrapment: water evaporating beneath a formed surface_fusion must permeate
   # the shell; low-permeability shells on superheated droplets build
   # internal vapor pressure and inflate vacuoles (hollow particles)
   f_trap  <- theta_skin / (theta_skin + Perm_shell)
@@ -704,7 +704,7 @@ titles <- c(d_droplet_um   = "Spray droplet size  Dv50 [um]",
             BI_bimodal     = "Bimodality index [-]",
             D_particle_um  = "Final particle size  Dp50 [um]",
             Dp90_um        = "Particle coarse tail  Dp90 [um]",
-            theta_skin_z   = "Skin formation  theta_skin,z [-]",
+            theta_skin_z   = "Surface_fusion formation  theta_skin,z [-]",
             Omega_struct_z = "Sphericity  Omega_struct,z [-]",
             phi_porosity_z = "Porosity  phi_porosity,z [-]",
             rho_tapped     = "Tapped density  rho_tapped [kg/m3]",

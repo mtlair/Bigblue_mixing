@@ -11,7 +11,7 @@ intrinsic material properties (which additive chemistry matters).
    T_bp_solv      solvent(bp/type)     mu*=1.337  decrease
    template_dose  dose:solvent(amount) mu*=1.149  decrease
 
-### up2_theta_skin_z     skin/fusion
+### up2_theta_skin_z     surface_fusion/fusion
    C_plasticizer  dose:plasticizer     mu*=0.004739  increase
    C_monomer      dose:monomer         mu*=0.003948  increase
    C_binder       dose:binder          mu*=0.002527  increase

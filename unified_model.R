@@ -15,7 +15,7 @@
 # state and structure history from the mixer exit into the dryer feed, so
 # the factors the two standalone screens duplicated (solids, additives,
 # surface chemistry, template) are now defined ONCE, at the mixer, and the
-# dryer sees their transformed values (dilution, gas holdup, wet skin,
+# dryer sees their transformed values (dilution, gas holdup, wet surface_fusion,
 # residual template fraction) instead of independent knobs.
 #
 # What this script does:
@@ -333,7 +333,7 @@ titles <- c(up1_Mixing_Potential      = "UP1 Mixing potential [-]",
             up2_d_droplet_um   = "Spray droplet size Dv50 [um]",
             up2_span           = "Droplet span (d90-d10)/d50 [-]",
             up2_D_particle_um  = "Final particle size Dp50 [um]",
-            up2_theta_skin_z   = "Skin formation theta_skin [-]",
+            up2_theta_skin_z   = "Surface_fusion formation theta_skin [-]",
             up2_Omega_struct_z = "Sphericity Omega_struct [-]",
             up2_phi_porosity_z = "Porosity phi_porosity [-]",
             up2_rho_tapped     = "Tapped density [kg/m3]",

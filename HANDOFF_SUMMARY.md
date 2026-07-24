@@ -60,22 +60,10 @@ This session completed a comprehensive technical accuracy review of the atomizer
 
 ---
 
-## Terminology Update
-
-**✓ Complete**: "Spray" → "Atomizer" terminology updated across:
-- File names: `up2_atomizer_dryer_module.R` (renamed)
-- Code: variable names, function names, comments
-- Documentation: markdown files, handoff notes
-- Generated outputs: `nominal_chain_summary.txt`, Morris plots
-
-Terminology reflects exact unit operation (effervescent-airblast atomizer, not generic "spray").
-
----
-
 ## Known Remaining Gaps
 
 1. **C_gas_diss calibration**: Henry-normalised model state (dimensionless, ~0.2 at 1 atm), not strict kg/kg. K_alpha_gas makes the conversion explicit; calibrate against measured porosity/bubble data.
-2. **Intermediate stages (UP2/UP3)**: wired models exist (foam_wash_module.R, up3_centrifuge_module.R) but are opt-in via `unified.wire_up2` / `unified.wire_up3` options. Full wired-chain Morris requires both enabled.
+2. **Intermediate stages (UP2/UP3)**: wired models exist (foam_wash_module.R, up3_separator_module.R) but are opt-in via `unified.wire_up2` / `unified.wire_up3` options. Full wired-chain Morris requires both enabled.
 3. **Bubble size from transfer line / pump**: D_b carries as NA until the intermediate stage sets it (future: transfer-line shear model).
 
 ---
@@ -86,7 +74,7 @@ Terminology reflects exact unit operation (effervescent-airblast atomizer, not g
 - **Morris cache recomputation**: nominal run regenerates 1290/1290 samples on first run; subsequent runs use cached values.
 - **Setup**: deSolve required (apt: `r-cran-desolve`); no CRAN internet access needed.
 - **Next steps**: 
-  - If pursuing 25–50 µm (high-porosity, low-skin) particles: atomizer-control regime (dispersed UP1 feed, no aggregation) + size-template overlay (muted by default).
+  - If pursuing 25–50 µm (high-porosity, low-surface_fusion) particles: atomizer-control regime (dispersed UP1 feed, no aggregation) + size-template overlay (muted by default).
   - If wiring UP2→UP3 full chain: enable intermediate stages and rerun Morris with both toggles on.
 
 ---

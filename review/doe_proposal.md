@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-23 · Source: `doe_wired_morris.R` → `unified_output/doe_wired_morris_indices.csv`,
 `doe_proposal.txt`. Morris elementary-effects screen (41 factors, r=30, 1260 runs)
-on the **fully wired** chain (foam wash + centrifuge enabled, size-template
+on the **fully wired** chain (foam wash + separator enabled, size-template
 morphology path on), so the dryer sees the concentrated ~40 % cake.
 
 ## Top drivers per product CQA (model ranking)
@@ -15,7 +15,7 @@ morphology path on), so the dryer sees the concentrated ~40 % cake.
 | **tapped density** | v_tip ↑, ionic_strength ↓, C_solid_mass ↓, ΔpH ↑ | — | — |
 | **product Tg** | Tg_polymer ↑ (dominant), C_plasticizer ↓, C_monomer ↓ | plasticizer/monomer soften | — |
 | **residual moisture** | Q_template ↓, C_solid_mass ↑, T_dryer_in ↓ | — | — |
-| **skin/fusion** | mu_L ↑, T_mix ↓, T_dryer_in ↑, v_tip ↓ | more viscous/hotter → more skin | **DEFERRED** (not repeatable) |
+| **surface_fusion/fusion** | mu_L ↑, T_mix ↓, T_dryer_in ↑, v_tip ↓ | more viscous/hotter → more surface_fusion | **DEFERRED** (not repeatable) |
 
 ## Recommended DoE — split by controllability
 
@@ -29,7 +29,7 @@ Bounds narrowed to the **real operating window** from the validation data
 
 | factor | unit | DoE low | DoE high | nominal | CQAs it drives |
 |--------|------|---------|----------|---------|----------------|
-| **v_tip** (UP1 tip speed) | m/s | 6 | 20 | 16 | d50, tapped density, skin |
+| **v_tip** (UP1 tip speed) | m/s | 6 | 20 | 16 | d50, tapped density, surface_fusion |
 | **C_solid_mass** (feed solids) | wt/wt | 0.15 | 0.30 | 0.25 | d50, porosity, tapped density, moisture |
 | **T_dryer_in** (UP4 inlet) | K | 410 | 435 | 425 | porosity, sphericity, moisture |
 | **ALR** (atomizing air-liquid ratio) | – | **0.1** | 1.8 | 0.6 | span/breadth, droplet size |
@@ -81,15 +81,15 @@ It sets the softness/free-volume axis and pulls almost everything:
 | retained solvent | **T_bp_solv** ↑ | higher-bp solvent stays in |
 | micro-explosion risk | **T_bp_solv** ↓, C_binder ↑ | high-bp solvent → less burst |
 | cake strength | **C_plasticizer** ↓, C_monomer ↓, C_binder ↓ | softeners weaken the cake |
-| skin/fusion | **C_plasticizer**, C_monomer, C_binder ↑ | all promote fusion |
+| surface_fusion/fusion | **C_plasticizer**, C_monomer, C_binder ↑ | all promote fusion |
 
 **Recommended formulation DoE — dosable knobs (proposed ranges):**
 
 | factor | role | DoE low | DoE high | nominal | drives |
 |--------|------|---------|----------|---------|--------|
-| **C_plasticizer** | plasticizer conc. | 0.005 | 0.04 | 0.0225 | Tg, sphericity, porosity, pore, strength, permeability, skin (8/10) |
-| **C_monomer** | monomer conc. | 0.001 | 0.03 | 0.0155 | Tg, pore size, strength, skin (4/10) |
-| **C_binder** | binder conc. | 0.01 | 0.15 | 0.08 | permeability, burst, strength, skin (4/10) |
+| **C_plasticizer** | plasticizer conc. | 0.005 | 0.04 | 0.0225 | Tg, sphericity, porosity, pore, strength, permeability, surface_fusion (8/10) |
+| **C_monomer** | monomer conc. | 0.001 | 0.03 | 0.0155 | Tg, pore size, strength, surface_fusion (4/10) |
+| **C_binder** | binder conc. | 0.01 | 0.15 | 0.08 | permeability, burst, strength, surface_fusion (4/10) |
 | **T_bp_solv** | solvent choice (bp) | 300 K | 360 K | 330 | solvent retention, burst, d50 (4/10) |
 | **template_dose** | solvent amount | 0.02 | 1.1 | 0.56 | porosity, d50 (3/10) |
 
@@ -104,7 +104,7 @@ chemistries against them rather than dialing them.
 
 ### C. Intrinsic/material — characterize, don't set
 `n_flow`, `mu_L` (slurry rheology), `k_perm_plast`, `T_bp_solv`, `σ`, `ionic_strength`,
-`ΔpH`. These rank high (n_flow is the top d50 driver, mu_L the top skin driver) but
+`ΔpH`. These rank high (n_flow is the top d50 driver, mu_L the top surface_fusion driver) but
 are **material/serum properties**, not direct setpoints — they move through solids,
 formulation and additive chemistry. Measure them per run (viscometry, ζ-potential)
 as covariates so the process-DoE effects are not confounded by drifting rheology.
@@ -113,7 +113,7 @@ as covariates so the process-DoE effects are not confounded by drifting rheology
 - **Porosity (~0.37) and sphericity (~0.91): robust SEM anchors** — usable as DoE
   responses and to calibrate `phi_porosity_z` / `Omega_struct_z` (note the
   definitional gap: SEM surface-porosity vs model bulk `phi_porosity_z`).
-- **Skin/fusion: deferred.** SEM skin is not repeatable per sample yet
+- **Surface_fusion/fusion: deferred.** SEM surface_fusion is not repeatable per sample yet
   (view-to-view scatter > between-sample spread). Before using it as a DoE
   response, collect **several high-mag views per sample at a fixed magnification**
   and average. Until then, `theta_skin_z` stays model-only.

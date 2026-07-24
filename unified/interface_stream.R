@@ -35,8 +35,8 @@
 #                  Grows in the aggregation regime, falls back to D_primary_exit_um
 #                  in the milling regime. Drives d_ratio in the dryer.
 #   sphericity     Omega at mixer exit (diagnostic)
-#   WetSkin        wet-skin fraction at mixer exit (partially survives
-#                  atomization; seeds the dryer skin state)
+#   WetSkin        wet-surface_fusion fraction at mixer exit (partially survives
+#                  atomization; seeds the dryer surface_fusion state)
 # Gas phase:
 #   alpha_g        entrained gas holdup (trapped microbubbles)
 #   D_b_m          bubble diameter [m]; NA until set — the transfer
@@ -56,7 +56,7 @@
 # =============================================================================
 
 RHO_TEMPLATE_LIQ <- 750    # template solvent liquid density [kg/m3] (UP2 spec)
-SKIN_SURVIVAL    <- 0.30   # fraction of mixer wet-skin surviving atomization
+SKIN_SURVIVAL    <- 0.30   # fraction of mixer wet-surface_fusion surviving atomization
                            # (new surface is created at the nozzle) — interface
                            # assumption, revisit when intermediate stages land
 
@@ -147,14 +147,14 @@ intermediate_stage_1 <- function(stream, pars = list()) {
   else stream
 }
 
-# Intermediate stage 2 = UP3 DECANTING CENTRIFUGE (up3_centrifuge_module.R).
-# Wired opt-in: set options(unified.wire_up3 = TRUE) and source up3_centrifuge_module.R.
+# Intermediate stage 2 = UP3 DECANTING SEPARATOR (up3_separator_module.R).
+# Wired opt-in: set options(unified.wire_up3 = TRUE) and source up3_separator_module.R.
 # Concentrates the washed foam to the cake solids (~40%), updates gas-free density,
 # trapped-gas floor and (calibrated) paste viscosity. See module header for the
 # viscosity caveat.
 intermediate_stage_2 <- function(stream, pars = list()) {
-  if (isTRUE(getOption("unified.wire_up3", FALSE)) && exists("up3_centrifuge"))
-    up3_centrifuge(stream, pars)
+  if (isTRUE(getOption("unified.wire_up3", FALSE)) && exists("up3_separator"))
+    up3_separator(stream, pars)
   else stream
 }
 

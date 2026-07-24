@@ -2,7 +2,7 @@
 # UP1 -> UP4 FULL-CHAIN validation harness (4 measured chain conditions)
 # =============================================================================
 # The 4 conditions in data/cond_up1234.csv were measured through the COMPLETE
-# train UP1 (mixer) -> UP2 (foam wash) -> UP3 (centrifuge) -> UP4 (atomizer dryer),
+# train UP1 (mixer) -> UP2 (foam wash) -> UP3 (separator) -> UP4 (atomizer dryer),
 # with SEM samples 114641-114644 = up3_1..up3_4 and a measured product PSD.
 #
 # This harness replays UP1 from its measured setpoints, then hands the dryer the
@@ -31,7 +31,7 @@ eval(parse(text = paste(lines[1:cut], collapse = "\n")))
 
 # --- UP2 / UP3 stage models (for the predictive "wired" path) ----------------
 source("foam_wash_module.R")      # UP2 foam-wash column: foam_wash_column(stream, pars)
-source("up3_centrifuge_module.R") # UP3 centrifuge:       up3_centrifuge(stream, pars)
+source("up3_separator_module.R") # UP3 separator:       up3_separator(stream, pars)
 
 dat  <- read.csv("data/cond_up1234.csv")
 visc <- read.csv("data/up3_viscometry.csv")
@@ -113,7 +113,7 @@ run_chain <- function(row, size_template = 0) {
        Csol       = s$C_solid)
 }
 
-# --- predictive WIRED path: UP1 -> UP2(foam wash) -> UP3(centrifuge) -> UP4 ---
+# --- predictive WIRED path: UP1 -> UP2(foam wash) -> UP3(separator) -> UP4 ---
 # Same UP1/UP4 setpoints, but UP2/UP3 are the MODELS (not measured injection).
 run_wired <- function(row, size_template = 1) {
   cond <- row$cond
@@ -141,9 +141,9 @@ run_wired <- function(row, size_template = 1) {
   r1 <- up1_run_mixer(p1, eq)
   s  <- stream_from_up1(r1, p1, eq)
 
-  # UP2 foam wash (gas removal, pressure); UP3 centrifuge (concentrate to cake)
+  # UP2 foam wash (gas removal, pressure); UP3 separator (concentrate to cake)
   s <- foam_wash_column(s)
-  s <- up3_centrifuge(s, pars = list(
+  s <- up3_separator(s, pars = list(
          Cs_target = row$up3_solid_pct / 100,       # per-condition measured cake solids
          Fg        = if (is.finite(row$up3_Fg)) row$up3_Fg else 430))
 
@@ -201,7 +201,7 @@ cat(sprintf("  d50, tmpl=1  : %.2f\n", logacc(d50_meas, d50_p1)))
 cat(sprintf("  d90, muted   : %.2f\n", logacc(d90_meas, d90_p0)))
 cat(sprintf("  d90, tmpl=1  : %.2f\n", logacc(d90_meas, d90_p1)))
 
-cat("\n--- PREDICTIVE WIRED chain: UP1 -> UP2(foam wash) -> UP3(centrifuge) -> UP4 ---\n")
+cat("\n--- PREDICTIVE WIRED chain: UP1 -> UP2(foam wash) -> UP3(separator) -> UP4 ---\n")
 cat("(UP2/UP3 are MODELS here; compare product d50 to measured and to injection)\n")
 cat(sprintf("%6s %8s %10s %9s %9s   %8s %10s %10s\n",
             "cond", "Cs_out", "eta[Pa.s]", "alpha_g", "meas d50", "wired", "inject", "meas d90"))

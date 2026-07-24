@@ -13,7 +13,7 @@
 lines <- readLines("unified_model.R")
 cut   <- grep("^# 5\\. MORRIS SCREEN", lines)[1] - 1
 eval(parse(text = paste(lines[1:cut], collapse = "\n")))
-source("foam_wash_module.R"); source("up3_centrifuge_module.R")
+source("foam_wash_module.R"); source("up3_separator_module.R")
 options(unified.wire_up2 = TRUE, unified.wire_up3 = TRUE)
 out_dir <- "unified_output"; dir.create(out_dir, showWarnings = FALSE)
 
@@ -69,7 +69,7 @@ sl <- setNames(lapply(ee, stat), unified_output_names)
 write.csv(do.call(rbind, lapply(unified_output_names, function(o) cbind(output=o, sl[[o]]))),
           file.path(out_dir, "doe_formulation_morris_indices.csv"), row.names=FALSE)
 
-CQA <- c(up2_Tg_product_K="product Tg [K]", up2_theta_skin_z="skin/fusion",
+CQA <- c(up2_Tg_product_K="product Tg [K]", up2_theta_skin_z="surface_fusion/fusion",
   up2_phi_porosity_z="porosity", up2_Omega_struct_z="sphericity",
   up2_Perm_shell_rel="shell permeability", up2_D_pore_um="pore size [um]",
   up2_solv_retained="retained solvent", up2_f_burst_solv="micro-explosion risk",

@@ -28,7 +28,7 @@
 #
 # Screened FEATURES OF INTEREST (after UP4):
 #   porosity (phi_porosity_z), sphericity (Omega_struct_z),
-#   size (D_particle_um), skin (theta_skin_z), tapped density (rho_tapped).
+#   size (D_particle_um), surface_fusion (theta_skin_z), tapped density (rho_tapped).
 #
 # Run:  Rscript full_train_morris.R           # default r_traj
 #       R_TRAJ=20 Rscript full_train_morris.R # override trajectory count
@@ -129,7 +129,7 @@ cat(sprintf("Merged dictionary: %d factors (UP1 %d + UP2 %d + UP3 %d + UP4 %d)\n
 # -----------------------------------------------------------------------------
 # 2. FLAT, NA-GUARDED TRAIN MODEL:  model(x named by factors$name) -> features
 # -----------------------------------------------------------------------------
-feature_names <- c("porosity", "sphericity", "size_um", "skin", "tapped")
+feature_names <- c("porosity", "sphericity", "size_um", "surface_fusion", "tapped")
 na_row <- setNames(rep(NA_real_, length(feature_names)), feature_names)
 
 split_by <- function(x, stage) {
@@ -158,7 +158,7 @@ run_train_x <- function(x) {
     v <- c(porosity   = sp[["phi_porosity_z"]],
            sphericity = sp[["Omega_struct_z"]],
            size_um    = sp[["D_particle_um"]],
-           skin       = sp[["theta_skin_z"]],
+           surface_fusion       = sp[["theta_skin_z"]],
            tapped     = sp[["rho_tapped"]])
     if (any(!is.finite(v))) return(na_row)
     v

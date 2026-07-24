@@ -10,8 +10,8 @@
 
 ### 1. theta_skin closure fix (`unified/up2_atomizer_dryer_module.R`)
 
-The original skin-formation closure had the wrong sign for plasticizer/monomer
-effects (more solvent → less skin, which is backwards). Fixed by adding a
+The original surface_fusion-formation closure had the wrong sign for plasticizer/monomer
+effects (more solvent → less surface_fusion, which is backwards). Fixed by adding a
 **surface-fusion route** (Fox Tg depression at constant-rate wet-bulb 100 °C) and
 correcting the Péclet route so softness *lowers* the aggregation threshold:
 
@@ -25,11 +25,11 @@ T_surface_cr  <- 373.15   # K (constant-rate period)
 inv_Tg_plas   <- (1 - phi_solvent) / Tg_polymer + phi_solvent / Tg_solv
 theta_skin_fus <- 1 / (1 + exp(-(T_surface_cr - (1/inv_Tg_plas)) / 15))
 
-# Parallel routes, series non-skin probabilities
+# Parallel routes, series non-surface_fusion probabilities
 theta_skin <- 1 - (1 - theta_skin_pe) * (1 - 0.5 * theta_skin_fus)
 ```
 
-After the fix C_monomer/C_plasticizer drive MORE skin (ranks 14/16, positive μ*),
+After the fix C_monomer/C_plasticizer drive MORE surface_fusion (ranks 14/16, positive μ*),
 up from ranks 16–17 with the wrong direction. All other factor rankings unchanged.
 
 ### 2. Morris sensitivity screen re-run
@@ -63,7 +63,7 @@ xlsx files.
 **UP2 water routing confirmed by mass balance**  
 UP3 mass balance closes against UP1 output alone (249.84 ≈ 152.8 + 97.2 lb/hr).
 The UP2 wash water (49 lb/hr, column `up2_h2o_lbhr`) exits UP2 as a separate
-effluent — it does NOT pass through the centrifuge. UP3 therefore receives
+effluent — it does NOT pass through the separator. UP3 therefore receives
 the UP1 foam unchanged in total flow; it only concentrates from 25 % → 40 % solid.
 
 **UP3 cake gas holdup: 7.6 %** (for up3_1, the only measured condition)  
@@ -120,7 +120,7 @@ Bigblue_mixing/
 ├── validate_up1_up4_direct.R   validation harness for 9 direct-path conditions
 │
 ├── unified_output/
-│   ├── unified_morris_t4_r30.rds    Morris cache (regenerated after skin fix)
+│   ├── unified_morris_t4_r30.rds    Morris cache (regenerated after surface_fusion fix)
 │   ├── unified_morris_indices.csv   41-factor μ* and σ rankings
 │   ├── unified_morris_{process,surface,polymer}_variables.png
 │   ├── nominal_chain_summary.txt    nominal-point chain outputs
@@ -145,7 +145,7 @@ Bigblue_mixing/
    the impurity-removal function of UP2 (monomer washout, template cleaning) is
    not modelled.
 
-3. **UP3 centrifuge model** — currently a pass-through. Could be modelled as a
+3. **UP3 separator model** — currently a pass-through. Could be modelled as a
    solid-liquid separator with a G-force–dependent moisture closure (weir height
    also affects cake wetness; `up3_weir` = hi/low is a control variable).
 
@@ -172,6 +172,6 @@ Bigblue_mixing/
 | Dry d50, muted (8) | 1.68 | ✓ |
 | Dry d50, tmpl=1 (8) | 1.24 | ✓ |
 
-Skin closure fix did not change the PSD calibration metrics (theta_skin feeds
+Surface_fusion closure fix did not change the PSD calibration metrics (theta_skin feeds
 morphology, not particle size). The full-chain calibration (through UP3) is the
 remaining open item.

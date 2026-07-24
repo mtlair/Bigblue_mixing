@@ -302,7 +302,7 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   x["D_agg_um"]         <- s$D_agg_um           # UP1 calibrated aggregate d50
   x["D_primary_phys_um"] <- s$D_primary_phys_um # physical colloid bead (200 nm base)
   # Viscosity coupling (couple_viscosity = TRUE): wire UP1 apparent slurry viscosity
-  # as the power-law reference for the nozzle atomization, replacing the centrifuge
+  # as the power-law reference for the nozzle atomization, replacing the separator
   # serum-based estimate.  The UP1 value embeds floc (D_agg/D_pri)^1.29 effects:
   # higher D_agg -> higher mu_slurry_up1 -> larger SMD -> coarser powder and wider
   # d90/d10.  The floc exponent was recalibrated (1.67 -> 1.29) against the
@@ -337,7 +337,7 @@ cat(sprintf("[UP3 hi-g sep]  cake solids %.1f%%  exit dens %.2f g/cc  gas holdup
             co$Entrained_Gas_Holdup, res$cen_run[["floc_strength_Pa"]]))
 cat(sprintf("[feed->UP4]      rho_L %.0f  C_solid %.2f (UP3-tied)  alpha_g0 %.3f  mu_slurry %.4f Pa.s  reslurry x%.2f\n",
             h[["rho_L"]], h[["C_solid_mass"]], h[["alpha_g_0"]], s$mu_exit_PaS, h[["dilution_x"]]))
-cat(sprintf("[UP4 dryer]      D_particle %.1f um  porosity %.3f  skin %.3f  rho_tap %.0f  X_moist %.3f\n",
+cat(sprintf("[UP4 dryer]      D_particle %.1f um  porosity %.3f  surface_fusion %.3f  rho_tap %.0f  X_moist %.3f\n",
             sp[["D_particle_um"]], sp[["phi_porosity_z"]], sp[["theta_skin_z"]],
             sp[["rho_tapped"]], sp[["X_moisture"]]))
 

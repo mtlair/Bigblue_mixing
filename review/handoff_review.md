@@ -15,12 +15,12 @@ substantive data-integrity issue and a handful of cosmetic nits are noted below.
 |-------|-------|--------|
 | theta_skin two-route closure (Péclet + surface-fusion) | `unified/up2_atomizer_dryer_module.R:262–290` | matches the snippet |
 | `SKIN_SURVIVAL = 0.30` seeding | `unified/interface_stream.R:59` | ✓ |
-| C_monomer / C_plasticizer → skin at ranks **14 / 16**, positive μ* | ranked `unified_morris_indices.csv` for `up2_theta_skin_z` | ✓ exact |
+| C_monomer / C_plasticizer → surface_fusion at ranks **14 / 16**, positive μ* | ranked `unified_morris_indices.csv` for `up2_theta_skin_z` | ✓ exact |
 | Morris: 41 factors, r=30 → **1260** runs, 1260/1260 valid | `(41+1)×30 = 1260`; `morris_run.log` | ✓ |
 | Top-5 driver tables (all 5 outputs) | `unified_morris_indices.csv` vs `nominal_chain_summary.txt` | ✓ match (spot-checked D_particle, X_moisture) |
 | Solid particle density 1730–1742 kg/m³ | `cond_up1234.csv` → 1729, 1742, 1742, 1742 | ✓ |
 | UP3 total mass balance 249.84 ≈ 152.8 + 97.2 | cake+reject = 250.0 | ✓ (and solid balance closes: 62.2+0.28 ≈ 62.5) |
-| UP2 wash water (49 lb/hr) bypasses centrifuge | UP3 balance closes on UP1 flow alone | ✓ consistent inference |
+| UP2 wash water (49 lb/hr) bypasses separator | UP3 balance closes on UP1 flow alone | ✓ consistent inference |
 | UP3 cake gas holdup 7.6% | (1209−1117.3)/(1209−1) = 7.59% | ✓ |
 | UP1 exit density (both estimates) | `cond_up1234.csv` cols match text | ✓ |
 | UP4 feed table (mb / heat-duty / efficiency) | efficiency = mb/heatduty, matches CSV | ✓ |
@@ -28,7 +28,7 @@ substantive data-integrity issue and a handful of cosmetic nits are noted below.
 
 The `theta_skin` sign fix is real and does what the handoff says: after the fix
 `C_monomer`/`C_plasticizer` carry positive μ* for `up2_theta_skin_z` (more
-solvent → more skin), consistent with the stated physical rationale.
+solvent → more surface_fusion), consistent with the stated physical rationale.
 
 ---
 

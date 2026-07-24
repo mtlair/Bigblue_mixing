@@ -21,7 +21,7 @@ names(ee) <- unified_output_names
 
 targets <- c("up2_D_particle_um","up2_phi_porosity_z","up2_Omega_struct_z",
              "up2_theta_skin_z","up2_rho_tapped")
-tnice <- c("size Dp50","porosity","sphericity","skin","tapped density")
+tnice <- c("size Dp50","porosity","sphericity","surface_fusion","tapped density")
 allrows <- list()
 for (oi in seq_along(targets)) {
   o <- targets[oi]; m <- ee[[o]]

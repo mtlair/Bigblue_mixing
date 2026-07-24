@@ -174,7 +174,7 @@ The overlay is exposed as `sp_mid["size_template"] <- 0` in
 
 ### Scope of this calibration
 The `visc.xlsx` runs are **UP1 → UP4 direct** — they do *not* pass through UP2
-(foam-wash) or UP3 (centrifuge). Accordingly, this pass recalibrates only the UP1
+(foam-wash) or UP3 (separator). Accordingly, this pass recalibrates only the UP1
 closures and the UP4 atomizer inputs; UP2/UP3 are untouched. Routing calibration
 data through UP2/UP3 is the next stage, once the UP1/UP4 models check out against
 this direct data. The end goal is to use the calibrated model to set the
@@ -344,7 +344,7 @@ energy. Result: **mdot_gas ≈ 0.40–0.62 kg/s** (air/feed ≈ 30×, humidity r
 **This finally grounds the drying-dependent properties.** The nominal thermals
 (127 °C, 0.32 kg/s) were badly off; the real dryer runs **hotter (152 °C) with ~1.5×
 the air**. Feeding the measured `T_dryer_in` + the evaporative `mdot_gas` per
-condition, **skin jumps from ~0.1 to ~0.75–0.82** — strong shell formation, which is
+condition, **surface_fusion jumps from ~0.1 to ~0.75–0.82** — strong shell formation, which is
 exactly what the SEM shows (skinned shells/granules). The thermal factor windows
 were retuned to the measured envelope: `T_dryer_in` 330–470 → **410–440 K**,
 `mdot_gas_dry` 0.10–1.00 → **0.40–0.62 kg/s** (and `sp_mid` nominal 0.25 → 0.47).
@@ -384,7 +384,7 @@ theta_skin <- S_skin / (S_skin + S_crit)
 
 `Softness = (1 + 5·C_binder)·exp(25·phi_solvent)` where `phi_solvent = C_monomer + C_plasticizer + w_core`.
 
-The sign of Softness in S_crit was wrong: higher Softness (more plasticizer) *raised* S_crit, making skin *harder* to form. In the Morris screen, C_monomer and C_plasticizer ranked 16–17 of 41 factors and drove theta_skin in the **wrong direction** (more plasticizer → less skin). Physically, plasticizer/monomer enable surface fusion by depressing the polymer Tg — they should drive *more* skin.
+The sign of Softness in S_crit was wrong: higher Softness (more plasticizer) *raised* S_crit, making surface_fusion *harder* to form. In the Morris screen, C_monomer and C_plasticizer ranked 16–17 of 41 factors and drove theta_skin in the **wrong direction** (more plasticizer → less surface_fusion). Physically, plasticizer/monomer enable surface fusion by depressing the polymer Tg — they should drive *more* surface_fusion.
 
 Two mechanisms are now implemented in parallel:
 
@@ -407,13 +407,13 @@ theta_skin_fus <- 1 / (1 + exp(-(T_surface_cr - Tg_plas) / 15))
 
 The 15 K sigmoid width spans the critical region around 100 °C. This route is the primary differentiator for high-Tg_polymer conditions where plasticizer determines whether the surface stays rubbery through the constant-rate period.
 
-**Two-stage temperature separation:** `T_surface_cr` (100 °C, constant-rate, skin formation) is distinct from `T_particle = 0.85·T_out + 0.15·T_feed` (~80–85 °C, falling-rate) which is retained for burst, solvent boiling, sticking, and residual-solvent escape — all falling-rate phenomena.
+**Two-stage temperature separation:** `T_surface_cr` (100 °C, constant-rate, surface_fusion formation) is distinct from `T_particle = 0.85·T_out + 0.15·T_feed` (~80–85 °C, falling-rate) which is retained for burst, solvent boiling, sticking, and residual-solvent escape — all falling-rate phenomena.
 
 ### Combined
 ```
 theta_skin <- 1 - (1 - theta_skin_pe) * (1 - 0.5 * theta_skin_fus)
 ```
-Both routes act in parallel (either independently forms skin); weight 0.5 on the fusion route avoids trivial saturation at nominal conditions (most process-relevant Tg_pol values are 40–80 K below T_surface_cr so theta_skin_fus ≈ 0.97 at nominal, saturation handled by the 0.5 weight).
+Both routes act in parallel (either independently forms surface_fusion); weight 0.5 on the fusion route avoids trivial saturation at nominal conditions (most process-relevant Tg_pol values are 40–80 K below T_surface_cr so theta_skin_fus ≈ 0.97 at nominal, saturation handled by the 0.5 weight).
 
 ### Result: corrected factor directions and rankings
 
@@ -421,16 +421,16 @@ From the re-run Morris screen (41 factors, r=30 trajectories, `template_type=4`)
 
 | Factor | Rank | μ* | Direction | Expected |
 |--------|------|----|-----------|---------|
-| C_monomer | 14 | 0.0254 | MORE skin | ✓ correct |
-| C_plasticizer | 16 | 0.0238 | MORE skin | ✓ correct |
-| Tg_polymer | 9 | 0.0627 | LESS skin | ✓ correct |
-| T_dryer_in | 4 | 0.1081 | MORE skin | ✓ correct |
-| T_mix | 3 | 0.1657 | LESS skin | ✓ (hotter feed → smaller ΔT driving kappa) |
-| mu_L | 1 | 0.2957 | MORE skin | ✓ (lower D_diff → higher Pe) |
+| C_monomer | 14 | 0.0254 | MORE surface_fusion | ✓ correct |
+| C_plasticizer | 16 | 0.0238 | MORE surface_fusion | ✓ correct |
+| Tg_polymer | 9 | 0.0627 | LESS surface_fusion | ✓ correct |
+| T_dryer_in | 4 | 0.1081 | MORE surface_fusion | ✓ correct |
+| T_mix | 3 | 0.1657 | LESS surface_fusion | ✓ (hotter feed → smaller ΔT driving kappa) |
+| mu_L | 1 | 0.2957 | MORE surface_fusion | ✓ (lower D_diff → higher Pe) |
 
 All signs are now physically consistent. C_monomer/C_plasticizer moved from rank 16–17 (wrong direction) to rank 14/16 (correct direction). The particle-size calibration metrics were **unchanged** by this fix — theta_skin feeds morphology, not the PSD.
 
-**Stale Morris cache removed and screen re-run** after the skin closure change.
+**Stale Morris cache removed and screen re-run** after the surface_fusion closure change.
 
 ---
 
@@ -458,7 +458,7 @@ UP4 inlet temperatures are similar to the direct-path runs (143 °C).
 
 **UP3 concentrates from 25 % → 39–43 % solids.** UP2 adds water
 (`up2_h2o_lbhr` ≈ 41–49 lb/hr, diluting the slurry slightly); UP3 (decanting
-centrifuge) then concentrates the cake. The UP4 dryer therefore sees a **richer feed
+separator) then concentrates the cake. The UP4 dryer therefore sees a **richer feed
 (~40 % solids)** than the UP1→UP4-direct path (25 %). The `dryer_airflow()` energy
 balance must be re-derived from the **post-UP3 solids** when routing the full chain.
 
@@ -479,7 +479,7 @@ compacted end of the plateau).
 The flow curves on sheets `up3_1` and `up3_3` are bit-for-bit identical (20 data
 points). This is **physically reasonable**: both conditions exited UP3 at essentially
 the same solid content (40.70 % vs 40.61 %) and the same UP1 feed solid (25 %),
-so their post-centrifuge slurry compositions are nearly indistinguishable. Identical
+so their post-separator slurry compositions are nearly indistinguishable. Identical
 viscometry from near-identical compositions is expected, not a data-entry error.
 
 ### UP3 rho — real measurement; residual trapped gas explains low density
@@ -505,7 +505,7 @@ With ρ_solid = 1730 kg/m³, the gas-free density at 40.7 % solid is:
 ```
 
 The measured 1117.3 kg/m³ is lower by 91.7 kg/m³. Attributing the deficit to
-residual gas trapped in the centrifuge cake:
+residual gas trapped in the separator cake:
 
 ```
 α_gas = (ρ_no_gas − ρ_meas) / (ρ_no_gas − ρ_air)
@@ -532,7 +532,7 @@ stage, once this direct calibration is accepted.
 
 The full-chain data (`up1_2_3_4_visc_sem.xlsx`) gives the first four-stage
 measurements; the next modelling step is to build a validation harness that routes
-UP1→UP2 (foam wash with water addition) →UP3 (decanting centrifuge, concentrating
+UP1→UP2 (foam wash with water addition) →UP3 (decanting separator, concentrating
 to ~40 %)→UP4 (dryer, re-derived air flow from post-UP3 solids).
 
 ---

@@ -12,11 +12,11 @@ Each SEM metric is dimensionless and maps to one model morphology output
 |--------|-----------|------------|--------------|
 | **Ω_SEM** (sphericity) | 500× | median particle **solidity** = area / convex-hull area, over watershed-segmented particles (aspect = minor/major and circularity 4πA/P² reported alongside) | `Omega_struct_z` |
 | **φ_SEM** (surface porosity) | 5k/10k× | dark interstitial **pore-pixel area / particle-body area**, on the curvature-flattened surface | `phi_porosity_z` |
-| **θ_SEM** (skin/fusion) | 5k/10k× | **smooth-area fraction** = fraction of the surface whose local texture CV < τ (0.06); a fused skin is smooth, an unfused bead packing is granular. `rms_rough` (mean texture CV) and `bump_density` (primary-bead peaks) reported alongside | `theta_skin_z` |
+| **θ_SEM** (surface_fusion/fusion) | 5k/10k× | **smooth-area fraction** = fraction of the surface whose local texture CV < τ (0.06); a fused surface_fusion is smooth, an unfused bead packing is granular. `rms_rough` (mean texture CV) and `bump_density` (primary-bead peaks) reported alongside | `theta_skin_z` |
 
 ## Model vs SEM (4 chain conditions)
 
-| cond | Ω model / SEM | φ model / SEM | θskin model / SEM(fused) |
+| cond | Ω model / SEM | φ model / SEM | θsurface_fusion model / SEM(fused) |
 |------|---------------|---------------|--------------------------|
 | up3_1 | 0.969 / 0.881 | 0.083 / 0.171 | 0.934 / 0.035 |
 | up3_2 | 0.973 / 0.883 | 0.080 / 0.154 | 0.924 / 0.283 |
@@ -26,7 +26,7 @@ Each SEM metric is dimensionless and maps to one model morphology output
 ## What the images show (calibration implications)
 
 1. **The product surface is an unfused granular packing of primary beads**
-   (~100–200 nm), with open interstitial pores — not a smooth melt skin. This is
+   (~100–200 nm), with open interstitial pores — not a smooth melt surface_fusion. This is
    the central finding and it splits the model's `theta_skin`:
    - The model's `theta_skin_z ≈ 0.92` is a **consolidation / Péclet-enrichment**
      measure — a packed shell IS present — and should be read that way, *not* as
@@ -55,18 +55,18 @@ Each SEM metric is dimensionless and maps to one model morphology output
 
 ## Surface porosity — % open space between spheres (`sem_porosity.py`)
 
-Per the reviewer's definition (114641_5kx annotation): **skin** = smooth, gap-free
+Per the reviewer's definition (114641_5kx annotation): **surface_fusion** = smooth, gap-free
 patches where beads have merged (darker, low local-range); **open pore** = the
 interstitial gap between distinct packing spheres (dark, bounded by bright caps,
 high local range). Pixels inside the particle body are classified by local
 intensity **range** (max−min over a bead-scale window) plus a darkness cut;
-overlays (`sem/overlay_*_5kx.png`, red = pore, blue = skin) confirm the split.
+overlays (`sem/overlay_*_5kx.png`, red = pore, blue = surface_fusion) confirm the split.
 
 The headline number is normalised to the **granular (bead-packed) region** so it
 is independent of how much smooth substrate/background is in frame (the 5k views
 differ — up3_1 is one large particle face, up3_2 is several granules on a stub):
 
-| cond | **open space between spheres** | (of whole surface) | skin | granular frac |
+| cond | **open space between spheres** | (of whole surface) | surface_fusion | granular frac |
 |------|-------------------------------|--------------------|------|---------------|
 | up3_1 | **43.7 %** | 26.3 % | 11.1 % | 60.3 % |
 | up3_2 | **42.8 %** | 25.9 % | 14.4 % | 60.5 % |
@@ -74,12 +74,12 @@ differ — up3_1 is one large particle face, up3_2 is several granules on a stub
 | up3_4 | **39.1 %** | 24.0 % | 15.0 % | 61.5 % |
 
 **Surface open-porosity ≈ 40–45 % (mean ~42.5 %)**, fairly flat across conditions;
-up3_4 is the most closed (39 %, highest skin 15 %), up3_3 the most open (44.5 %).
+up3_4 is the most closed (39 %, highest surface_fusion 15 %), up3_3 the most open (44.5 %).
 
 **Vs the model:** `phi_porosity_z ≈ 0.08` is *bulk/structural* porosity; the SEM
 ~42 % is the *2-D projected surface* void between the outer bead layer — a looser,
 projected quantity, so >> the bulk value by definition. The qualitative reading
-still matters: the surface is a very open (~42 %), lightly-fused (~12 % skin) bead
+still matters: the surface is a very open (~42 %), lightly-fused (~12 % surface_fusion) bead
 packing, so the surface-fusion route `theta_skin_fus` should calibrate LOW and
 `phi_porosity` may under-represent a genuinely porous particle. Resolving bulk vs
 surface porosity needs a fractured/FIB cross-section (data request).
@@ -98,14 +98,14 @@ conventions.
 **Particle-first segmentation.** Each frame is first split into particle vs
 non-particle: the particle is the raised region — **bright (large-scale) AND/OR
 textured** — while the stub/background is darker and flatter (measured on 110046:
-particle intensity 132 / local-range 55 vs stub 83 / 14). Skin and porosity are
+particle intensity 132 / local-range 55 vs stub 83 / 14). Surface_fusion and porosity are
 then measured *only inside the isolated particle*, so the smooth stub between
-grains is no longer mis-counted as skin, and this keeps genuinely **fused**
-particles (bright even when smooth). Skin uses an absolute normalised local-range
+grains is no longer mis-counted as surface_fusion, and this keeps genuinely **fused**
+particles (bright even when smooth). Surface_fusion uses an absolute normalised local-range
 cut so fusion is comparable across samples. Overlays `sem/overlay_X*.png`
-(red = open pore, blue = skin) confirm the split on both granular and fused faces.
+(red = open pore, blue = surface_fusion) confirm the split on both granular and fused faces.
 
-| sample | cond | Ω_SEM | aspect | porosity (open space between spheres) | skin |
+| sample | cond | Ω_SEM | aspect | porosity (open space between spheres) | surface_fusion |
 |--------|------|-------|--------|---------------------------------------|------|
 | 114641 | up3_1 | 0.906 | 0.75 | 37.2 % | 5.7 % |
 | 114642 | up3_2 | 0.921 | 0.81 | 37.7 % | 7.8 % |
@@ -131,7 +131,7 @@ cut so fusion is comparable across samples. Overlays `sem/overlay_X*.png`
   primary-particle packing, essentially independent of run conditions. (This is
   the particle-isolated value; the earlier per-sample section reads ~44 % only
   because it used a looser darkness cut — `sem_all.py` supersedes it.)
-- **Skin/fusion now discriminates: 1.4–18.8 %.** Granular faces (110043 1.4 %,
+- **Surface_fusion/fusion now discriminates: 1.4–18.8 %.** Granular faces (110043 1.4 %,
   110049 1.9 %, 114643 2.3 %) vs fused faces (110041 18.8 %, up3_4 15.8 %,
   110044/110045/110495 ≈ 15 %). The earlier substrate artefacts are resolved
   (110046 35 %→12 %, 110495 30 %→15 %). Fusion is the real cross-sample

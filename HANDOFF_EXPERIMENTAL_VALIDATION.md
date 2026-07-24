@@ -144,7 +144,7 @@ Validate that BA and BB produce **distinct PSD and pore morphologies** due to:
 3. **Net free template** available for pore formation (BA 46% vs BB 84%)
 
 ### Conditions
-- **Process backbone:** up3_1 (measured T_inlet=143°C, T_outlet=90°C, cake solids=40.7%, centrifuge Fg=430)
+- **Process backbone:** up3_1 (measured T_inlet=143°C, T_outlet=90°C, cake solids=40.7%, separator Fg=430)
 - **Template loading:** 0.20 (pendular optimum, co-feed with water)
 - **Atomizer:** baseline (ALR ≈ 2.2, P_atom ≈ 9 psig)
 - **Controls:** no template, measured post-UP3 feed state
@@ -207,7 +207,7 @@ Validate that BA and BB produce **distinct PSD and pore morphologies** due to:
 1. **Experimental run:** Compare BA vs. BB at up3_1 backbone. Measure PSD, porosity, bulk density, residual solvent.
 2. **SEM validation:** Compare pore morphology (pore size, pore distribution) to model predictions.
 3. **RTF measurement:** If feasible, measure core-absorbed template in dried particles (TGA, spectroscopy) to validate RTF_dryer signature.
-4. **Extend to other stages:** Wire UP2/UP3 models fully (currently using measured post-UP3 feed state). This will expose any gaps in chemistry transport through foam-wash and centrifuge.
+4. **Extend to other stages:** Wire UP2/UP3 models fully (currently using measured post-UP3 feed state). This will expose any gaps in chemistry transport through foam-wash and separator.
 5. **Non-volatile template exploration:** If composite particles (size-increasing fillers) are desired, develop atomizer dynamics + interfacial tension coupling to model coalescence resistance and phase stability.
 
 ---

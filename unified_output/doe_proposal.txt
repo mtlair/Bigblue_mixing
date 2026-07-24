@@ -58,7 +58,7 @@ model factor range as the proposed experimental bound.
   n_flow           up2     0.0001709  0.0006655  increase  [0.2, 0.67] -
   T_dryer_in       up2     0.0001485  0.0008136  decrease  [410, 440] K
 
-### up2_theta_skin_z   : skin/fusion (SEM DEFERRED - not repeatable)
+### up2_theta_skin_z   : surface_fusion/fusion (SEM DEFERRED - not repeatable)
   factor           module        mu*      sigma  direction range [min,max] unit
   mu_L             up2        0.2074     0.1091  increase  [0.0012, 0.056] Pa s
   T_mix            up1       0.08896    0.07925  decrease  [290, 360] K

@@ -2,7 +2,7 @@
 # DoE screen on the WIRED full chain  UP1 -> UP2 -> UP3 -> UP4
 # =============================================================================
 # Runs a Morris elementary-effects screen on the fully wired chain (foam wash +
-# centrifuge enabled, size-template morphology path ON) to rank which factors
+# separator enabled, size-template morphology path ON) to rank which factors
 # actually move each product CQA, then proposes experimental bounds for a DoE.
 #
 # Differs from unified_model.R's screen (which runs UP1->UP4 DIRECT with the two
@@ -12,7 +12,7 @@
 # Calibration anchors from SEM (review/sem_morphology_metrics.md):
 #   phi_porosity_z  <-> surface open-porosity ~37% (ROBUST)
 #   Omega_struct_z  <-> sphericity ~0.91 (ROBUST)
-#   theta_skin_z    <-> fusion (DEFERRED: SEM skin not repeatable per-sample yet)
+#   theta_skin_z    <-> fusion (DEFERRED: SEM surface_fusion not repeatable per-sample yet)
 #
 # Run:  Rscript doe_wired_morris.R
 # =============================================================================
@@ -21,7 +21,7 @@ lines <- readLines("unified_model.R")
 cut   <- grep("^# 5\\. MORRIS SCREEN", lines)[1] - 1
 eval(parse(text = paste(lines[1:cut], collapse = "\n")))
 source("foam_wash_module.R")
-source("up3_centrifuge_module.R")
+source("up3_separator_module.R")
 options(unified.wire_up2 = TRUE, unified.wire_up3 = TRUE)
 
 out_dir <- "unified_output"; dir.create(out_dir, showWarnings = FALSE)
@@ -98,7 +98,7 @@ CQA <- c(up2_D_particle_um = "particle size d50 [um]",
          up2_rho_tapped     = "tapped density [kg/m3]",
          up2_Tg_product_K   = "product Tg [K]",
          up2_X_moisture     = "residual moisture [-]",
-         up2_theta_skin_z   = "skin/fusion (SEM DEFERRED - not repeatable)")
+         up2_theta_skin_z   = "surface_fusion/fusion (SEM DEFERRED - not repeatable)")
 
 sink(file.path(out_dir, "doe_proposal.txt"))
 cat("========================================================================\n")

@@ -1,5 +1,5 @@
 # =============================================================================
-# UP3 — DECANTING CENTRIFUGE MODULE  (stream-contract closure)
+# UP3 — DECANTING SEPARATOR MODULE  (stream-contract closure)
 # =============================================================================
 # Concentrates the washed foam from UP1/UP2 (~25% solid) to the measured cake
 # solids (~38-43%), consistent with the confirmed mass balance in DATA_REVIEW:
@@ -26,7 +26,7 @@
 # sweep -- flagged as a data request in review/up3_density_monomer_note.md.
 # =============================================================================
 
-up3_centrifuge <- function(stream, pars = list()) {
+up3_separator <- function(stream, pars = list()) {
   p <- modifyList(list(
     Cs_target        = 0.405,   # target cake solids mass frac (measured 38.8-42.7%)
     Fg               = 430,     # centrifugal number [g]; reference up3_1 = 430

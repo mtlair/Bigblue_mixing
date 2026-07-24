@@ -24,7 +24,7 @@ source("unified/up1_mixer_module.R")
 source("unified/interface_stream.R")
 source("unified/up2_atomizer_dryer_module.R")
 source("foam_wash_module.R")
-source("up3_centrifuge_module.R")
+source("up3_separator_module.R")
 source("theta_solvent_chi.R")
 
 lines <- readLines("unified_model.R")
@@ -109,7 +109,7 @@ run_scenario <- function(template_name, ALR_mult = 1.0, P_atom_mult = 1.0,
   r1 <- up1_run_mixer(p1, eq)
   s  <- stream_from_up1(r1, p1, eq)
   s  <- foam_wash_column(s)
-  s  <- up3_centrifuge(s, pars = list(
+  s  <- up3_separator(s, pars = list(
            Cs_target = row$up3_solid_pct / 100,
            Fg        = if (is.finite(row$up3_Fg)) row$up3_Fg else 430))
 

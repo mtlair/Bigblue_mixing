@@ -5,7 +5,7 @@
 # (COFEED_HANDOFF.md). For each of the two recommended type-4 pore templates --
 # butyl acetate (BA) and butyl butyrate (BB) -- this replays the FULL wired train
 #
-#     UP1 gassed mixer -> UP2 foam-wash -> UP3 centrifuge -> UP4 atomizer dryer
+#     UP1 gassed mixer -> UP2 foam-wash -> UP3 separator -> UP4 atomizer dryer
 #
 # and prints the stream state at every interface, so the chemistry (Hansen RED,
 # boiling point, core-absorption RTF) can be traced from the mixer feed to the
@@ -23,7 +23,7 @@ source("unified/up1_mixer_module.R")
 source("unified/interface_stream.R")
 source("unified/up2_atomizer_dryer_module.R")
 source("foam_wash_module.R")        # UP2 foam-wash column
-source("up3_centrifuge_module.R")   # UP3 decanting centrifuge
+source("up3_separator_module.R")   # UP3 decanting separator
 source("theta_solvent_chi.R")       # chemistry -> template regime (Hansen RED)
 
 # --- load the unified chain's factor dictionary / nominal point (functions) ---
@@ -125,11 +125,11 @@ step_template <- function(template, T_dry_C) {
   cat("\n[2] UP2  foam-wash column  (gas washout, monomer/template rinse)\n")
   show(c("C_solid","rho_slurry","mu_exit_PaS","alpha_g","phi_templ_free","w_core"), s)
 
-  # ---- UP3 : decanting centrifuge ------------------------------------------
-  s <- up3_centrifuge(s, pars = list(
+  # ---- UP3 : decanting separator ------------------------------------------
+  s <- up3_separator(s, pars = list(
          Cs_target = row$up3_solid_pct / 100,
          Fg        = if (is.finite(row$up3_Fg)) row$up3_Fg else 430))
-  cat("\n[3] UP3  decanting centrifuge  (concentrate 25% -> ", row$up3_solid_pct,
+  cat("\n[3] UP3  decanting separator  (concentrate 25% -> ", row$up3_solid_pct,
       "% cake, ", if (is.finite(row$up3_Fg)) row$up3_Fg else 430, " g)\n", sep="")
   show(c("C_solid","rho_slurry","mu_exit_PaS","alpha_g","phi_templ_free","w_core"), s)
 
@@ -143,7 +143,7 @@ step_template <- function(template, T_dry_C) {
   cat(sprintf("    %-14s %8.3f um   %-14s %8.3f\n",
               "pore size", r2[["D_pore_um"]], "porosity phi", r2[["phi_porosity_z"]]))
   cat(sprintf("    %-14s %8.3f      %-14s %8.3f\n",
-              "skin theta", r2[["theta_skin_z"]], "sphericity", r2[["Omega_struct_z"]]))
+              "surface_fusion theta", r2[["theta_skin_z"]], "sphericity", r2[["Omega_struct_z"]]))
   cat(sprintf("    %-14s %8.1f K    %-14s %8.5f\n",
               "Tg_product", r2[["Tg_product_K"]], "X_moisture", r2[["X_moisture"]]))
   cat(sprintf("    %-14s %8.3f      %-14s %8.3f\n",
@@ -168,7 +168,7 @@ run_no_template <- function() {
   r1 <- up1_run_mixer(p1, eq)
   s  <- stream_from_up1(r1, p1, eq)
   s  <- foam_wash_column(s)
-  s  <- up3_centrifuge(s, pars = list(
+  s  <- up3_separator(s, pars = list(
            Cs_target = row$up3_solid_pct / 100,
            Fg        = if (is.finite(row$up3_Fg)) row$up3_Fg else 430))
   x_up2 <- as.list(x[up2_names]); x_up2[["size_template"]] <- x[["size_template"]]
@@ -225,7 +225,7 @@ cmp4("product d50 [um]",    "D_particle_um",  "", 2)
 cmp4("product d90 [um]",    "Dp90_um",        "", 2)
 cmp4("pore size [um]",      "D_pore_um")
 cmp4("porosity phi",        "phi_porosity_z")
-cmp4("skin theta",          "theta_skin_z")
+cmp4("surface_fusion theta",          "theta_skin_z")
 hr("-")
 cmp4("f_cr (Raoult CR)",   "f_cr_solv",      "", 3)
 cmp4("f_esc (total)",       "f_esc_solv",     "", 3)

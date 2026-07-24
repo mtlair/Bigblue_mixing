@@ -35,7 +35,7 @@ Perm_shell = exp(k_pm·C_mono + k_pp·C_plas) / (1 + k_pb·C_bind)
 ```
 
 **Couplings:**
-- **Falling-rate drying:** Skin retardation on per-mode drying time scales as `1 + 20·θ_skin/Perm_shell`
+- **Falling-rate drying:** Surface_fusion retardation on per-mode drying time scales as `1 + 20·θ_skin/Perm_shell`
 - **Vapor entrapment:** Trapping fraction `θ_skin/(θ_skin + Perm_shell)` gates vacuole inflation (hollow particles)
 - **Blowhole rupture:** Over-pressurized impermeable shells dent sphericity
 - **Residual moisture & Tg:** Slower vapor escape leaves coarse tail wetter, plasticizing product via Fox moisture term
@@ -197,7 +197,7 @@ Full analysis run: 60 trajectories × 8 levels × 29 factors = 1,620 model evalu
 
 3. **Module 6–7 (Dryer & Particle Formation):**
    - 6a: Energy/moisture balance (**NEW:** dual latent heats)
-   - 6b: Drying kinetics (**NEW:** permeability-gated skin resistance)
+   - 6b: Drying kinetics (**NEW:** permeability-gated surface_fusion resistance)
    - 6c: Per-mode drying + residual moisture
    - 7a: Product Tg (**NEW:** retained template solvent as plasticizer)
    - 7b: Cake mechanics (yield stress vs. overpressure)
@@ -273,7 +273,7 @@ All symbols follow the master nomenclature sheet in `deepresearchreport.md` wher
 - `Perm_shell`: relative shell permeability (free-volume theory)
 - `phi_templ`: templated void fraction (emulsion-driven)
 - `D_pore`: templated pore size after balloon inflation/collapse
-- `f_trap_s`: vapor-trapping fraction under skin
+- `f_trap_s`: vapor-trapping fraction under surface_fusion
 - `Pi_b`: dimensionless Clausius–Clapeyron overpressure ratio
 - `f_burst`: micro-explosion severity (Heaviside-like curve)
 - `solv_retained`: boil-vs-retain split (logistic on T_particle − T_bp)

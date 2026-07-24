@@ -2,7 +2,7 @@
 # UP1 -> UP4 DIRECT validation harness
 # =============================================================================
 # The visc.xlsx calibration runs did NOT pass through UP2 (foam-wash) or UP3
-# (centrifuge) -- see DATA_REVIEW.md. This harness replays each of the nine
+# (separator) -- see DATA_REVIEW.md. This harness replays each of the nine
 # measured conditions UP1 (mixer) -> UP4 (dryer) *directly*, bypassing UP2/UP3,
 # and compares the calibrated model against the measurements:
 #

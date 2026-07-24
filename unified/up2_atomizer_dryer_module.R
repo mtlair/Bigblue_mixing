@@ -31,8 +31,8 @@
 #                     screening factor x$D_b (transfer-line shear unknown yet)
 #
 # New cross-module couplings (rev38 "collapse risk" wired in):
-#   * theta_skin seeding: the mixer wet-skin fraction partially survives
-#     atomization (SKIN_SURVIVAL) and pre-seeds the dryer skin state.
+#   * theta_skin seeding: the mixer wet-surface_fusion fraction partially survives
+#     atomization (SKIN_SURVIVAL) and pre-seeds the dryer surface_fusion state.
 #   * Core-absorbed template (feed$w_core = RTF * template load): acts as a
 #     core plasticizer — enters phi_solvent (Flory-Huggins Softness), the
 #     shell permeability exponent (plasticizer coefficient), and the Fox
@@ -185,7 +185,7 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   # nucleates heterogeneously at the polymer-water interface when feed pressure
   # drops at the nozzle. UP1 aggregates (D_agg ~10 µm) are already formed at
   # this point, so bubbles nucleate INTO aggregate pore space — already in
-  # position for pore retention. Local skin softening only (surface layer):
+  # position for pore retention. Local surface_fusion softening only (surface layer):
   # gaseous alkyl monomer (bp < RT) partitions to the particle surface but
   # cannot accumulate in glassy bulk cores → does NOT raise w_core or Softness.
   #
@@ -233,7 +233,7 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
     theta_surf    <- min(1, cap_area / (part_area + gas_area_post + emu_area))
     alpha_g       <- alpha_g * (0.3 + 0.7 * theta_surf)
 
-    # Local skin softening: dissolved gas partitions to particle surface layer
+    # Local surface_fusion softening: dissolved gas partitions to particle surface layer
     # (~10–50 nm) only — tracked via theta_seed, not Softness or w_core.
     k_part_gas    <- if (!is.null(x[["k_part_gas"]])) x[["k_part_gas"]] else 0.05
     phi_skin_gas  <- min(C_gas_diss * k_part_gas, 0.10)
@@ -346,11 +346,11 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   Tg_plas       <- 1 / inv_Tg_plas
   theta_skin_fus <- 1 / (1 + exp(-(T_surface_cr - Tg_plas) / 15))
 
-  # Parallel paths: series non-skin probabilities (either route independently fires)
+  # Parallel paths: series non-surface_fusion probabilities (either route independently fires)
   # Weight 0.5 on fusion route avoids trivial saturation at nominal conditions
   theta_skin <- 1 - (1 - theta_skin_pe) * (1 - 0.5 * theta_skin_fus)
 
-  # Cross-module coupling: mixer wet-skin seeds the dryer skin state
+  # Cross-module coupling: mixer wet-surface_fusion seeds the dryer surface_fusion state
   theta_skin <- 1 - (1 - theta_seed) * (1 - theta_skin)
 
   D_f <- 1.8 + 0.7 * min((stability - 1) / 5, 1)

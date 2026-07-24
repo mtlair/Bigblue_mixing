@@ -54,7 +54,7 @@ implemented. Spot-checked and confirmed:
   `ΔH_vap = 88·T_bp` (L361), **Clausius–Clapeyron** partial pressure with the
   correct sign (L362, `p=P_atm` at `T=T_bp`), **Krieger–Dougherty**
   `(1−φ/φ_m)^(−2.5φ_m)` (L152), **Fox** Tg mixing (L380–381), **Stokes–Einstein**
-  diffusivity + **Péclet** skin criterion (L300–303) — all correct.
+  diffusivity + **Péclet** surface_fusion criterion (L300–303) — all correct.
 - **Laplace critical-nucleus form** `D_b_nucl = 4σ/ΔP` (L198) is the correct
   mechanical-equilibrium diameter (`ΔP = 2σ/r = 4σ/D`).
 - **Henry release fraction** `1 − P_atm/P_feed` (L194) is the correct

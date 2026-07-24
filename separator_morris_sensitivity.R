@@ -71,7 +71,7 @@ mu_water_T <- function(T) 2.414e-5 * 10^(247.8 / (T - 140))          # water vis
 k_H_T      <- function(T) 6.5e-6 * exp(1700 * (1/T - 1/298))          # Henry const [mol/(m3 Pa)]
 
 # =========================================================================
-# 1. THE UNIFIED COMPREHENSIVE CENTRIFUGE ENGINE
+# 1. THE UNIFIED COMPREHENSIVE SEPARATOR ENGINE
 # =========================================================================
 unified_centrifuge_model <- function(run) {
 
@@ -524,11 +524,11 @@ unified_centrifuge_model <- function(run) {
 }
 
 # =========================================================================
-# 1b. CENTRIFUGE -> SPRAY-DRYER HANDOFF
+# 1b. SEPARATOR -> SPRAY-DRYER HANDOFF
 # =========================================================================
 # The discharged cake is too concentrated to atomize (see Spray_Visc_Ratio), so
 # a reslurry / dilution step sits between the units. This maps every atomizer-model
-# input the centrifuge STREAM determines, after diluting to a target atomizerable
+# input the separator STREAM determines, after diluting to a target atomizerable
 # solids mass fraction. Spray-unit operating settings (ALR, air/feed pressures,
 # dryer gas flow/temperature/humidity, hold time, Tg, permeabilities, emulsion
 # template) are NOT set here - they belong to the atomizer dryer.
@@ -755,7 +755,7 @@ png(file.path("output", "centrifuge_morris_plots.png"),
 op <- par(mfrow = c(nrow_p, ncol_p), mar = c(4.5, 4.5, 2.5, 1),
           oma = c(3.5, 0, 1.5, 0))
 for (o in outputs) plot_panel(stats_list[[o]], o)
-mtext(sprintf("Centrifuge Morris: groups {%s} active | %d factors, r=25, %d runs",
+mtext(sprintf("Separator Morris: groups {%s} active | %d factors, r=25, %d runs",
               paste(active_groups, collapse = ", "), k_act, nrow(Y)),
       side = 1, outer = TRUE, cex = 0.8, line = 0.5)
 legend_lab <- names(grp_col)[names(grp_col) %in% act$group]
@@ -789,7 +789,7 @@ atomizer_ranges <- list(rho_L=c(1000,1300), C_solid_mass=c(0.05,0.40),
                      C_monomer=c(0,0.02), C_plasticizer=c(0,0.05),
                      C_binder=c(0,0.05), I_strength=c(1e-3,0.5), Delta_pH=c(0.2,4.0))
 sf <- centrifuge_to_atomizer(nominal_vec, reslurry_add = 0.5)
-cat("\n== Centrifuge -> atomizer-dryer feed (nominal, cake-tied + light reslurry) ==\n")
+cat("\n== Separator -> atomizer-dryer feed (nominal, cake-tied + light reslurry) ==\n")
 for (nm in names(atomizer_ranges)) {
   rng <- atomizer_ranges[[nm]]
   flag <- if (sf[[nm]] < rng[1] || sf[[nm]] > rng[2]) "  <-- outside atomizer range" else ""

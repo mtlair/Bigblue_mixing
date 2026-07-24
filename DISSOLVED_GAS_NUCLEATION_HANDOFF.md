@@ -88,7 +88,7 @@ if (C_gas_diss > 1e-4) {
             else D_b_h
   alpha_g <- a_tot
   
-  # Local skin softening only (surface layer ~10–50 nm, not bulk core)
+  # Local surface_fusion softening only (surface layer ~10–50 nm, not bulk core)
   k_part_gas   <- if (!is.null(x[["k_part_gas"]])) x[["k_part_gas"]] else 0.05
   phi_skin_gas <- min(C_gas_diss * k_part_gas, 0.10)
   skin_gas_frac <- phi_skin_gas / (phi_skin_gas + 0.03)
@@ -216,7 +216,7 @@ x["CMC"]            <- 0.002        # typical for anionic/nonionic
 ### UP3 Concentration (if used)
 
 ```r
-# Centrifuge to higher solids
+# Separator to higher solids
 cake_C_sol <- 0.38–0.40     # 38–40% solids (vs 25% UP1 exit)
 # This reduces shrinkage factor in dryer (0.53 → 0.74)
 ```
@@ -276,7 +276,7 @@ x["k_part_gas"]     <- 0.05         # partition coeff for surface softening
 
 5. **Scale-up:** Once 50 µm validated, scale flow rates proportionally. Check that:
    - Saturator capacity matches Q_template
-   - Centrifuge throughput supports 0.38–0.40 C_sol
+   - Separator throughput supports 0.38–0.40 C_sol
    - Spray-dryer feed pressure (P_feed ~30 bar) is achievable
 
 ---
@@ -289,7 +289,7 @@ x["k_part_gas"]     <- 0.05         # partition coeff for surface softening
 | **dpH *suppresses* aggregation** | Exponential DLVO barrier W_barrier=exp(dpH-...) | **Low dpH + high I_str required** for sticky irreversible adhesion (opposite of what pH buffers typically do) |
 | **Template-aided floc rate** | Droplets/bubbles provide geometric scaffolding | Direct assembly (no ripening needed); template escapes downstream → geometry frozen in |
 | **Heterogeneous nucleation inside aggregates** | UP1 D_agg already formed when gas flashes | Bubbles nucleate at particle surfaces inside 10 µm floc → already in position for pore retention |
-| **Local skin softening only** | Gaseous monomer (bp < RT) partitions to surface layer | Does NOT raise w_core or bulk Softness → glassy cores stay intact |
+| **Local surface_fusion softening only** | Gaseous monomer (bp < RT) partitions to surface layer | Does NOT raise w_core or bulk Softness → glassy cores stay intact |
 
 ---
 
