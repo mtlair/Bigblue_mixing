@@ -93,6 +93,7 @@ factors <- rbind(
   fac("ionic_strength", 0.01,   0.50,  FALSE, "M",     "up1", "Surface", "ionic strength"),
   fac("Delta_pH",       0.0,    5.0,   FALSE, "pH",    "up1", "Surface", "delta pH vs isoelectric point"),
   fac("template_dose",  0.02,   1.10,  FALSE, "-",     "up1", "Polymer", "template liquid / interstitial void"),
+  fac("chi_template",   0.30,   2.50,  FALSE, "-",     "up1", "Polymer", "Flory-Huggins chi (template solvent vs polymer; <0.5 good, 0.5 theta, >0.5 poor)"),
   # --- UP2 dryer side --------------------------------------------------------
   fac("ALR",            0.9,    1.8,   FALSE, "-",     "up2", "Process", "atomizing air-liquid mass ratio (measured up4atom_scfm/up4_feed, visc.xlsx: 0.90-1.78)"),
   fac("P_atom_air",     1.2e5,  1.8e5, FALSE, "Pa",    "up2", "Process", "atomizing air supply pressure (measured max_up4atom_psig, visc.xlsx: 2.7-11.4 psig abs)"),

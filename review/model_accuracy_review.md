@@ -205,7 +205,48 @@ to document this limitation explicitly.
 
 ---
 
-## 3. Bottom line
+## 3. Flory–Huggins solvency coupling (added this branch)
+
+A follow-up review of the template-escape path found that the model computed a
+Flory–Huggins interaction parameter χ (via Hansen RED in `theta_solvent_chi.R`)
+but **discarded its escape consequence**: the dryer used a pure-component vapour
+pressure for every solvent, and the chain recomputed the core/free template
+split (RTF) from a diffusion timescale, ignoring χ entirely. Two independent
+sweeps confirmed the gap — in the wired chain, escape tracked **boiling point
+only**, so a very-poor low-boiling solvent (n-hexane, `f_esc ≈ 0.99`) and a
+merely-poor high-boiling one (amyl acetate, `f_esc ≈ 0.15`) were separated by bp,
+not by solvency, and the discrete `escapes = bp < T_dry+40` flag over-promised by
+~10× against the dryer's own `f_esc` for high-boiling poor solvents.
+
+**Fix applied** (this branch) — one thermodynamic parameter (χ) now drives both
+the pore/collapse split and the escape rate, consistently:
+
+- **`unified_model.R`**: `chi_template` added as a screened Morris factor
+  (range [0.30, 2.50]; <0.5 good, 0.5 θ, >0.5 poor). The output schema/factor
+  count grew, so the committed Morris cache is invalidated by the schema guard
+  and rebuilt (1290/1290 runs valid).
+- **`up1_mixer_module.R`** (wires pore-vs-core split): RTF is now the
+  Flory–Huggins equilibrium core-uptake `1/(1+exp((χ−0.5)/0.30))` gated by the
+  kinetic completeness `f_diff`. Good solvent (low χ) swells into cores (high
+  RTF → plasticizer/collapse); poor solvent (high χ) is excluded → free droplet
+  → clean pore template. Verified monotonic: RTF 0.22 (χ=0.35) → 0.0006 (χ=2.4).
+- **`up2_spray_dryer_module.R`** (wires partial evaporation): Module 6c escape
+  driving force is now a true partial-pressure difference
+  `dp = a₁·p_sat(T_wb) − p_solv,gas` with the Flory–Huggins solvent activity
+  `a₁ = φ·exp[(1−φ)+χ(1−φ)²]` integrated as the core dries (φ-evolving). Free
+  droplets escape as pure solvent (a₁≈1 → pores); core-absorbed solvent is
+  activity-suppressed the more strongly the *lower* χ ("held" by a good solvent).
+  The gas-phase term subtracts the solvent partial pressure already in the
+  drying gas, bounded by the vapour-space headroom left after **steam** (`p_v`)
+  — so a near-water-saturated gas throttles template escape (the "how much can
+  actually evaporate" limit). Escape is now split into free/core pools, each
+  retained at its own fraction.
+
+Morris confirms χ as a first-class driver with physically-correct signs:
+μ*=0.174 on RTF (χ↑ → RTF↓), μ*=0.124 on `f_cr` (χ↑ → more escape), negative μ on
+`solv_retained` (poor solvent retains less), positive μ on porosity (more pores).
+
+## 4. Bottom line
 
 - The **transport/thermo backbone** (atomization, drying, DLVO aggregation,
   Tg/Fox, KD rheology, Raoult/Clausius–Clapeyron escape) is technically sound

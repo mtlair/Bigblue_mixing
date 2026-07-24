@@ -118,6 +118,9 @@ stream_from_up1 <- function(up1_res, pars, equipment) {
     D_template_um  = p$D_template,
     RTF            = RTF,
     w_core         = w_core,
+    # Flory-Huggins chi of the template solvent vs polymer: drives both the
+    # RTF core/free split (above) and the activity-corrected escape in the dryer
+    chi_template   = if (!is.null(p$chi_template)) p$chi_template else 0.5,
     # dissolved gas carried to the atomizer (nucleates at nozzle, not in transfer line)
     C_gas_diss = ex$C_gas_diss_exit,
     # diagnostics

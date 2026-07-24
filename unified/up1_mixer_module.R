@@ -518,11 +518,19 @@ up1_run_mixer <- function(pars, equipment = up1_default_equipment()) {
 
   Swelling_Softness_exit <- Swelling_Softness
 
+  # Equilibrium core-uptake fraction from Flory-Huggins solvency: a GOOD solvent
+  # (chi < 0.5) swells and partitions into the particle cores (high RTF -> core-
+  # absorbed plasticizer); a POOR solvent (chi > 0.5) is excluded and stays as a
+  # free interstitial droplet (low RTF -> clean pore template). The theta point
+  # chi = 0.5 splits 50/50. f_diff then gates this equilibrium by the kinetic
+  # completeness of absorption within the mixer residence time.
+  chi_t  <- if (!is.null(p$chi_template) && is.finite(p$chi_template)) p$chi_template else 0.5
+  RTF_eq <- 1.0 / (1.0 + exp((chi_t - 0.5) / 0.30))
   Residual_Template_Fraction <- switch(as.character(t_type),
     "1" = 0.0,
     "2" = 0.0,
-    "3" = f_diff,
-    "4" = s_clamp(0.05 * f_diff * s_clamp(fill, 0.0, 1.0), 0.0, 0.15),
+    "3" = s_clamp(RTF_eq * f_diff, 0.0, RTF_eq),
+    "4" = s_clamp(RTF_eq * f_diff * s_clamp(fill, 0.0, 1.0), 0.0, RTF_eq),
     0.0)
 
   outputs <- c(Blended_Porosity = Blended_Porosity,

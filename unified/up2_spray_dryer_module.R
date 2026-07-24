@@ -383,24 +383,69 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   # C_cr = 5.0 sets the scale so that BA (p_cr/P_atm~0.075 at T_wb~321K) gives
   # ~35-40% escape and BB (~0.020 at T_wb~321K) gives ~12%, consistent with the
   # 3.6x vapour-pressure ratio between BA and BB at wet-bulb conditions.
+  # Constant-rate escape is driven by the SURFACE partial pressure of template
+  # solvent minus the partial pressure already carried by the drying gas:
+  #     dp = a1 * p_sat_solv(T_wb) - p_solv_gas
+  # a1 is the Flory-Huggins solvent activity, a1 = phi*exp((1-phi)+chi*(1-phi)^2):
+  #   * free droplets (phase-separated poor solvent, phi ~ 1) -> a1 ~ 1: escape
+  #     as pure solvent and template the pores;
+  #   * core-absorbed solvent (dissolved at low phi) -> a1 < 1: "held" by the
+  #     polymer, the more strongly the LOWER chi (good solvent). Evaluated as the
+  #     core dries (phi falls from phi_c0 toward zero) so the chi effect grows
+  #     through the constant-rate period (composition-evolving activity).
   T_wb_cr <- T_out - 0.8 * pmax(T_in - T_out, 0)
   dHvap_J <- 88.0 * T_bpS                          # Trouton estimate [J/mol]
-  p_cr    <- pmin(P_atm, P_atm * exp(dHvap_J / R_GAS * (1/T_bpS - 1/T_wb_cr)))
-  f_cr    <- if (phi_e > 1e-4) max(0, min(1, 1 - exp(-5.0 * (p_cr / P_atm) * Perm_shell)))
-             else 0.0
+  p_sat_s <- pmin(P_atm, P_atm * exp(dHvap_J / R_GAS * (1/T_bpS - 1/T_wb_cr)))
+
+  # Gas-phase solvent partial pressure: evaporated template accumulates in the
+  # drying gas (solvent humidity Y_solv), but the vapour space is already partly
+  # occupied by steam (water vapour p_v). The solvent partial pressure cannot
+  # exceed the remaining headroom OR its own saturation -> a near-water-saturated
+  # gas throttles template escape. This is the "how much can actually evaporate"
+  # limit set by the drying-gas partial pressures.
+  MW_air  <- 0.02896                               # dry air molar mass [kg/mol]
+  MW_solv <- if (!is.null(x[["MW_solv"]])) x[["MW_solv"]] else 0.100   # ~100 g/mol
+  Y_solv  <- (mdot_L * (w_e + w_core)) / max(mdot_g, 1e-9)  # kg solvent / kg dry gas (cap)
+  p_solv0 <- Y_solv / (Y_solv + MW_air / MW_solv) * P_atm
+  p_head  <- max(0, P_atm - p_v)                   # headroom left after steam (p_v)
+  p_solv_gas <- min(p_solv0, p_head, p_sat_s)
+
+  chi_t <- if (!is.null(feed$chi_template) && is.finite(feed$chi_template))
+             feed$chi_template else 0.5
 
   ## --- Module 7a: Product glass transition (Fox: solvent + moisture) -------
   T_particle <- 0.85 * T_out + 0.15 * T_feed
-  S_bs   <- 1 / (1 + exp(-(T_particle - T_bpS) / 8))
-  # Combined sequential escape: constant-rate partial-pressure first, then
-  # falling-rate boiling of whatever remains.
-  f_esc  <- f_cr + (1 - f_cr) * S_bs
+  S_bs   <- 1 / (1 + exp(-(T_particle - T_bpS) / 8))   # falling-rate boiling gate
+
+  # Free-droplet template: evaporates as ~pure solvent (a1 ~ 1)
+  dp_free    <- max(0, p_sat_s - p_solv_gas)
+  f_cr_free  <- if (phi_e > 1e-4)
+                  max(0, min(1, 1 - exp(-5.0 * (dp_free / P_atm) * Perm_shell))) else 0.0
+  f_esc_free <- f_cr_free + (1 - f_cr_free) * S_bs
+
+  # Core-absorbed template: FH-activity-suppressed, phi-evolving (activity
+  # integrated as the core solvent fraction falls from phi_c0 toward dry)
+  phi_c0     <- min(0.9, max(w_core, 1e-4))
+  phis       <- seq(phi_c0, phi_c0 / 8, length.out = 8)
+  a1s        <- phis * exp((1 - phis) + chi_t * (1 - phis)^2)
+  dp_core    <- max(0, mean(pmax(0, a1s * p_sat_s - p_solv_gas)))
+  f_cr_core  <- if (w_core > 1e-5)
+                  max(0, min(1, 1 - exp(-5.0 * (dp_core / P_atm) * Perm_shell))) else 0.0
+  f_esc_core <- f_cr_core + (1 - f_cr_core) * S_bs
+
+  # Mass-weighted reported escape over the two solvent pools (free + core)
+  m_free <- w_e; m_core <- w_core; m_tot <- m_free + m_core
+  f_cr   <- if (m_tot > 1e-9) (m_free * f_cr_free  + m_core * f_cr_core ) / m_tot else f_cr_free
+  f_esc  <- if (m_tot > 1e-9) (m_free * f_esc_free + m_core * f_esc_core) / m_tot else f_esc_free
   R_solv <- 1 - f_esc
 
-  # Residual solvent load now includes the core-absorbed template: it only
-  # escapes above its boiling point (same R_solv gate as the free emulsion)
-  w_res  <- (0.5 * C_mono + C_plas + (w_e + w_core) * R_solv) /
-            (0.5 * C_mono + C_plas + (w_e + w_core) * R_solv + C_sol)
+  # Residual solvent load: each pool retained at its OWN escape fraction (free
+  # template escapes as pure solvent -> pores; core template is held by FH
+  # activity -> residual / collapse pathway)
+  R_solv_free <- 1 - f_esc_free
+  R_solv_core <- 1 - f_esc_core
+  w_res  <- (0.5 * C_mono + C_plas + w_e * R_solv_free + w_core * R_solv_core) /
+            (0.5 * C_mono + C_plas + w_e * R_solv_free + w_core * R_solv_core + C_sol)
   w_wat  <- min(0.12, X_moist * (1 - C_sol) /
                       (X_moist * (1 - C_sol) + C_sol))
   Tg_dry <- 1 / ((1 - w_res) / Tg_pol + w_res / Tg_solv)
@@ -423,12 +468,13 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   # evaporation (f_cr) exits freely before the shell seals.
   Pi_b     <- dP_vap * f_trap_s * S_bs / max(sigma_y, 1e3)
   f_burst  <- Pi_b^2 / (1 + Pi_b^2)
-  # Shell inflation scaled by (1 - f_cr): template that escaped in constant-rate
-  # period never reaches the sealed-shell stage and does not contribute to inflation.
-  B_infl   <- 1.5 * f_trap_s * (1 - f_burst) * (1 - f_cr)
-  # phi_templ: total escaped template (f_esc) creates pores; post-escape inflation
-  # and burst logic as before.
-  phi_templ <- min(0.6, phi_e * f_esc * (1 + B_infl) * (1 - 0.5 * f_burst))
+  # Shell inflation scaled by (1 - f_cr_free): free template that escaped in the
+  # constant-rate period never reaches the sealed-shell stage and does not inflate.
+  B_infl   <- 1.5 * f_trap_s * (1 - f_burst) * (1 - f_cr_free)
+  # phi_templ: escaped FREE template (f_esc_free) creates pores; post-escape
+  # inflation and burst logic as before. Core-absorbed solvent is tracked
+  # separately (w_res / collapse), not as a pore former.
+  phi_templ <- min(0.6, phi_e * f_esc_free * (1 + B_infl) * (1 - 0.5 * f_burst))
   D_pore    <- D_e_h * (1 + B_infl)^(1/3)
 
   a_trap_j <- alpha_e / (1 + D_b_e / modes_m) * (0.5 + 0.5 * theta_surf)
