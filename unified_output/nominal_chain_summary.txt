@@ -1,5 +1,5 @@
 UNIFIED CHAIN - nominal factor values, per templating strategy
-(mixer -> 2 placeholder stages -> spray dryer; 42 factors)
+(mixer -> 2 placeholder stages -> atomizer dryer; 42 factors)
 
 ================ template_type = 1 (rigid) ================
   up1_Mixing_Potential             387.9

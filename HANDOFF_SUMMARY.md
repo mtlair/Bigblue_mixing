@@ -62,7 +62,13 @@ This session completed a comprehensive technical accuracy review of the spray-dr
 
 ## Terminology Update
 
-**Spray dryer → Atomizer dryer**: updated across all file names, variable names, comments, and documentation to reflect the exact unit operation (effervescent-airblast atomizer, not generic "spray").
+**✓ Complete**: "spray dryer" → "atomizer dryer" across all:
+- File names: `up2_spray_dryer_module.R` → `up2_atomizer_dryer_module.R`
+- Code: variable names, function names, comments
+- Documentation: markdown files, handoff notes
+- Generated outputs: `nominal_chain_summary.txt`, Morris plots, etc.
+
+Reflects exact unit operation (effervescent-airblast atomizer, not generic "spray").
 
 ---
 
