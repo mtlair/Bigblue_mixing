@@ -8,7 +8,7 @@
 
 ## What was done this session
 
-### 1. theta_skin closure fix (`unified/up2_spray_dryer_module.R`)
+### 1. theta_skin closure fix (`unified/up2_atomizer_dryer_module.R`)
 
 The original skin-formation closure had the wrong sign for plasticizer/monomer
 effects (more solvent → less skin, which is backwards). Fixed by adding a
@@ -113,7 +113,7 @@ Bigblue_mixing/
 │
 ├── unified/
 │   ├── up1_mixer_module.R      UP1 gassed mixer model
-│   ├── up2_spray_dryer_module.R  ← theta_skin fixed here (two-route closure)
+│   ├── up2_atomizer_dryer_module.R  ← theta_skin fixed here (two-route closure)
 │   └── interface_stream.R      stream state definitions (SKIN_SURVIVAL = 0.30)
 │
 ├── unified_model.R             top-level chain runner + Morris screen

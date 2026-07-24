@@ -7,8 +7,8 @@
 #   UP1 mixer            unified/up1_mixer_module.R      (pulled, deSolve ODE)
 #     -> UP2 (foam-wash)   foam_wash_column()
 #       -> UP3 (separator) centrifuge_morris_sensitivity.R (unified_centrifuge_model)
-#         -> reslurry      centrifuge_to_spray()  (dilution to sprayable solids)
-#           -> UP4 (dryer) morris_sensitivity_analysis.R (spray_dry_model)
+#         -> reslurry      centrifuge_to_atomizer()  (dilution to atomizerable solids)
+#           -> UP4 (dryer) morris_sensitivity_analysis.R (atomizer_dry_model)
 #
 # The mixer (UP1) is "the 2nd step prior to the separator"; the foam-wash column (UP2) is
 # "the 1st step prior to the separator". Composition, gas holdup, surface
@@ -53,9 +53,9 @@ src_defs <- function(path, stop_marker) {
   L <- readLines(path); cut <- grep(stop_marker, L)[1]
   paste(L[seq_len(cut - 1)], collapse = "\n")
 }
-cen_env <- new.env(); spray_env <- new.env()
+cen_env <- new.env(); atomizer_env <- new.env()
 eval(parse(text = src_defs("centrifuge_morris_sensitivity.R", "^# 3\\. SMOKE TEST")), envir = cen_env)
-eval(parse(text = src_defs("morris_sensitivity_analysis.R",   "^# 3\\. Morris design")), envir = spray_env)
+eval(parse(text = src_defs("morris_sensitivity_analysis.R",   "^# 3\\. Morris design")), envir = atomizer_env)
 
 # ---- UP2 foam-wash column: the 491-line ODE (functions only; skip its driver
 #      + plots by cutting at the "solve + report" marker) --------------------
@@ -63,15 +63,15 @@ fc_env <- new.env()
 eval(parse(text = src_defs("foam_wash_column_psd.R", "^# --- solve \\+ report")), envir = fc_env)
 
 unified_centrifuge_model <- cen_env$unified_centrifuge_model
-centrifuge_to_spray      <- cen_env$centrifuge_to_spray
+centrifuge_to_atomizer      <- cen_env$centrifuge_to_atomizer
 cen_nominal              <- cen_env$nominal_vec
 cen_factors              <- cen_env$factors
-spray_dry_model          <- spray_env$spray_dry_model
-spray_factors            <- spray_env$factors
+atomizer_dry_model          <- atomizer_env$atomizer_dry_model
+atomizer_factors            <- atomizer_env$factors
 
-# spray operating / formulation setpoints: midpoints, then the plant setpoints
-# (same as chained_centrifuge_spray.R).
-sp_mid <- setNames((spray_factors$min + spray_factors$max) / 2, spray_factors$name)
+# atomizer operating / formulation setpoints: midpoints, then the plant setpoints
+# (same as chained_centrifuge_atomizer.R).
+sp_mid <- setNames((atomizer_factors$min + atomizer_factors$max) / 2, atomizer_factors$name)
 sp_mid["T_system"]     <- 423   # dryer inlet ~150 C
 sp_mid["T_feed"]       <- 300   # atomizing air ~ ambient
 sp_mid["T_sticky_K"]   <- 493   # melt/clumping ~220 C (heat-resistant product)
@@ -262,7 +262,7 @@ foam_wash_column_ode <- function(stream, pars = list()) {
 # =============================================================================
 run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
                            wash_pars = list(), cen_op = cen_nominal,
-                           reslurry_add = 0, spray_op = sp_mid,
+                           reslurry_add = 0, atomizer_op = sp_mid,
                            up2 = c("ode", "algebraic"),
                            couple_viscosity = FALSE,   # TRUE: wire UP1 slurry visc to nozzle
                            verbose = FALSE) {
@@ -287,10 +287,10 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   # 3. UP3 (separator) + 4. reslurry handoff (one call: runs the model, dilutes)
   cen_run <- stream_to_centrifuge(s, cen_op)
   cen_out <- unified_centrifuge_model(cen_run)
-  hand    <- centrifuge_to_spray(cen_run, reslurry_add = reslurry_add)
+  hand    <- centrifuge_to_atomizer(cen_run, reslurry_add = reslurry_add)
 
   # 5. UP4 (dryer)
-  x <- spray_op
+  x <- atomizer_op
   for (nm in sp_from_centrifuge) x[nm] <- hand[[nm]]
   # UP1-bounded template + feed temperature + v_tip carried through the stream (no
   # pre-heater stage yet, so the dryer feed T is the mixer-exit T; the template
@@ -309,10 +309,10 @@ run_full_train <- function(mixer_x = mixer_nominal_x, template_type = 4,
   # 9-condition rheology set (visc.xlsx, geomean 0.201 Pa.s); see DATA_REVIEW.md.
   # Still default OFF pending nozzle-geometry calibration of the SMD scale.
   if (couple_viscosity) x["mu_slurry_up1"] <- s$mu_exit_PaS
-  sp <- spray_dry_model(x)
+  sp <- atomizer_dry_model(x)
 
   list(mixer = r1$outputs, stream = s, cen_run = cen_run,
-       cen_out = cen_out, handoff = hand, spray = sp, spray_in = x)
+       cen_out = cen_out, handoff = hand, atomizer = sp, atomizer_in = x)
 }
 
 # =============================================================================
@@ -322,7 +322,7 @@ cat("=== FULL TRAIN: UP1 -> UP2 (foam-wash) -> UP3 (separator) -> reslurry -> UP
 cat("    (nominal inputs, capillary_bridge template)\n\n")
 res <- run_full_train(verbose = TRUE)
 
-m <- res$mixer; s <- res$stream; co <- res$cen_out; h <- res$handoff; sp <- res$spray
+m <- res$mixer; s <- res$stream; co <- res$cen_out; h <- res$handoff; sp <- res$atomizer
 cat(sprintf("\n[UP1]            C_solid %.3f  alpha_g %.3f  D_agg %.0f um  Bond %.3f  RTF %.3f\n",
             s$C_solid, m[["Blended_Porosity"]], m[["Blended_Size_um"]],
             m[["Bond_Strength"]], m[["Residual_Template_Fraction"]]))
@@ -386,7 +386,7 @@ for (cs in c(1.0, 3.0, 5.0, 8.0)) {
   d2 <- attr(r$stream, "up2_ode")
   cat(sprintf("  %-12.1f %-10.2f %-12.3f %-12.3f %-12.1f %-12.3f\n", cs,
               d2$eta_gas, r$cen_out$Entrained_Gas_Holdup, r$handoff[["alpha_g_0"]],
-              r$spray[["D_particle_um"]], r$spray[["phi_porosity_z"]]))
+              r$atomizer[["D_particle_um"]], r$atomizer[["phi_porosity_z"]]))
 }
 cat("\nMore surfactant -> more-stable films -> less bubble coalescence -> more gas\n",
     "stays finely dispersed (weaker wash, lower eta_gas) -> gassier feed into\n",

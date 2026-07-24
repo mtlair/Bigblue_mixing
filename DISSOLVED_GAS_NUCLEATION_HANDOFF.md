@@ -10,7 +10,7 @@
 
 Two parallel developments for porous-particle manufacturing:
 
-1. **Dissolved-Gas Nucleation (Module 0f):** A new spray-dryer branch model that treats dissolved gas fundamentally differently from pre-sparged bubbles. Gas stays dissolved in the pressurized transfer line (zero Ostwald ripening), nucleates heterogeneously at the atomizer nozzle via pressure drop, and forms bubbles *inside* UP1 aggregates (already-formed at ~10 µm). Enables gas-template pore formation without the ripening loss that kills free-bubble templates.
+1. **Dissolved-Gas Nucleation (Module 0f):** A new atomizer-dryer branch model that treats dissolved gas fundamentally differently from pre-sparged bubbles. Gas stays dissolved in the pressurized transfer line (zero Ostwald ripening), nucleates heterogeneously at the atomizer nozzle via pressure drop, and forms bubbles *inside* UP1 aggregates (already-formed at ~10 µm). Enables gas-template pore formation without the ripening loss that kills free-bubble templates.
 
 2. **50 µm Aggregate Sizing via Template Scaffolding:** A strategy to build large (40–50 µm), porous granules in UP1 using temporary adhesion scaffolds (dissolved gas or poor-solvent emulsion) in combination with low dpH + high ionic strength to suppress electrostatic barriers. The template is removed downstream (gas flashes at nozzle, solvent evaporates in dryer), leaving behind the fused granule structure.
 
@@ -56,7 +56,7 @@ C_gas_diss = ex$C_gas_diss_exit,
 
 Carries dissolved gas through UP2/UP3 (identity pass-throughs) to dryer.
 
-**File 3: `unified/up2_spray_dryer_module.R` (Module 0f, after line 173)**
+**File 3: `unified/up2_atomizer_dryer_module.R` (Module 0f, after line 173)**
 
 New module between 0d (Ostwald ripening for pre-existing bubbles) and 0e (DLVO):
 
@@ -106,7 +106,7 @@ D_b_nucl_um  = D_b_nucl * 1e6
 
 ### Key Insight
 
-Nucleated bubbles form *inside* UP1 aggregates at the particle surface, not as free dispersed bubbles. They are already in position for pore retention—no need to wait for entrapment by the spray droplet. Gaseous alkyl monomer (bp < RT) partitions only to the surface layer, so it doesn't affect w_core or bulk Softness.
+Nucleated bubbles form *inside* UP1 aggregates at the particle surface, not as free dispersed bubbles. They are already in position for pore retention—no need to wait for entrapment by the atomizer droplet. Gaseous alkyl monomer (bp < RT) partitions only to the surface layer, so it doesn't affect w_core or bulk Softness.
 
 ---
 
@@ -141,7 +141,7 @@ Two paths that both escape downstream:
 
 2. **Transfer line:** Gas stays dissolved → zero ripening loss
 
-3. **UP4 spray dryer (T_in ≥ 140°C):**
+3. **UP4 atomizer dryer (T_in ≥ 140°C):**
    - Nozzle pressure drop → Henry's law flash → bubbles escape (Module 0f)
    - Dry d50 ~50–60 µm (1.2× D_agg template at size_template=1)
    - Porosity ~15–25% (volume of nucleated gas)
@@ -158,7 +158,7 @@ Two paths that both escape downstream:
 
 2. **Transfer line:** Emulsion is stable; small droplets don't coalesce significantly
 
-3. **UP4 spray dryer (T_in ≥ 150°C for BB):**
+3. **UP4 atomizer dryer (T_in ≥ 150°C for BB):**
    - Module 6c (Raoult): poor solvents evaporate (f_esc ~15–46%)
    - Droplets escape → template pores left behind
    - Dry d50 ~50–60 µm (1.2× D_agg template at size_template=1)
@@ -247,7 +247,7 @@ x["k_part_gas"]     <- 0.05         # partition coeff for surface softening
 3. `unified/interface_stream.R` (line 122–123)
    - Added C_gas_diss to stream output
 
-4. `unified/up2_spray_dryer_module.R` (Module 0f, lines 175–212; output names line 75; return vector)
+4. `unified/up2_atomizer_dryer_module.R` (Module 0f, lines 175–212; output names line 75; return vector)
    - New dissolved-gas nucleation branch
    - Two new output fields: alpha_g_nucl, D_b_nucl_um
 
@@ -257,7 +257,7 @@ x["k_part_gas"]     <- 0.05         # partition coeff for surface softening
 
 - [ ] **UP1 parameter sweep:** dpH 0.05–2.0, I_str 0.01–0.20 at fixed v_tip, tau, template_dose. Confirm D_agg plateaus move lower dpH + higher I_str?
 - [ ] **Gas solubility:** Measure C_gas_diss in saturated feed (Henry's law ρ_gas ≈ P/RT at process T). Does ODE flux match?
-- [ ] **Nucleation test:** Run spray dryer with high C_gas_diss, measure pore size distribution. Do 1–5 µm voids appear? Do they match D_b_nucl predictions?
+- [ ] **Nucleation test:** Run atomizer dryer with high C_gas_diss, measure pore size distribution. Do 1–5 µm voids appear? Do they match D_b_nucl predictions?
 - [ ] **Poor-solvent emulsion:** Prepare BA or BB dispersion (0.5–1% Tween 80, microfluidizer). Run UP1 + UP4. Does pore size match D_template?
 - [ ] **Dry d50 vs D_agg:** With size_template=1, measure dry d50 on samples from UP1 at different D_agg values. Is the 1.2× scaling law holding?
 - [ ] **Span control:** Compare low-ALR atomization (0.08) to baseline (0.5). Does narrower distribution hold at 50 µm?
@@ -285,7 +285,7 @@ x["k_part_gas"]     <- 0.05         # partition coeff for surface softening
 
 | Finding | Mechanism | Implication |
 |---|---|---|
-| **Dissolved gas ≠ free bubbles** | No interface → zero ripening in transfer line | Gas template doesn't lose size before spray; nucleates fresh at nozzle |
+| **Dissolved gas ≠ free bubbles** | No interface → zero ripening in transfer line | Gas template doesn't lose size before atomizer; nucleates fresh at nozzle |
 | **dpH *suppresses* aggregation** | Exponential DLVO barrier W_barrier=exp(dpH-...) | **Low dpH + high I_str required** for sticky irreversible adhesion (opposite of what pH buffers typically do) |
 | **Template-aided floc rate** | Droplets/bubbles provide geometric scaffolding | Direct assembly (no ripening needed); template escapes downstream → geometry frozen in |
 | **Heterogeneous nucleation inside aggregates** | UP1 D_agg already formed when gas flashes | Bubbles nucleate at particle surfaces inside 10 µm floc → already in position for pore retention |
@@ -298,7 +298,7 @@ x["k_part_gas"]     <- 0.05         # partition coeff for surface softening
 - **COFEED_HANDOFF.md** — Co-feed mechanism for liquid-template pore formation
 - **theta_solvent_chi.R** — Hansen HSP database and solvency classification
 - **up1_module_rev38_dryer_risk.r** — UP1 ODE kinetics and bond-strength calibration
-- **up2_spray_dryer_module.R** — Spray-dryer closure, now with Module 0f
+- **up2_atomizer_dryer_module.R** — Spray-dryer closure, now with Module 0f
 
 ---
 

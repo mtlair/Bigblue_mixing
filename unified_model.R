@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# UNIFIED PROCESS MODEL: mixer (UP1) -> ... -> spray dryer (UP2)
+# UNIFIED PROCESS MODEL: mixer (UP1) -> ... -> atomizer dryer (UP2)
 # =============================================================================
 # Connects the two existing modules end-to-end through a common feed-stream
 # interface, with two identity placeholder stages reserved for the unit
@@ -9,7 +9,7 @@
 #   UP1 gassed/templated mixer      unified/up1_mixer_module.R
 #     -> intermediate stage 1       unified/interface_stream.R  (placeholder)
 #     -> intermediate stage 2       unified/interface_stream.R  (placeholder)
-#       -> UP2 spray dryer          unified/up2_spray_dryer_module.R
+#       -> UP2 atomizer dryer          unified/up2_atomizer_dryer_module.R
 #
 # The stream carries composition, physical state, particulate/gas/template
 # state and structure history from the mixer exit into the dryer feed, so
@@ -34,7 +34,7 @@
 
 source("unified/up1_mixer_module.R")
 source("unified/interface_stream.R")
-source("unified/up2_spray_dryer_module.R")
+source("unified/up2_atomizer_dryer_module.R")
 
 set.seed(42)
 
@@ -195,7 +195,7 @@ template_modes <- c(rigid = 1, gas = 2, surface_weld = 3, capillary_bridge = 4)
 
 sink(file.path(out_dir, "nominal_chain_summary.txt"))
 cat("UNIFIED CHAIN - nominal factor values, per templating strategy\n")
-cat(sprintf("(mixer -> 2 placeholder stages -> spray dryer; %d factors)\n\n", k))
+cat(sprintf("(mixer -> 2 placeholder stages -> atomizer dryer; %d factors)\n\n", k))
 nom_tbl <- NULL
 for (mn in names(template_modes)) {
   cat(sprintf("================ template_type = %d (%s) ================\n",

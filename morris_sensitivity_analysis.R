@@ -86,7 +86,7 @@ set.seed(42)
 # One row per factor: name, min, max, log (TRUE = sampled log-uniformly over
 # its range, used for wide-ranging positive factors), unit, and description.
 # Symbols follow the master nomenclature sheet where they exist; others use
-# the spray report's notation. t_hold, mdot_gas_dry and Y_in are spray-line
+# the atomizer report's notation. t_hold, mdot_gas_dry and Y_in are atomizer-line
 # additions (pressurized residence before the nozzle; dryer gas flow and
 # inlet humidity); k_perm_* are the shell permeability coefficients for
 # monomer / plasticizer / binder.
@@ -165,7 +165,7 @@ HLB      <- 12        # surfactant HLB (foam stability driver)  [-]
 phi_m    <- 0.63      # Krieger-Dougherty max packing           [-]
 Tg_solv  <- 150       # solvent (monomer/plasticizer) Tg, Fox   [K]
 d_ratio  <- 0.10      # primary/aggregate size ratio: fallback constant [-]
-                      # (overridden inside spray_dry_model when D_agg_um is wired)
+                      # (overridden inside atomizer_dry_model when D_agg_um is wired)
 C_cham   <- 0.80      # mixing chamber / air supply pressure    [-]
 k_rip0   <- 4.0e-15   # Ostwald ripening rate at 1 atm          [m3/s]
 cp_gas   <- 1005      # dryer gas heat capacity                 [J/kg K]
@@ -179,7 +179,7 @@ h_fg_solv <- 3.5e5    # template solvent latent heat            [J/kg]
 k_emu0   <- 2.0e-20   # emulsion LSW ripening rate (solubility-
                       # limited; immiscible in water)           [m3/s]
 
-spray_dry_model <- function(x) {
+atomizer_dry_model <- function(x) {
   ALR    <- x[["ALR"]];        P_G    <- x[["P_system"]]
   P_F    <- x[["P_feed"]]
   mdot_L <- x[["mdot_L"]];     sigma  <- x[["sigma"]]
@@ -518,7 +518,7 @@ spray_dry_model <- function(x) {
   Dp_j <- Dp_j * packing_size_factor
 
   # --- UP1 aggregate size-template regime (MUTED by default) ----------------
-  # Mirror of unified/up2_spray_dryer_module.R. Two dry-PSD control regimes seen
+  # Mirror of unified/up2_atomizer_dryer_module.R. Two dry-PSD control regimes seen
   # in visc.xlsx: atomizer-control (dispersed feed -> droplet-shell sets size) vs
   # UP1-control (a UP1 aggregate templates the particle, dry d50 ~ 1.2 * D_agg).
   # This overlay lets the aggregate TEMPLATE the size; preserved for a future
@@ -559,7 +559,7 @@ spray_dry_model <- function(x) {
   rho_tapped <- rho_env * max(f_pack, 0.05)
 
   ## --- Particle-morphology recalibration (MUTED by default) -----------------
-  # Mirror of unified/up2_spray_dryer_module.R. Anchored to bulk 0.30 g/cc with
+  # Mirror of unified/up2_atomizer_dryer_module.R. Anchored to bulk 0.30 g/cc with
   # skeletal 1.70 g/cc: compact UP1-control granule phi ~ 0.65 at packing 0.50
   # (-> 0.30 g/cc), atomizer-control (dispersed) feed gets a central-void hollow
   # bump (total void ~0.85, lower sphericity). Regime weight from D_primary_exit
@@ -608,7 +608,7 @@ spray_dry_model <- function(x) {
 
 run_model <- function(X01) {
   Xphys <- scale_design(as.matrix(X01))
-  t(apply(Xphys, 1, spray_dry_model))
+  t(apply(Xphys, 1, atomizer_dry_model))
 }
 
 # -----------------------------------------------------------------------------

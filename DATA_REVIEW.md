@@ -5,7 +5,7 @@ Source data: [`data/visc.xlsx`](data/visc.xlsx) — rotational-rheometer flow cu
 (`up1_up4_psd`) keyed by **cond** number.
 
 - `sample_type = m` — post-**UP1** wet PSD (colloid/aggregate out of the mixer)
-- `sample_type = p` — post-**UP4** dry PSD (spray-dried powder)
+- `sample_type = p` — post-**UP4** dry PSD (atomizer-dried powder)
 - Temperatures in °C; `up1_psig` / `max_up4atom_psig` are gauge pressures at the
   UP1 exit and the UP4 atomizer; all PSD percentiles in µm.
 
@@ -101,7 +101,7 @@ For the atomizer-control regime, cond2 anchors the droplet→particle scale: dry
 ## Part 2 — Model vs. measurement
 
 The active chain is `unified/up1_mixer_module.R` → `interface_stream.R` →
-`unified/up2_spray_dryer_module.R` (sourced by `unified_model.R` and
+`unified/up2_atomizer_dryer_module.R` (sourced by `unified_model.R` and
 `full_train_mixer_to_dryer.R`). The UP1 slurry viscosity `Blended_Viscosity_PaS`
 becomes `mu_exit_PaS` and feeds the nozzle `mu_slurry0` when `couple_viscosity`
 is on, so the UP1 viscosity closure has real downstream consequence.
@@ -153,7 +153,7 @@ aggregated), fully consistent with the calibrated 6.81 m/s at 20 % solids.
 
 ### Dry-PSD control regime — size-template overlay (implemented, muted)
 The two control regimes are now represented in both dryers
-(`up2_run_dryer`, `spray_dry_model`) as a switchable **size-template overlay**,
+(`up2_run_dryer`, `atomizer_dry_model`) as a switchable **size-template overlay**,
 governed by a `size_template` knob in [0, 1]:
 
 - **`size_template = 0` (default, muted).** The dry particle is the droplet→shell
@@ -626,7 +626,7 @@ evaporation enthalpy (water 25 °C → steam at 90 °C, Δh = 2555 kJ/kg):
 
 The heat-duty estimate exceeds the mass-balance estimate by 1.5–1.9×. For up3_1
 (the best-closed condition) the implied dryer thermal efficiency is **65 %**,
-plausible for a small pilot spray dryer with wall losses and air bypass. The
+plausible for a small pilot atomizer dryer with wall losses and air bypass. The
 efficiency varies across conditions (52–69 %), likely because up4_dry_air_scfm
 was set at a fixed high value regardless of feed throughput. **The mass-balance
 estimate is the primary basis for the UP4 feed rate; the heat-duty estimate

@@ -2,7 +2,7 @@
 # =============================================================================
 # FULL-TRAIN MORRIS SCREEN
 #   UP1 mixer -> UP2 foam-wash (491-line ODE) -> UP3 separator -> reslurry
-#   -> UP4 spray dryer
+#   -> UP4 atomizer dryer
 # =============================================================================
 # One Morris elementary-effects screen over the WHOLE train. The per-stage
 # factor tables are MERGED into a single dictionary, with three rules:
@@ -80,7 +80,7 @@ d_up1 <- with(mx_factors[mx_factors$module == "up1", ],
 d_up2 <- mk(up2_tbl$base, up2_tbl$min, up2_tbl$max, up2_tbl$log, "up2")
 d_up3 <- with(cen_factors[match(up3_free, cen_factors$name), ],
               mk(name, lo, hi, log, "up3"))
-d_up4 <- with(spray_factors[match(up4_free, spray_factors$name), ],
+d_up4 <- with(atomizer_factors[match(up4_free, atomizer_factors$name), ],
               mk(name, min, max, log, "up4"))
 
 factors <- rbind(d_up1, d_up2, d_up3, d_up4)
@@ -143,18 +143,18 @@ run_train_x <- function(x) {
     u1 <- split_by(x, "up1"); for (nm in names(u1)) mixer_x[nm] <- u1[[nm]]
     cen_op <- cen_nominal
     u3 <- split_by(x, "up3"); for (nm in names(u3)) cen_op[nm] <- u3[[nm]]
-    spray_op <- sp_mid
-    u4 <- split_by(x, "up4"); for (nm in names(u4)) spray_op[nm] <- u4[[nm]]
+    atomizer_op <- sp_mid
+    u4 <- split_by(x, "up4"); for (nm in names(u4)) atomizer_op[nm] <- u4[[nm]]
     wash_pars <- as.list(split_by(x, "up2"))
 
     r <- NULL
     # swallow deSolve/lsoda solver chatter (DINTDY etc.) on corner failures;
     # the NA-guard below is what actually records them
     suppressWarnings(suppressMessages(invisible(capture.output(
-      r <- run_full_train(mixer_x = mixer_x, cen_op = cen_op, spray_op = spray_op,
+      r <- run_full_train(mixer_x = mixer_x, cen_op = cen_op, atomizer_op = atomizer_op,
                           wash_pars = wash_pars, up2 = "ode")))))
     if (is.null(r)) return(na_row)
-    sp <- r$spray
+    sp <- r$atomizer
     v <- c(porosity   = sp[["phi_porosity_z"]],
            sphericity = sp[["Omega_struct_z"]],
            size_um    = sp[["D_particle_um"]],

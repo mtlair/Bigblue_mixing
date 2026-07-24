@@ -1,7 +1,7 @@
 # =============================================================================
-# UP2 MODULE: effervescent-airblast spray drying + particle formation
+# UP2 MODULE: effervescent-airblast atomizer drying + particle formation
 # =============================================================================
-# Physics from morris_sensitivity_analysis.R (spray_dry_model: pressurized
+# Physics from morris_sensitivity_analysis.R (atomizer_dry_model: pressurized
 # hold -> two-phase conditioning -> effervescent-airblast exit -> secondary
 # breakup -> dryer balance -> particle formation), refactored so that the
 # FEED is no longer a set of independent screening factors but the stream

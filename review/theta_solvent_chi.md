@@ -40,7 +40,7 @@ three components and misclassifies polar species with different δP/δH profiles
 
 ## Water-dispersibility filter
 
-In aqueous spray-drying the template must form **stable droplets** in the
+In aqueous atomizer-drying the template must form **stable droplets** in the
 slurry, not dissolve into the continuous water phase. A candidate is viable only if:
 
 ```
@@ -62,7 +62,7 @@ aqueous phase regardless of their RED with the polymer.
 | any | — | NO | **not viable** — dissolves in slurry | — | — |
 | gas (bp < 25 °C) | — | — | **PV=nRT** expansion | 2 (gas) | α_g / chi_npgas |
 
-**Volatility threshold:** `bp_C < T_dry_C + 40`. For spray-drying, set
+**Volatility threshold:** `bp_C < T_dry_C + 40`. For atomizer-drying, set
 `T_dry_C` to the **inlet** temperature (≈140–160 °C) rather than outlet
 (≈90 °C) when assessing whether a template escapes in-process.
 
@@ -85,7 +85,7 @@ cores → plasticize), ≈ 0 for poor solvents (stay as free droplets → pores)
 | d-limonene* | 1.49 | 176 | 4.57 | ~0 | type **1** at T_dry=90 C; type **4** at T_dry=140 C (inlet) |
 
 *d-limonene is borderline volatile: bp 176 °C means it evaporates readily at
-spray-dryer inlet conditions (≈150 °C) but is classified as rigid filler at
+atomizer-dryer inlet conditions (≈150 °C) but is classified as rigid filler at
 the 90 °C outlet reference. Use `template_from_chemistry("d-limonene", T_dry_C=140)`
 to evaluate at inlet conditions — result flips to type 4 (clean pore template),
 making it an attractive green-solvent candidate.

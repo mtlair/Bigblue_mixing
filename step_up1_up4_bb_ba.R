@@ -5,7 +5,7 @@
 # (COFEED_HANDOFF.md). For each of the two recommended type-4 pore templates --
 # butyl acetate (BA) and butyl butyrate (BB) -- this replays the FULL wired train
 #
-#     UP1 gassed mixer -> UP2 foam-wash -> UP3 centrifuge -> UP4 spray dryer
+#     UP1 gassed mixer -> UP2 foam-wash -> UP3 centrifuge -> UP4 atomizer dryer
 #
 # and prints the stream state at every interface, so the chemistry (Hansen RED,
 # boiling point, core-absorption RTF) can be traced from the mixer feed to the
@@ -21,7 +21,7 @@
 
 source("unified/up1_mixer_module.R")
 source("unified/interface_stream.R")
-source("unified/up2_spray_dryer_module.R")
+source("unified/up2_atomizer_dryer_module.R")
 source("foam_wash_module.R")        # UP2 foam-wash column
 source("up3_centrifuge_module.R")   # UP3 decanting centrifuge
 source("theta_solvent_chi.R")       # chemistry -> template regime (Hansen RED)
@@ -133,10 +133,10 @@ step_template <- function(template, T_dry_C) {
       "% cake, ", if (is.finite(row$up3_Fg)) row$up3_Fg else 430, " g)\n", sep="")
   show(c("C_solid","rho_slurry","mu_exit_PaS","alpha_g","phi_templ_free","w_core"), s)
 
-  # ---- UP4 : spray dryer ----------------------------------------------------
+  # ---- UP4 : atomizer dryer ----------------------------------------------------
   x_up2 <- as.list(x[up2_names]); x_up2[["size_template"]] <- x[["size_template"]]
   r2 <- up2_run_dryer(s, x_up2)
-  cat("\n[4] UP4  spray dryer  (atomise + dry; inlet ", round(x["T_dryer_in"]-273.15,0),
+  cat("\n[4] UP4  atomizer dryer  (atomise + dry; inlet ", round(x["T_dryer_in"]-273.15,0),
       " C, ALR ", round(x["ALR"],2), ")\n", sep="")
   cat(sprintf("    %-14s %8.2f um   %-14s %8.2f um\n",
               "product d50", r2[["D_particle_um"]], "product d90", r2[["Dp90_um"]]))

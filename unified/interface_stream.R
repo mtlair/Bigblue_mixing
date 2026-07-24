@@ -4,7 +4,7 @@
 # The unified model chains unit operations through a single "stream" object —
 # a named list describing the slurry leaving one stage and entering the next:
 #
-#   UP1 mixer -> [intermediate stage 1] -> [intermediate stage 2] -> spray dryer
+#   UP1 mixer -> [intermediate stage 1] -> [intermediate stage 2] -> atomizer dryer
 #
 # The two intermediate stages are IDENTITY PLACEHOLDERS for the unit
 # operations to be added later (e.g. transfer line / pump, hold tank,

@@ -177,7 +177,7 @@ Full analysis run: 60 trajectories × 8 levels × 29 factors = 1,620 model evalu
 
 **New factor interactions:**
 - `phi_emulsion` is now a top-3 driver of porosity and tapped density (comparable to `alpha_g_0`'s 71 kg/m³ sensitivity)
-- `D_template` decouples porosity control from spray process noise (unlike `D_b` or `alpha_g_0`)
+- `D_template` decouples porosity control from atomizer process noise (unlike `D_b` or `alpha_g_0`)
 - `T_bp_solv` and `T_system` interact to set the operating regime; narrow window between clean templating and burst
 
 ---
@@ -229,7 +229,7 @@ Full analysis run: 60 trajectories × 8 levels × 29 factors = 1,620 model evalu
   - Higher `k_perm_bind` increases both (pore-blocking effect)
 - ✅ Emulsion factors show regime structure:
   - `T_system` and `T_bp_solv` pull `solv_retained` and `f_burst` in opposite directions (under-heated ↔ templating ↔ burst)
-  - `D_template` controls `D_pore` almost exclusively (~9.3), decoupling pore size from spray process
+  - `D_template` controls `D_pore` almost exclusively (~9.3), decoupling pore size from atomizer process
   - `phi_emulsion` is now a top-3 porosity driver
 - ✅ Gas foam chain metrics unchanged (α_g_0, t_hold, etc. maintain their historical sensitivity ranks)
 

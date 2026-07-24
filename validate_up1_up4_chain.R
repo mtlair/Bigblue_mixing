@@ -2,7 +2,7 @@
 # UP1 -> UP4 FULL-CHAIN validation harness (4 measured chain conditions)
 # =============================================================================
 # The 4 conditions in data/cond_up1234.csv were measured through the COMPLETE
-# train UP1 (mixer) -> UP2 (foam wash) -> UP3 (centrifuge) -> UP4 (spray dryer),
+# train UP1 (mixer) -> UP2 (foam wash) -> UP3 (centrifuge) -> UP4 (atomizer dryer),
 # with SEM samples 114641-114644 = up3_1..up3_4 and a measured product PSD.
 #
 # This harness replays UP1 from its measured setpoints, then hands the dryer the

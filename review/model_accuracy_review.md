@@ -230,7 +230,7 @@ the pore/collapse split and the escape rate, consistently:
   kinetic completeness `f_diff`. Good solvent (low χ) swells into cores (high
   RTF → plasticizer/collapse); poor solvent (high χ) is excluded → free droplet
   → clean pore template. Verified monotonic: RTF 0.22 (χ=0.35) → 0.0006 (χ=2.4).
-- **`up2_spray_dryer_module.R`** (wires partial evaporation): Module 6c escape
+- **`up2_atomizer_dryer_module.R`** (wires partial evaporation): Module 6c escape
   driving force is now a true partial-pressure difference
   `dp = a₁·p_sat(T_wb) − p_solv,gas` with the Flory–Huggins solvent activity
   `a₁ = φ·exp[(1−φ)+χ(1−φ)²]` integrated as the core dries (φ-evolving). Free
@@ -252,7 +252,7 @@ wiring carried one constant χ through the whole chain. Fixed so the input
 `chi_template` (quoted at `T_CHI_REF = 298.15 K`, entropic floor `χ_S = 0.34`) is
 re-evaluated at the *local* temperature: at the **mixer** temperature in
 `up1_mixer_module.R` where the absorption equilibrium (RTF) is set, and at the
-**constant-rate wet-bulb** surface in `up2_spray_dryer_module.R` where the escape
+**constant-rate wet-bulb** surface in `up2_atomizer_dryer_module.R` where the escape
 activity acts. Physically: a poor solvent becomes somewhat less poor when warm,
 so the mixer (warm) absorbs a little more while the constant-rate surface (cool
 wet-bulb) keeps a poor solvent poor during escape.
@@ -285,7 +285,7 @@ T_wb_cr <- T_out - 0.8 * pmax(T_in - T_out, 0)
 
 For `T_in = 500 K`, `T_out = 360 K` this gives `T_wb_cr = 248 K = −25 °C` — a
 physically impossible sub-freezing droplet-surface temperature during hot-gas
-spray drying. The formula has the sign of the `T_in − T_out` term backward; it
+atomizer drying. The formula has the sign of the `T_in − T_out` term backward; it
 sub-tracts an extra cooling step instead of placing the wet-bulb between inlet
 and outlet. As a consequence, template-solvent vapour pressure at `T_wb_cr` was
 essentially zero, making `f_cr ≈ 0` regardless of solvent boiling point or

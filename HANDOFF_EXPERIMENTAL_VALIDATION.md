@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The unified spray-drying model now includes **Raoult constant-rate evaporation (Module 6c)** to differentiate volatile template escape via partial-pressure driving force during the constant-rate drying window (T_inlet ≈ 143°C, T_outlet ≈ 90°C).
+The unified atomizer-drying model now includes **Raoult constant-rate evaporation (Module 6c)** to differentiate volatile template escape via partial-pressure driving force during the constant-rate drying window (T_inlet ≈ 143°C, T_outlet ≈ 90°C).
 
 ### Key Findings at up3_1 Conditions
 
@@ -165,7 +165,7 @@ Validate that BA and BB produce **distinct PSD and pore morphologies** due to:
 
 ## Module Changes Summary
 
-### `unified/up2_spray_dryer_module.R`
+### `unified/up2_atomizer_dryer_module.R`
 
 **Added:**
 - `R_GAS = 8.314` to constants
@@ -198,7 +198,7 @@ Validate that BA and BB produce **distinct PSD and pore morphologies** due to:
 | **validate_up1_up4_chain.R** | root | Chain validation with measured post-UP3 injection |
 | **scenario_large_template_droplets.R** | root | Atomizer sensitivity sweep |
 | **scenario_large_template_droplets.csv** | `unified_output/` | Scenario results table |
-| **up2_spray_dryer_module.R** | `unified/` | Dryer model (Module 6c added) |
+| **up2_atomizer_dryer_module.R** | `unified/` | Dryer model (Module 6c added) |
 
 ---
 
@@ -208,7 +208,7 @@ Validate that BA and BB produce **distinct PSD and pore morphologies** due to:
 2. **SEM validation:** Compare pore morphology (pore size, pore distribution) to model predictions.
 3. **RTF measurement:** If feasible, measure core-absorbed template in dried particles (TGA, spectroscopy) to validate RTF_dryer signature.
 4. **Extend to other stages:** Wire UP2/UP3 models fully (currently using measured post-UP3 feed state). This will expose any gaps in chemistry transport through foam-wash and centrifuge.
-5. **Non-volatile template exploration:** If composite particles (size-increasing fillers) are desired, develop spray dynamics + interfacial tension coupling to model coalescence resistance and phase stability.
+5. **Non-volatile template exploration:** If composite particles (size-increasing fillers) are desired, develop atomizer dynamics + interfacial tension coupling to model coalescence resistance and phase stability.
 
 ---
 

@@ -5,7 +5,7 @@
 # two-compartment (cavern A / dead-wall B) ODE model with C-infinity smoothed
 # algebra, surface chemistry (CMC cap, HLB efficiency, DLVO), templating
 # closure (rigid / gas / surface-weld / capillary-bridge) and the rev38
-# spray-dryer risk outputs (Swelling_Softness_exit, Residual_Template_Fraction).
+# atomizer-dryer risk outputs (Swelling_Softness_exit, Residual_Template_Fraction).
 #
 # This file contains NO study driver (no Morris, no sweeps, no plotting) —
 # only the physics, packaged as:

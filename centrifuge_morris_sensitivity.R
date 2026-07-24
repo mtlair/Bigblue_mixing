@@ -429,13 +429,13 @@ unified_centrifuge_model <- function(run) {
   paste_viscosity_pa_s <- cake_yield_stress / gamma_disc + K_hb * gamma_disc^(n_hb - 1)
 
   # Sprayability: apparent (Herschel-Bulkley) viscosity at an atomization shear
-  # rate vs a practical sprayable ceiling. As dewatering pushes solids toward
+  # rate vs a practical atomizerable ceiling. As dewatering pushes solids toward
   # 50 %, the yield stress climbs and the cake becomes too viscous to atomize
   # without dilution / heating downstream (Spray_Visc_Ratio > 1).
-  gamma_spray    <- 1e4              # atomization shear rate      [1/s]
-  mu_spray_limit <- 0.5              # practical atomization ceiling [Pa s]
-  mu_spray <- cake_yield_stress / gamma_spray + K_hb * gamma_spray^(n_hb - 1)
-  Spray_Visc_Ratio <- mu_spray / mu_spray_limit
+  gamma_atomizer    <- 1e4              # atomization shear rate      [1/s]
+  mu_atomizer_limit <- 0.5              # practical atomization ceiling [Pa s]
+  mu_atomizer <- cake_yield_stress / gamma_atomizer + K_hb * gamma_atomizer^(n_hb - 1)
+  Spray_Visc_Ratio <- mu_atomizer / mu_atomizer_limit
 
   # Plasticizer Retention (Flory-Huggins)
   Q_liq_safe  <- max(Q_liq, 1e-12)
@@ -484,8 +484,8 @@ unified_centrifuge_model <- function(run) {
   rho_pf <- (Q_solid_rec * rho_poly + Q_liq_rec * rho_liq) /
             max(Q_solid_rec + Q_liq_rec, 1e-12)
   exit_density_kg_m3 <- (1 - alpha_g_out) * rho_pf + alpha_g_out * rho_gas
-  # product solids on a MASS basis (spray model's C_solid_mass), and the
-  # continuous-phase serum viscosity handed downstream (spray model's mu_L)
+  # product solids on a MASS basis (atomizer model's C_solid_mass), and the
+  # continuous-phase serum viscosity handed downstream (atomizer model's mu_L)
   solids_mass_frac <- (Q_solid_rec * rho_poly) /
                       max(Q_solid_rec * rho_poly + Q_liq_rec * rho_liq, 1e-12)
 
@@ -527,25 +527,25 @@ unified_centrifuge_model <- function(run) {
 # 1b. CENTRIFUGE -> SPRAY-DRYER HANDOFF
 # =========================================================================
 # The discharged cake is too concentrated to atomize (see Spray_Visc_Ratio), so
-# a reslurry / dilution step sits between the units. This maps every spray-model
-# input the centrifuge STREAM determines, after diluting to a target sprayable
+# a reslurry / dilution step sits between the units. This maps every atomizer-model
+# input the centrifuge STREAM determines, after diluting to a target atomizerable
 # solids mass fraction. Spray-unit operating settings (ALR, air/feed pressures,
 # dryer gas flow/temperature/humidity, hold time, Tg, permeabilities, emulsion
-# template) are NOT set here - they belong to the spray dryer.
+# template) are NOT set here - they belong to the atomizer dryer.
 #
 # Dilution assumptions (flagged where approximate): solids mass is conserved;
 # everything dissolved/entrained in the liquid is diluted by the added water;
 # gas-free slurry density is the exact two-density mixture at the target solids;
 # bubble size is unchanged; serum surface tension and viscosity move toward the
 # clean-water limits as the surfactant/polymer are diluted (first-order).
-centrifuge_to_spray <- function(run, reslurry_add = 0) {
+centrifuge_to_atomizer <- function(run, reslurry_add = 0) {
   o <- unified_centrifuge_model(run)
   rho_poly <- 1800; rho_liq <- 1000; sigma_clean0 <- 0.072
 
   Cs_cake <- o$Product_Solids_MassFrac
   # The feed to UP4 is TIED to the UP3 cake output (solids, liquid, entrained
   # gas) rather than a fixed reslurry target. reslurry_add = added dilution
-  # liquid per unit cake liquid (0 = spray the separator cake as-is); the feed
+  # liquid per unit cake liquid (0 = atomizer the separator cake as-is); the feed
   # solids then tracks the separator's actual cake concentration.
   dil    <- 1 + max(0, reslurry_add)                        # >=1 = water added
   target <- Cs_cake / dil                                   # UP3-tied feed solids
@@ -783,17 +783,17 @@ cat("Wrote output/centrifuge_morris_plots.png and output/centrifuge_morris_indic
 # -----------------------------------------------------------------------------
 # 6. Spray-dryer handoff (nominal case, reslurried to 30% solids)
 # -----------------------------------------------------------------------------
-spray_ranges <- list(rho_L=c(1000,1300), C_solid_mass=c(0.05,0.40),
+atomizer_ranges <- list(rho_L=c(1000,1300), C_solid_mass=c(0.05,0.40),
                      alpha_g_0=c(0.05,0.60), sigma=c(0.030,0.070),
                      D_b=c(2e-5,2e-4), mu_L=c(0.0012,0.056),
                      C_monomer=c(0,0.02), C_plasticizer=c(0,0.05),
                      C_binder=c(0,0.05), I_strength=c(1e-3,0.5), Delta_pH=c(0.2,4.0))
-sf <- centrifuge_to_spray(nominal_vec, reslurry_add = 0.5)
-cat("\n== Centrifuge -> spray-dryer feed (nominal, cake-tied + light reslurry) ==\n")
-for (nm in names(spray_ranges)) {
-  rng <- spray_ranges[[nm]]
-  flag <- if (sf[[nm]] < rng[1] || sf[[nm]] > rng[2]) "  <-- outside spray range" else ""
+sf <- centrifuge_to_atomizer(nominal_vec, reslurry_add = 0.5)
+cat("\n== Centrifuge -> atomizer-dryer feed (nominal, cake-tied + light reslurry) ==\n")
+for (nm in names(atomizer_ranges)) {
+  rng <- atomizer_ranges[[nm]]
+  flag <- if (sf[[nm]] < rng[1] || sf[[nm]] > rng[2]) "  <-- outside atomizer range" else ""
   cat(sprintf("  %-14s %11.5g   [%.4g, %.4g]%s\n", nm, sf[[nm]], rng[1], rng[2], flag))
 }
-cat(sprintf("  (cake was %.1f%% solids; diluted %.1fx to reach the spray feed)\n",
+cat(sprintf("  (cake was %.1f%% solids; diluted %.1fx to reach the atomizer feed)\n",
             100 * sf[["C_solid_massfrac_cake"]], sf[["dilution_x"]]))

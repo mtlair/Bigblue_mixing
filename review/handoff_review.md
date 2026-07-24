@@ -13,7 +13,7 @@ substantive data-integrity issue and a handful of cosmetic nits are noted below.
 
 | Claim | Check | Result |
 |-------|-------|--------|
-| theta_skin two-route closure (Péclet + surface-fusion) | `unified/up2_spray_dryer_module.R:262–290` | matches the snippet |
+| theta_skin two-route closure (Péclet + surface-fusion) | `unified/up2_atomizer_dryer_module.R:262–290` | matches the snippet |
 | `SKIN_SURVIVAL = 0.30` seeding | `unified/interface_stream.R:59` | ✓ |
 | C_monomer / C_plasticizer → skin at ranks **14 / 16**, positive μ* | ranked `unified_morris_indices.csv` for `up2_theta_skin_z` | ✓ exact |
 | Morris: 41 factors, r=30 → **1260** runs, 1260/1260 valid | `(41+1)×30 = 1260`; `morris_run.log` | ✓ |
@@ -56,7 +56,7 @@ mapping as usable, and it isn't.
 
 1. **Code snippet vs. source.** The handoff's `theta_skin_fus` snippet writes
    `Tg_polymer` where the source clamps it: `inv_Tg_plas <- (1 - phi_solvent) /
-   max(Tg_pol, 200) + …` (`up2_spray_dryer_module.R:278`). Math-equivalent except
+   max(Tg_pol, 200) + …` (`up2_atomizer_dryer_module.R:278`). Math-equivalent except
    for the `Tg_pol < 200 K` guard; the snippet is a faithful simplification.
 2. **Column label.** `up1_exit_rho_5pctgas_kgm3` holds the Boyle back-calc value
    (1063–1070 kg/m³) that the handoff text describes as ~4.4–4.9% gas, not 5%.

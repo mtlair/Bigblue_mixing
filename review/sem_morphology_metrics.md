@@ -6,7 +6,7 @@ Extractor: `sem_morphology.py` → `data/sem_morphology.csv`.
 ## Metric definitions
 
 Each SEM metric is dimensionless and maps to one model morphology output
-(`unified/up2_spray_dryer_module.R`).
+(`unified/up2_atomizer_dryer_module.R`).
 
 | Metric | Source mag | Definition | Model output |
 |--------|-----------|------------|--------------|

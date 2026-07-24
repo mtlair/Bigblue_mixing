@@ -130,7 +130,7 @@ is_water_dispersible <- function(water_sol, logP)
   !is.na(water_sol) && (water_sol < 5 | (!is.na(logP) && logP > 1.5))
 
 # --- predict template regime + model parameters ------------------------------
-# T_dry_C: use INLET temperature (~140-160 C for spray drying) for volatility.
+# T_dry_C: use INLET temperature (~140-160 C for atomizer drying) for volatility.
 template_from_chemistry <- function(template, poly = POLY_HSP,
                                      T_dry_C = 90, db = solubility_db()) {
   s <- db[db$species == template, ]
@@ -335,7 +335,7 @@ if (sys.nframe() == 0) {
   }
   cat("[*] water_sol > 5 g/100mL AND logP < 1.5 -> dissolves in aqueous phase\n")
 
-  cat("\n=== VIABLE CANDIDATES (water-dispersible, aqueous spray-drying) ===\n")
+  cat("\n=== VIABLE CANDIDATES (water-dispersible, aqueous atomizer-drying) ===\n")
   cat("\n--- Type 4: clean pore templates (poor + volatile + w-dispersible) ---\n")
   cat("    Tip: use T_dry_C = inlet temp (~150 C) for high-bp solvents\n")
   cat(sprintf("  %-24s %5s %5s %5s %5s %5s\n","template","RED","bp C","logP","RTF","Vmol"))

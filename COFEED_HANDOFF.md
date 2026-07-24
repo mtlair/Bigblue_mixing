@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-A new **co-feed template-in-water mechanism** has been developed for spray-dryer pore formation. Instead of pre-emulsifying the template solvent into the polymer slurry, the template is injected as a fine aqueous dispersion directly into UP1 (the mixer) alongside the colloid feed. This approach:
+A new **co-feed template-in-water mechanism** has been developed for atomizer-dryer pore formation. Instead of pre-emulsifying the template solvent into the polymer slurry, the template is injected as a fine aqueous dispersion directly into UP1 (the mixer) alongside the colloid feed. This approach:
 
 - **Decouples template droplet size from slurry homogenization** → fine control over pore size
 - **Maintains type-4 (capillary_bridge) pore formation** → clean spherical pores with capillary wetting
@@ -51,7 +51,7 @@ Water dispersibility criterion: `water_sol < 5 g/100mL` OR `logP > 1.5`
 | **butyl butyrate** | **1.33** | **166** | **2.83** | **0.04** | **0.035** | **96%** |
 
 **Why BB over BA:**
-- Lower RTF (dryer model): 0.035 vs 0.12 → less core absorption in spray dryer
+- Lower RTF (dryer model): 0.035 vs 0.12 → less core absorption in atomizer dryer
 - Better water immiscibility: 0.04 g/100mL vs 0.7 → droplet stability
 - Higher bp: 166°C vs 126°C → slower evaporation (more control in dryer, needs inlet T ≥ 140°C)
 - Pore yield: 96% vs 88% (minimal softening of polymer cores)
@@ -146,7 +146,7 @@ At nominal conditions (D_particle ≈ 1 μm, tau ≈ 20 min):
 - **SEM morphology:** Spherical pores, capillary-connected network
 - **Porosity measurement:** BET (gas adsorption) or mercury porosimetry
 - **Expected pore size distribution:** Narrow, centered at 0.3–0.5 μm
-- **Batch consistency:** Pore size reproducible across spray runs
+- **Batch consistency:** Pore size reproducible across atomizer runs
 
 ---
 
@@ -257,7 +257,7 @@ RTF_mixer <- up1_result$Residual_Template_Fraction  # ~0.005–0.010
 
 1. **Experimental validation:**
    - Prepare BB dispersion (0.5% Tween 80, homogenize to D ≈ 0.5 μm)
-   - Run spray-dryer trial at inlet T = 150°C, fill = 0.20
+   - Run atomizer-dryer trial at inlet T = 150°C, fill = 0.20
    - Measure pore size (SEM, BET), porosity, and mechanical properties
    - Compare to pre-emulsified slurry baseline
 
@@ -282,6 +282,6 @@ RTF_mixer <- up1_result$Residual_Template_Fraction  # ~0.005–0.010
 
 - **Chemistry module:** `theta_solvent_chi.R` — Hansen HSP, RED, RTF (dryer model)
 - **Kinetics module:** `up1_module_rev38_dryer_risk.r` — UP1 RTF_mixer, f_diff, type-4 gating
-- **Implementation:** Co-feed dispersion prep, spray-dryer conditions, validation plan
+- **Implementation:** Co-feed dispersion prep, atomizer-dryer conditions, validation plan
 
 *Handoff ready for experimental validation. All simulation results are reproducible via R scripts.*
