@@ -73,7 +73,7 @@ factors <- rbind(
   fac("tau_mix",        5.0,    40.0,  FALSE, "min",   "up1", "Process", "mixer residence time"),
   fac("P_mix",          5/14.7, 64.7/14.7, FALSE, "atm", "up1", "Process", "mixer headspace pressure"),
   fac("T_mix",          290,    360,   FALSE, "K",     "up1", "Process", "mixer temperature (-> dryer feed T)"),
-  fac("C_gas_diss_temp",0.0,    1.0,   FALSE, "-",     "up1", "Process", "dissolved gas in template stream"),
+  fac("C_gas_diss_temp",0.0,    0.25,  FALSE, "-",     "up1", "Process", "dissolved gas Henry-normalised saturation index (model units; C_eq ~ 0.2 at 1 atm)"),
   fac("Q_gas",          0.4,    2.0,   FALSE, "-",     "up1", "Process", "sparge gas flow"),
   fac("Q_colloid",      40/60,  200/60,FALSE, "-",     "up1", "Process", "colloid feed flow"),
   fac("Q_template",     0.1,    2.0,   FALSE, "-",     "up1", "Process", "template feed flow"),

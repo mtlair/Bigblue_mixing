@@ -82,4 +82,12 @@ if (sys.nframe() == 0) {
               free_monomer_ppm(1001, 0.25, feed_T_C, feed_P_atm)$free_monomer_ppm,
               feed_T_C, feed_P_atm))
   cat("chain-condition estimates:\n"); print(ch)
+  neg <- ch[!is.na(ch$free_monomer_ppm) & ch$free_monomer_ppm < 0, ]
+  if (nrow(neg) > 0)
+    cat(sprintf(
+      "NOTE: %d row(s) with negative free_monomer_ppm (cond %s): measured\n",
+      nrow(neg), paste(neg$cond, collapse = ", ")),
+      "density exceeds the colloid+water baseline — the density method\n",
+      "cannot detect dissolved monomer at these conditions (see header).\n",
+      sep = "")
 }

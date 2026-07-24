@@ -173,6 +173,12 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   k_emu <- k_emu0 * (1 - 0.9 * theta_surf)
   D_e_h <- (max(D_e, 1e-8)^3 + k_emu * t_hold)^(1/3)  # coarsened template size
 
+  ## --- Module 0e: DLVO electrostatics --------------------------------------
+  # Runs on the feed-state theta_surf (pre-nucleation): DLVO stability is a
+  # property of the slurry entering the dryer, before nozzle pressure drop.
+  E_rep     <- dpH * (1 / (1 + 10 * I_str)) * (1 - theta_surf)
+  stability <- 1 + E_rep + 5 * theta_surf         # electrostatic + steric
+
   ## --- Module 0f: Dissolved-gas nucleation at the atomizer -----------------
   # Dissolved gas stays dissolved in the pressurised transfer line (no gas/water
   # interface → zero Ostwald ripening, unlike pre-sparged free bubbles). It
@@ -182,6 +188,12 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   # position for pore retention. Local skin softening only (surface layer):
   # gaseous alkyl monomer (bp < RT) partitions to the particle surface but
   # cannot accumulate in glassy bulk cores → does NOT raise w_core or Softness.
+  #
+  # NOTE on C_gas_diss units: the UP1 ODE tracks dissolved gas as a Henry-
+  # normalised model state (C_eq = P_local/(5*T_scale) ~ 0.2 at 1 atm), not a
+  # strict kg/kg mass fraction. K_alpha_gas converts from ODE model units to gas
+  # volume fraction; calibrate experimentally for your gas/pressure system
+  # (default 1.0 preserves the original phenomenological calibration).
   r_exp_0f <- max(P_F / P_atm, 1)
   C_gas_diss <- if (!is.null(feed$C_gas_diss) && is.finite(feed$C_gas_diss))
                   pmax(0, feed$C_gas_diss) else 0.0
@@ -190,30 +202,44 @@ up2_run_dryer <- function(feed, x, cst = up2_constants()) {
   D_b_nucl     <- D_b_h   # default: no nucleation event, carry existing size
 
   if (C_gas_diss > 1e-4) {
-    # Henry's law: fraction of dissolved gas released = 1 - 1/r_exp
-    alpha_g_nucl <- min(C_gas_diss * (1 - 1 / r_exp_0f), 0.25)
-    # Nucleated bubble size: Laplace balance at heterogeneous nucleation site
-    # (contact-angle cavity at particle surface sets a smaller effective radius)
-    dP_flash   <- max(P_F - P_atm, 1e3)              # pressure drop [Pa]
-    D_b_nucl   <- min(max(4 * sigma / dP_flash, 1e-7), 20e-6)  # 0.1–20 µm
-    # Volume-weighted merge: nucleated bubbles join any pre-existing free gas
+    # Henry-scaled release: K_alpha_gas maps ODE concentration units to gas
+    # volume fraction; (1 - 1/r_exp) is the depressurisation release fraction.
+    K_alpha_gas  <- if (!is.null(x[["K_alpha_gas"]])) x[["K_alpha_gas"]] else 1.0
+    alpha_g_nucl <- min(C_gas_diss * K_alpha_gas * (1 - 1 / r_exp_0f), 0.90)
+
+    # Critical-nucleus diameter from Laplace balance at heterogeneous cavity.
+    dP_flash      <- max(P_F - P_atm, 1e3)                       # [Pa]
+    D_b_nucl_crit <- min(max(4 * sigma / dP_flash, 1e-7), 20e-6) # 0.1–20 µm
+
+    # Post-nucleation diffusive growth: redistribute alpha_g_nucl across
+    # N_bub nucleation sites per m³ of slurry (default 1e15 m⁻³ gives 1–5 µm
+    # final bubble diameters at typical alpha_g_nucl 0.01–0.10).
+    # The user may calibrate N_bub_m3 from observed pore-size distributions.
+    N_bub_m3  <- if (!is.null(x[["N_bub_m3"]])) x[["N_bub_m3"]] else 1e15
+    D_b_grown <- (6 * max(alpha_g_nucl, 1e-12) / (pi * N_bub_m3))^(1 / 3)
+    D_b_nucl  <- max(D_b_nucl_crit, D_b_grown)  # grown >= critical nucleus
+
+    # Volume-weighted merge: nucleated bubbles join any pre-existing free gas.
     a_pre  <- alpha_g
     a_tot  <- min(a_pre + alpha_g_nucl, 0.90)
     D_b_h  <- if (a_tot > 1e-8)
                 ((a_pre * D_b_h^3 + alpha_g_nucl * D_b_nucl^3) / a_tot)^(1/3)
               else D_b_h
     alpha_g <- a_tot
+
+    # Surfactant debit: nucleation adds new gas/liquid interface; recompute
+    # coverage with updated total gas area and shed under-stabilised foam.
+    gas_area_post <- 6 * alpha_g / max(D_b_h, 1e-7)
+    theta_surf    <- min(1, cap_area / (part_area + gas_area_post + emu_area))
+    alpha_g       <- alpha_g * (0.3 + 0.7 * theta_surf)
+
     # Local skin softening: dissolved gas partitions to particle surface layer
     # (~10–50 nm) only — tracked via theta_seed, not Softness or w_core.
-    k_part_gas   <- if (!is.null(x[["k_part_gas"]])) x[["k_part_gas"]] else 0.05
-    phi_skin_gas <- min(C_gas_diss * k_part_gas, 0.10)
+    k_part_gas    <- if (!is.null(x[["k_part_gas"]])) x[["k_part_gas"]] else 0.05
+    phi_skin_gas  <- min(C_gas_diss * k_part_gas, 0.10)
     skin_gas_frac <- phi_skin_gas / (phi_skin_gas + 0.03)
-    theta_seed   <- 1 - (1 - theta_seed) * (1 - 0.4 * skin_gas_frac)
+    theta_seed    <- 1 - (1 - theta_seed) * (1 - 0.4 * skin_gas_frac)
   }
-
-  ## --- Module 0e: DLVO electrostatics --------------------------------------
-  E_rep     <- dpH * (1 / (1 + 10 * I_str)) * (1 - theta_surf)
-  stability <- 1 + E_rep + 5 * theta_surf         # electrostatic + steric
 
   ## --- Module 1: Feed properties (at liquid-line pressure P_feed) ----------
   rho_G0    <- P_F / (R_air * T_feed)

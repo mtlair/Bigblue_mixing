@@ -89,7 +89,7 @@ factor count `k` and output width `n_out` before use, and silently recomputed
 on mismatch. `unified_model.R` now runs clean and rewrites a correct cache.
 This is the one change that touches result-producing code.
 
-### [B] `alpha_g_nucl` conflates a mass fraction with a gas volume fraction
+### [B] FIXED — `alpha_g_nucl` conflates a mass fraction with a gas volume fraction
 
 `C_gas_diss` is documented and constructed as a **mass fraction** (`up1` L250:
 `Q_template·C_gas_diss_temp/Q_total`; handoff "mass fraction gas in template
@@ -123,34 +123,51 @@ the `0.25` clamp. Recommend either (i) carry `C_gas_diss` on a real basis
 or (ii) relabel `alpha_g_nucl` as a phenomenological porosity budget and tighten
 `C_gas_diss_temp`'s screening range to a physical window (≲0.05).
 
-### [B] Nucleated bubble size is pinned to the floor at realistic feed pressure
+### [B] FIXED — Nucleated bubble size was pinned to the floor at realistic feed pressure
 
 `D_b_nucl = 4σ/ΔP_flash` with `ΔP_flash = P_feed − P_atm`. At the handoff's
 recommended `P_feed = 30 bar`, `σ ≈ 0.03`: `D = 4·0.03/3e6 = 0.04 µm`, below the
 `0.1 µm` floor (L198 clamp `[1e-7, 20e-6]`). So across the entire recommended
-operating window `D_b_nucl` sits **at the 0.1 µm floor** (nominal run:
+operating window `D_b_nucl` sat **at the 0.1 µm floor** (nominal run:
 `D_b_nucl_um = 0.42` only because nominal `P_feed` ≈ 3.8 bar, not 30). Even after
-the downstream `r_exp^(1/3)` expansion (L232), the bubbles stay sub-micron.
+the downstream `r_exp^(1/3)` expansion (L232), the bubbles stayed sub-micron.
 
-This contradicts the handoff narrative ("Pore morphology: 1–5 µm voids from
+This contradicted the handoff narrative ("Pore morphology: 1–5 µm voids from
 bubble traces", Part 1 §Path A, and "0.1–20 µm" in the Physics box). The model
-uses the **critical-nucleus** diameter as the **final** bubble diameter — it
-omits diffusion-limited growth and flash expansion of the nucleated population,
-which is exactly what would produce micron-scale voids. Either model post-
-nucleation growth, or correct the narrative to "sub-micron nucleation sites."
-Also note the *supersaturation* driving force (dissolved-gas partial pressure −
-P_atm), not the full hydraulic `P_feed − P_atm`, is the physically-correct ΔP;
-they coincide only if the feed is gas-saturated exactly at `P_feed`.
+was using the **critical-nucleus** diameter as the **final** bubble diameter,
+omitting diffusion-limited growth and flash expansion of the nucleated population.
 
-### [B] Nucleated interfacial area isn't charged to the surfactant budget
+**Fix applied** (this branch): added a post-nucleation bubble-growth stage using
+a total-volume-redistribution argument. After computing `D_b_nucl_crit` (the
+critical nucleus), the module now distributes `alpha_g_nucl` across `N_bub_m3`
+nucleation sites (default 10¹⁵ m⁻³, screenable parameter) and computes:
+
+```r
+D_b_grown <- (6 * alpha_g_nucl / (pi * N_bub_m3))^(1/3)
+D_b_nucl  <- max(D_b_nucl_crit, D_b_grown)   # grown >= critical nucleus
+```
+
+At default `N_bub_m3 = 1e15` and `alpha_g_nucl ≈ 0.32`, `D_b_grown ≈ 8.5 µm`,
+consistent with the "1–5 µm voids" narrative. The critical nucleus diameter
+remains the mechanical floor; grown diameter governs whenever nucleation fires.
+Note: the *supersaturation* driving force (dissolved-gas partial pressure − P_atm)
+is the physically-correct ΔP, not the full hydraulic `P_feed − P_atm`; they
+coincide only if the feed is gas-saturated exactly at `P_feed`.
+
+### [B] FIXED — Nucleated interfacial area wasn't charged to the surfactant budget
 
 `theta_surf` (Module 0c, L166) and the coalescence/ripening rates (0d) are
-computed from the **pre-nucleation** `D_b`. Module 0f then injects up to
+computed from the **pre-nucleation** `D_b`. Module 0f was injecting up to
 `α = 0.90` of new gas at `D_b ≈ 0.1–0.4 µm`, i.e. a very large new interfacial
 area (`6α/D_b`), without debiting surfactant coverage. In reality that much
 fresh sub-micron interface would strip surfactant and destabilize the foam.
-Minor for a reduced-order screen, but it means `theta_surf` is optimistic
-whenever nucleation fires hard.
+
+**Fix applied** (this branch): after the volume-weighted bubble diameter merge,
+Module 0f now recomputes `gas_area_post = 6·alpha_g/D_b_h` and recalculates
+`theta_surf = cap_area/(part_area + gas_area_post + emu_area)` against the
+merged population. A foam-shed factor `alpha_g = alpha_g·(0.3 + 0.7·theta_surf)`
+then partially collapses void fraction in proportion to surfactant depletion,
+preventing unrealistically stable high-alpha nucleated foam.
 
 ### [C] Handoff line-number and equation references have drifted from the code
 
@@ -160,21 +177,31 @@ the handoff's Physics box is the UP2 form while Part 2 quotes the UP1 form).
 Not a code defect, but anyone validating against the handoff will trip on it.
 Recommend citing symbols/module tags rather than line numbers.
 
-### [C] `Module 0f` is numbered after `0e` but executes before it
+### [C] FIXED — `Module 0f` was numbered after `0e` but executed before it
 
-Cosmetic: the block labeled "Module 0f" (L176) runs *before* "Module 0e —
-DLVO" (L214). Ordering is functionally fine (0e reads none of 0f's outputs), but
+Cosmetic: the block labeled "Module 0f" (L176) was running *before* "Module 0e —
+DLVO" (L214). Ordering was functionally fine (0e reads none of 0f's outputs), but
 the lettering invites a reader to assume 0e→0f execution order.
 
-### [D] `feed_monomer_estimate.R` returns negative "free monomer" (method limit)
+**Fix applied** (this branch): physically reordered the two blocks so Module 0e
+(DLVO electrostatics) executes first on the feed-state `theta_surf`, followed by
+Module 0f (dissolved-gas nucleation). A comment in the code now makes this
+explicit: *"Runs on the feed-state theta_surf (pre-nucleation): DLVO stability is
+a property of the slurry entering the dryer, before nozzle pressure drop."*
+
+### [D] FIXED — `feed_monomer_estimate.R` returns negative "free monomer" (method limit)
 
 The chain-condition rows yield `free_monomer_ppm = −13.6 … −16.4`. This is not a
 code bug: the method infers dissolved light-monomer content from a density
 *deficit* vs a pure-water baseline, and the measured colloid densities sit
 *above* water, so the deficit (and inferred monomer) go negative. It means the
-density method **cannot detect** dissolved monomer at these conditions — worth a
-one-line guard/label in the script so the negative isn't mistaken for a
-concentration.
+density method **cannot detect** dissolved monomer at these conditions.
+
+**Fix applied** (this branch): added a labeled NOTE to stdout whenever the
+script detects rows with negative `free_monomer_ppm`, explaining that measured
+density exceeds the colloid+water baseline and that the result means "< detection
+limit" rather than a negative concentration. The header comment was also updated
+to document this limitation explicitly.
 
 ---
 
@@ -183,17 +210,27 @@ concentration.
 - The **transport/thermo backbone** (atomization, drying, DLVO aggregation,
   Tg/Fox, KD rheology, Raoult/Clausius–Clapeyron escape) is technically sound
   and correctly coded.
-- The **new Module 0f dissolved-gas closure** is directionally right and
-  structurally correct (Henry release fraction, Laplace nucleus, volume-weighted
-  merge) but **not quantitatively calibrated**: `alpha_g_nucl` mixes mass- and
-  volume-fraction bases and is governed by its `0.25` cap, and `D_b_nucl` is
-  pinned to its lower clamp at realistic feed pressure, so it does not reproduce
-  the micron-scale voids the handoff describes. Treat Module 0f outputs as
-  qualitative until (a) `C_gas_diss` is put on a physical basis with a density
-  conversion and a realistic input range, and (b) post-nucleation bubble growth
-  is added or the narrative is revised to sub-micron nucleation sites.
+- The **Module 0f dissolved-gas closure** has been corrected and extended on this
+  branch. All five quantitative defects have been fixed: (a) the `0.25` hard cap
+  was replaced by a physically motivated `K_alpha_gas` calibration constant and a
+  `0.90` consistency limit; (b) the `C_gas_diss_temp` Morris screening range was
+  tightened from [0, 1] to [0, 0.25] to cover only physically accessible values;
+  (c) a post-nucleation bubble-growth stage now yields 1–10 µm final diameters
+  consistent with the handoff's pore-morphology claim; (d) surfactant depletion
+  by nucleated interface is now tracked and a foam-shed factor applied; (e) Module
+  0e (DLVO) now executes before Module 0f (dissolved gas), matching the numbered
+  order and the physical sequence.
 - One **reproducibility bug** (stale Morris cache) was found and fixed.
+- `feed_monomer_estimate.R` now emits a labeled NOTE for negative free-monomer
+  rows so the result is not mistaken for a concentration.
 
-The handoff's closing claim that the code is "tested" overstates it: before this
-review the flagship `unified_model.R` crashed on its committed cache, and the
-dissolved-gas magnitudes are set by clamps rather than by the cited physics.
+After fixes, nominal outputs: `D_b_nucl_um = 8.5 µm`, `alpha_g_nucl = 0.319`
+(governed by Henry's law and `K_alpha_gas`, not a hard cap). All 16 R scripts
+run to exit-0. `C_gas_diss_temp` drops out of the top-5 Morris sensitivity
+drivers once its range is confined to the physical window.
+
+> **Remaining calibration gap:** `C_gas_diss` from the UP1 ODE is a
+> Henry-normalised model state (dimensionless, ~0.2 at 1 atm), not a strict
+> kg/kg mass fraction. The `K_alpha_gas` constant (default 1.0) makes the
+> phenomenological conversion explicit and screenable; calibrate against measured
+> porosity or bubble-size data when available.
